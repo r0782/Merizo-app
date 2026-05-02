@@ -425,7 +425,49 @@ async def add_expense(trip_id: str, req: ExpenseCreateReq, user=Depends(get_curr
     await db.trips.update_one({"id": trip_id}, {"$push": {"expenses": expense}})
     trip = await db.trips.find_one({"id": trip_id})
     await invalidate_smart_limit_for_trip(trip)
-    return serialize_trip(trip, user["id"])
+
+    # Recurring detector for Home category — does a similar-named expense exist
+    # in *previous* months of the same trip?
+    recurring_suggestion = None
+    if (trip.get("split_category") == "home") and req.category == "home":
+        try:
+            target = req.name.strip().lower()
+            now = datetime.now(timezone.utc)
+            month_ago = now - timedelta(days=25)
+            for prev in trip.get("expenses", []):
+                if prev.get("id") == expense["id"]:
+                    continue
+                if prev.get("is_settlement"):
+                    continue
+                pname = (prev.get("name") or "").strip().lower()
+                if not pname:
+                    continue
+                same = pname == target or (pname.split() and target.split() and pname.split()[0] == target.split()[0])
+                if same:
+                    try:
+                        ts = prev.get("created_at")
+                        if isinstance(ts, str):
+                            pdt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        else:
+                            pdt = ts
+                        if pdt and pdt.tzinfo is None:
+                            pdt = pdt.replace(tzinfo=timezone.utc)
+                        if pdt and pdt < month_ago:
+                            recurring_suggestion = {
+                                "expense_id": expense["id"],
+                                "name": expense["name"],
+                                "previous_at": pdt.date().isoformat(),
+                            }
+                            break
+                    except Exception:
+                        pass
+        except Exception:
+            recurring_suggestion = None
+
+    payload = serialize_trip(trip, user["id"])
+    if recurring_suggestion:
+        payload["recurring_suggestion"] = recurring_suggestion
+    return payload
 
 
 @api.delete("/trips/{trip_id}/expenses/{expense_id}")
@@ -492,50 +534,10 @@ async def settle(trip_id: str, req: SettleReq, user=Depends(get_current_user)):
     await db.trips.update_one({"id": trip_id}, {"$push": {"expenses": expense}})
     trip = await db.trips.find_one({"id": trip_id})
     await invalidate_smart_limit_for_trip(trip)
+    return serialize_trip(trip, user["id"])
 
-    # Recurring detector for Home category — does a similar-named expense exist
-    # in *previous* months of the same trip (or the user's home trips)?
-    recurring_suggestion = None
-    if (trip.get("split_category") == "home") and req.category == "home":
-        try:
-            target = req.name.strip().lower()
-            now = datetime.now(timezone.utc)
-            month_ago = now - timedelta(days=25)
-            for prev in trip.get("expenses", []):
-                if prev.get("id") == expense["id"]:
-                    continue
-                if prev.get("is_settlement"):
-                    continue
-                pname = (prev.get("name") or "").strip().lower()
-                if not pname:
-                    continue
-                # Loose match: same first word OR substantial substring overlap
-                same = pname == target or pname.split()[0] == target.split()[0]
-                if same:
-                    try:
-                        ts = prev.get("created_at")
-                        if isinstance(ts, str):
-                            pdt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                        else:
-                            pdt = ts
-                        if pdt and pdt.tzinfo is None:
-                            pdt = pdt.replace(tzinfo=timezone.utc)
-                        if pdt and pdt < month_ago:
-                            recurring_suggestion = {
-                                "expense_id": expense["id"],
-                                "name": expense["name"],
-                                "previous_at": pdt.date().isoformat(),
-                            }
-                            break
-                    except Exception:
-                        pass
-        except Exception:
-            recurring_suggestion = None
 
-    payload = serialize_trip(trip, user["id"])
-    if recurring_suggestion:
-        payload["recurring_suggestion"] = recurring_suggestion
-    return payload
+@api.get("/trips/{trip_id}/settlement")
 async def get_settlement(trip_id: str, user=Depends(get_current_user)):
     trip = await db.trips.find_one({"id": trip_id})
     if not trip:

@@ -99,28 +99,25 @@ export default function InsightsScreen() {
           </View>
         </View>
 
-        {/* Chart */}
+        {/* Chart - gauge dial in both modes (black ticks in light, indigo in dark) */}
         <View style={{ alignItems: "center", marginTop: 32 }}>
           {loading ? (
             <ActivityIndicator color={c.indigo} size="large" />
-          ) : isDark ? (
+          ) : (
             <GaugeDial percent={Math.min(100, topPct)} size={240}>
-              <DotNum value={`${Math.round(topPct)}%`} size="xl" color="gold" />
-              <View style={{ marginTop: 4 }}>
-                <DotNum
+              <SmartNum
+                value={`${Math.round(topPct)}%`}
+                size="xl"
+                color={isDark ? "gold" : "black"}
+              />
+              <View style={{ marginTop: 6 }}>
+                <SmartNum
                   value={`${currencySymbol("INR")}${Math.round(total).toLocaleString("en-IN")}`}
                   size="sm"
-                  color="white"
+                  color={isDark ? "white" : "black"}
                 />
               </View>
             </GaugeDial>
-          ) : (
-            <DonutRing percent={Math.min(100, topPct)} segments={segments.length ? segments : undefined} size={220} thickness={20}>
-              <Text style={{ color: c.textPrimary, fontSize: 38, fontWeight: "900", letterSpacing: -1 }}>
-                {Math.round(topPct)}%
-              </Text>
-              <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>top category</Text>
-            </DonutRing>
           )}
         </View>
 

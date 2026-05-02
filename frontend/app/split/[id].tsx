@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
+import { confirmAction } from "../../src/lib/confirm";
 import { GaugeDial, DonutRing, HybridBar } from "../../src/components/Charts";
 import { SmartNum, DotNum } from "../../src/components/DotNum";
 import {
@@ -403,21 +404,20 @@ function OverviewTab({ trip }: { trip: any }) {
   return (
     <View style={{ padding: 24 }}>
       <View style={{ alignItems: "center" }}>
-        {isDark ? (
-          <GaugeDial percent={pct} size={220}>
-            <DotNum value={`${Math.round(pct)}%`} size="lg" color="gold" />
-            <View style={{ marginTop: 6 }}>
-              <DotNum value={`${currencySymbol(currency)}${Math.round(total).toLocaleString("en-IN")}`} size="sm" color="white" />
-            </View>
-          </GaugeDial>
-        ) : (
-          <DonutRing percent={pct} segments={segments.length ? segments : undefined} size={200}>
-            <Text style={{ color: c.textPrimary, fontSize: 32, fontWeight: "900", letterSpacing: -1 }}>
-              {currencySymbol(currency)}{Math.round(total).toLocaleString("en-IN")}
-            </Text>
-            <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 4 }}>total spent</Text>
-          </DonutRing>
-        )}
+        <GaugeDial percent={pct} size={220}>
+          <SmartNum
+            value={`${Math.round(pct)}%`}
+            size="lg"
+            color={isDark ? "gold" : "black"}
+          />
+          <View style={{ marginTop: 6 }}>
+            <SmartNum
+              value={`${currencySymbol(currency)}${Math.round(total).toLocaleString("en-IN")}`}
+              size="sm"
+              color={isDark ? "white" : "black"}
+            />
+          </View>
+        </GaugeDial>
         {budget && (
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
             Budget {currencySymbol(currency)}{budget.toLocaleString("en-IN")}
@@ -506,22 +506,15 @@ function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
   const currency = trip.currency || "INR";
   const memberMap = new Map((trip.members || []).map((m: any) => [m.id, m.name]));
 
-  const onDelete = (eid: string) => {
-    Alert.alert("Delete expense?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/trips/${trip.id}/expenses/${eid}`);
-            onChange();
-          } catch {
-            Alert.alert("Error", "Could not delete");
-          }
-        },
-      },
-    ]);
+  const onDelete = async (eid: string) => {
+    const ok = await confirmAction("Delete expense?", "This cannot be undone.", "Delete", true);
+    if (!ok) return;
+    try {
+      await api.delete(`/trips/${trip.id}/expenses/${eid}`);
+      onChange();
+    } catch {
+      Alert.alert("Error", "Could not delete");
+    }
   };
 
   if (expenses.length === 0) {
@@ -1189,23 +1182,21 @@ function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember,
   const { c } = useTheme();
   const [showCur, setShowCur] = useState(false);
 
-  const onDelete = () => {
-    Alert.alert("Are you sure?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/trips/${trip.id}`);
-            onDeleted();
-          } catch (e: any) {
-            const detail = e?.response?.data?.detail;
-            Alert.alert("Could not delete", typeof detail === "string" ? detail : "Try again later");
-          }
-        },
-      },
-    ]);
+  const onDelete = async () => {
+    const ok = await confirmAction(
+      "Are you sure?",
+      "This cannot be undone.",
+      "Delete",
+      true
+    );
+    if (!ok) return;
+    try {
+      await api.delete(`/trips/${trip.id}`);
+      onDeleted();
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      Alert.alert("Could not delete", typeof detail === "string" ? detail : "Try again later");
+    }
   };
 
   const changeCurrency = async (cur: string) => {

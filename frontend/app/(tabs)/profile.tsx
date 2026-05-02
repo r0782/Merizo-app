@@ -8,6 +8,7 @@ import { api } from "../../src/lib/api";
 import { SmartNum } from "../../src/components/DotNum";
 import { currencySymbol } from "../../src/lib/tokens";
 import { getOverbudgetAlerts, setOverbudgetAlerts } from "../../src/lib/settings";
+import { confirmAction } from "../../src/lib/confirm";
 
 export default function ProfileScreen() {
   const { c, isDark, mode, setMode } = useTheme();
@@ -39,18 +40,16 @@ export default function ProfileScreen() {
 
   const initial = (user?.name || "M").trim().charAt(0).toUpperCase();
 
-  const onLogout = () => {
-    Alert.alert("Sign out?", "You'll need to sign in again to use Merizo.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/login");
-        },
-      },
-    ]);
+  const onLogout = async () => {
+    const ok = await confirmAction(
+      "Sign out?",
+      "You'll need to sign in again to use Merizo.",
+      "Sign out",
+      true
+    );
+    if (!ok) return;
+    await logout();
+    router.replace("/login");
   };
 
   return (

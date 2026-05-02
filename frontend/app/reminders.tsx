@@ -21,6 +21,7 @@ import { api } from "../src/lib/api";
 import { SmartNum } from "../src/components/DotNum";
 import { currencySymbol } from "../src/lib/tokens";
 import { setNotifId, popNotifId } from "../src/lib/settings";
+import { confirmAction } from "../src/lib/confirm";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -129,23 +130,16 @@ export default function RemindersScreen() {
     }
   };
 
-  const onDelete = (id: string) => {
-    Alert.alert("Delete reminder?", "", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/reminders/${id}`);
-            await cancelScheduledFor(id);
-            setItems((arr) => arr.filter((x) => x.id !== id));
-          } catch {
-            Alert.alert("Error", "Could not delete");
-          }
-        },
-      },
-    ]);
+  const onDelete = async (id: string) => {
+    const ok = await confirmAction("Delete reminder?", "", "Delete", true);
+    if (!ok) return;
+    try {
+      await api.delete(`/reminders/${id}`);
+      await cancelScheduledFor(id);
+      setItems((arr) => arr.filter((x) => x.id !== id));
+    } catch {
+      Alert.alert("Error", "Could not delete");
+    }
   };
 
   return (
