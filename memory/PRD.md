@@ -75,8 +75,28 @@ Merizo is a mobile-first expense splitting app that lets friends and roommates c
 10. Cover image auto-resolves from destination + category, user can override from 8 thumbnails ✅
 
 ## Status
-- Backend: 16/16 pytest tests passing (auth, trips, expenses with USD→INR FX, members, insights, invite/rotate/preview/join, FX cache)
-- Frontend: All key screens render correctly. Demo login → Home with carousel works. Theme toggle, Insights donut/gauge, Profile, Category Select, Create Split wizard, Split Detail tabs and Add Expense sheet all working
+- Backend: 26/26 pytest tests passing (16 from MVP + 10 from iteration 2: smart-limit, reminders CRUD, scan-bill auth + format + real OCR)
+- Frontend: All key screens render correctly. Demo login → Home with carousel + real Smart Limit (~77%) + 3 reminders count works. Theme toggle, Insights donut/gauge, Profile, Category Select, Create Split wizard, Split Detail tabs and Add Expense sheet all working.
+
+## Iteration 2 (Feature additions on top of MVP)
+
+### 1. Smart Limit — wired to real per-user weekly budget
+- `GET /api/smart-limit` computes `current_week_spent` from expenses where the demo user is the payer in the current ISO week.
+- `weekly_budget` = (avg of last 4 full weeks) × 1.1 buffer; falls back to ₹5000 with `has_history=false` if no history.
+- Demo seed expenses use explicit `days_ago` so first login shows a realistic ~77% (matches the design spec image).
+
+### 2. Shadow → boxShadow migration
+- `StackedCarousel.card` and `split/[id].styles.fab` now use `boxShadow: "..."` (RN 0.81+ unified syntax). Native `elevation` retained for Android.
+
+### 3. Scan Bill (OpenAI vision via emergentintegrations)
+- `POST /api/scan-bill` accepts `{ image_base64 }` (no `data:` prefix), calls `LlmChat(...).with_model("openai", "gpt-4o-mini")` with `ImageContent`, returns `{ vendor, amount, currency (ISO), category, date, suggested_name }`.
+- New `app/scan.tsx` screen: camera + gallery picker via `expo-image-picker`, preview, "Scan with AI" button, editable result card with trip picker, then "Add to split" creates the expense. Permissions declared in `app.json` (NSCameraUsageDescription, NSPhotoLibraryUsageDescription, android.permission.CAMERA, READ_MEDIA_IMAGES).
+
+### 4. Reminders + Push notifications
+- New `reminders` collection (id, user_id, title, amount, due_date, completed). `GET/POST/PATCH /complete/DELETE /api/reminders[/{id}]`.
+- 3 demo reminders auto-seeded (Pay Aman / Settle Karan / Collect from Neha).
+- New `app/reminders.tsx` screen with add/complete/delete and a `+` quick-add bottom sheet (4 "when" presets — Today/Tomorrow/3d/1w).
+- `expo-notifications` schedules a local notification for the due_date 9 AM. Permission prompt banner on iOS/Android. Web is graceful (saves but doesn't push). Permission `POST_NOTIFICATIONS` declared on Android.
 
 ## Smart Business Enhancement
 Smart Limit widget renders an "AI-suggested weekly spending threshold" UI surface — it currently shows a static 74%. Hooking this to a per-user `weekly_budget` setting in MongoDB (driven by the user's last 4 weeks of spend) would unlock a clear premium upgrade path: Merizo Pro ($2.99/mo) for personalized limits + push notifications when users approach their AI budget — a recurring revenue lane on top of the free splitter.

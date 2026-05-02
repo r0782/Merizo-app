@@ -837,11 +837,11 @@ DEMO_SPLITS = [
         "budget": 30000.0,
         "members": ["Aman", "Riya"],
         "expenses": [
-            {"name": "Flights to Goa", "amount": 12000, "category": "trip", "emoji": "✈️", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Aman", "Riya"]},
-            {"name": "Beach Resort 2 nights", "amount": 8400, "category": "home", "emoji": "🏠", "paid_by_name": "Aman", "split_among_names": ["Demo User", "Aman", "Riya"]},
-            {"name": "Seafood dinner", "amount": 3600, "category": "food", "emoji": "🍽️", "paid_by_name": "Riya", "split_among_names": ["Demo User", "Aman", "Riya"]},
-            {"name": "Scuba diving", "amount": 4500, "category": "friends", "emoji": "🎉", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Aman", "Riya"]},
-            {"name": "Cabs around Goa", "amount": 2100, "category": "trip", "emoji": "🚗", "paid_by_name": "Aman", "split_among_names": ["Demo User", "Aman", "Riya"]},
+            {"name": "Flights to Goa", "amount": 12000, "category": "trip", "emoji": "✈️", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Aman", "Riya"], "days_ago": 18},
+            {"name": "Beach Resort 2 nights", "amount": 8400, "category": "home", "emoji": "🏠", "paid_by_name": "Aman", "split_among_names": ["Demo User", "Aman", "Riya"], "days_ago": 11},
+            {"name": "Seafood dinner", "amount": 3600, "category": "food", "emoji": "🍽️", "paid_by_name": "Riya", "split_among_names": ["Demo User", "Aman", "Riya"], "days_ago": 4},
+            {"name": "Scuba diving", "amount": 4500, "category": "friends", "emoji": "🎉", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Aman", "Riya"], "days_ago": 2},
+            {"name": "Cabs around Goa", "amount": 2100, "category": "trip", "emoji": "🚗", "paid_by_name": "Aman", "split_among_names": ["Demo User", "Aman", "Riya"], "days_ago": 25},
         ],
     },
     {
@@ -855,9 +855,9 @@ DEMO_SPLITS = [
         "budget": 22000.0,
         "members": ["Karan"],
         "expenses": [
-            {"name": "Volvo bus", "amount": 3200, "category": "trip", "emoji": "🚌", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Karan"]},
-            {"name": "Cottage stay", "amount": 6800, "category": "home", "emoji": "🏠", "paid_by_name": "Karan", "split_among_names": ["Demo User", "Karan"]},
-            {"name": "Snow trek + gear", "amount": 4400, "category": "friends", "emoji": "⛷️", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Karan"]},
+            {"name": "Volvo bus", "amount": 3200, "category": "trip", "emoji": "🚌", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Karan"], "days_ago": 20},
+            {"name": "Cottage stay", "amount": 6800, "category": "home", "emoji": "🏠", "paid_by_name": "Karan", "split_among_names": ["Demo User", "Karan"], "days_ago": 14},
+            {"name": "Snow trek + gear", "amount": 4400, "category": "friends", "emoji": "⛷️", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Karan"], "days_ago": 8},
         ],
     },
     {
@@ -869,8 +869,8 @@ DEMO_SPLITS = [
         "budget": 8000.0,
         "members": ["Neha", "Vikram", "Sana"],
         "expenses": [
-            {"name": "Pizza night", "amount": 2400, "category": "food", "emoji": "🍕", "paid_by_name": "Neha", "split_among_names": ["Demo User", "Neha", "Vikram", "Sana"]},
-            {"name": "Movie tickets", "amount": 1600, "category": "friends", "emoji": "🎬", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Neha", "Vikram", "Sana"]},
+            {"name": "Pizza night", "amount": 2400, "category": "food", "emoji": "🍕", "paid_by_name": "Neha", "split_among_names": ["Demo User", "Neha", "Vikram", "Sana"], "days_ago": 6},
+            {"name": "Movie tickets", "amount": 1600, "category": "friends", "emoji": "🎬", "paid_by_name": "Demo User", "split_among_names": ["Demo User", "Neha", "Vikram", "Sana"], "days_ago": 13},
         ],
     },
 ]
@@ -902,7 +902,7 @@ async def seed_demo():
             "created_at": datetime.now(timezone.utc),
         })
 
-    for spec in DEMO_SPLITS:
+    for idx, spec in enumerate(DEMO_SPLITS):
         trip_id = str(uuid.uuid4())
         owner_member_id = str(uuid.uuid4())
         members = [{"id": owner_member_id, "name": DEMO_NAME, "user_id": user_id, "registered": True}]
@@ -914,6 +914,9 @@ async def seed_demo():
 
         expenses = []
         for i, e in enumerate(spec["expenses"]):
+            # Use explicit days_ago from the spec when present so smart-limit
+            # has a realistic mix of current-week and historical activity.
+            days_ago = e.get("days_ago", i * 6 + idx * 2 + 1)
             exp = {
                 "id": str(uuid.uuid4()),
                 "name": e["name"],
@@ -925,7 +928,7 @@ async def seed_demo():
                 "emoji": e["emoji"],
                 "paid_by": name_to_id[e["paid_by_name"]],
                 "split_among": [name_to_id[n] for n in e["split_among_names"]],
-                "created_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
+                "created_at": (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat(),
                 "added_by": user_id,
             }
             expenses.append(exp)
