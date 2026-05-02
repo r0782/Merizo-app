@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 2 of Merizo (Smart Limit + Reminders + Scan Bill + boxShadow migration). Backend: 10/10 new tests pass (smart-limit shape & auth; reminders CRUD + complete + 404s; scan-bill validation + real receipt OCR via gpt-4o-mini returning vendor='Tasty Burger Cafe' / amount=472.5 / currency='INR' / category='food' / date='2026-01-15'). Frontend mobile tests pass: SmartLimit widget shows real percent (150% capped, NOT hardcoded 74%), Reminders widget shows '3 active' from real /api/reminders, Reminders screen lists 3 demo + add flow works, Scan screen layout + camera/gallery/back nav work. Zero shadow* deprecation warnings in console after migration to boxShadow.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/smart-limit", "issue": "Demo seed expenses use created_at = now - i days (so Goa+Manali+Buddies expenses paid by Demo all fall within current week). With weekly_budget defaulting to 5000 (no history), demo user shows percent=150 (capped) immediately on first login. Functionally correct but visually the SmartLimit widget always reads MAX for fresh demo accounts. Consider seeding some expenses with created_at older than 7 days so has_history=true and the donut shows a more representative ratio."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home / SmartLimit widget", "issues": ["Widget renders '150%' label twice (once large center, once around the dial as 'MIN/MAX'); the percent color when capped at 150 should arguably switch to red/negative — currently still uses default tint."]}
+    ],
+    "react_native_issues": [
+      {"component": "package versions (Expo doctor warning)", "issue": "expo-image-picker@55.0.19 expected ~17.0.11; expo-notifications@55.0.22 expected ~0.32.17; @react-native-async-storage/async-storage@3.0.2 expected 2.2.0; expo-linear-gradient@55.0.13 expected ~15.0.8; react-native-svg@15.15.4 expected 15.12.1. Runtime works on web but `yarn expo install --check` should be run before native builds."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/test_reports/pytest/iteration2_results.xml"
+  ],
+  "action_items": [
+    "Optional: bump expo packages with `yarn expo install expo-image-picker expo-notifications expo-linear-gradient @react-native-async-storage/async-storage react-native-svg` to silence doctor warnings.",
+    "Optional UX: when /api/smart-limit returns has_history=false, show a 'Set your own weekly budget' affordance instead of defaulting silently to 5000.",
+    "Optional UX: red/negative tint when smart-limit percent >= 100."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/scan-bill correctly strips data: prefix, validates min length (100 chars), wraps LlmChat in try/except, falls back to JSON-substring parsing if model wraps response in prose. Returns 422 if amount missing. Good defensive parsing.",
+    "server.py /api/smart-limit only counts expenses where exp.paid_by == my_member_id. This is 'spend by you', not 'your share'. Acceptable interpretation but worth confirming with PM.",
+    "server.py is now ~1000 lines — split-threshold breached; consider modules: auth, trips, reminders, ai (smart_limit + scan_bill).",
+    "frontend/app/reminders.tsx: scheduleReminder() uses Notifications.SchedulableTriggerInputTypes.DATE — correct API for SDK 55 expo-notifications.",
+    "frontend/app/scan.tsx: web camera falls back to gallery (good); however on web the picker also requires user gesture — covered by TouchableOpacity onPress so OK."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2.py (created — 10 new tests)"
+  ],
+  "success_rate": {"backend": "100% (10/10 iteration-2 tests; previous 17 also still passing)", "frontend": "100% (smart-limit, reminders widget+screen+add, scan screen+nav, zero shadow* warnings)"},
+  "seed_data_creation": "Test data 'TEST_reminder' created during the create→complete→delete flow is fully cleaned up by the test (DELETE 200 then DELETE 404). One UI-test 'Test reminder' was added via the Add sheet during Playwright run and not cleaned up — it sits in the demo user's reminders list until the next backend restart re-seeds, or can be removed manually.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iteration-2 endpoints (/api/smart-limit, /api/reminders [GET/POST/PATCH-complete/DELETE], /api/scan-bill) covered by /app/backend/tests/test_iteration2.py. Real receipt OCR uses a PIL-generated synthetic JPEG with text — works deterministically. Run: `python -m pytest backend/tests/ -v` to re-run all tests. Frontend testIDs: smart-limit, widget-reminders, widget-insights, quick-scan, reminders-back, reminders-add, rem-title, rem-amount, rem-when-{0,1,3,7}, rem-submit, rem-complete-{id}, rem-delete-{id}, scan-back, scan-camera-btn, scan-gallery-btn, scan-submit-btn, scan-preview, scan-edit-name, scan-edit-amount, scan-trip-{id}, scan-add-btn.",
+  "rca_of_issue": "N/A — no blocking bugs. All 4 features (smart-limit budget, boxShadow migration, scan-bill, push reminders) work end-to-end. Real receipt OCR returned correct structured JSON: {vendor: 'Tasty Burger Cafe', amount: 472.5, currency: 'INR', category: 'food', date: '2026-01-15', suggested_name: 'Burger meal'}."
+}

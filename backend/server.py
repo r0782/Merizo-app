@@ -595,6 +595,219 @@ async def fx_endpoint(base: str, target: str):
     return {"base": base.upper(), "target": target.upper(), "rate": rate}
 
 
+# ===== Smart Limit (AI-suggested weekly budget) =====
+@api.get("/smart-limit")
+async def smart_limit(user=Depends(get_current_user)):
+    """
+    Compute the user's current week spending vs an AI-suggested weekly budget.
+    Budget = average weekly spend over the last 4 full weeks (excluding the current week),
+    bumped up by 10% as a soft buffer. Falls back to 5000 (in user's primary currency) if no history.
+    """
+    now = datetime.now(timezone.utc)
+    week_start = now - timedelta(days=now.weekday())
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    history_start = week_start - timedelta(days=28)
+
+    trips = await db.trips.find(
+        {"$or": [{"owner_id": user["id"]}, {"members.user_id": user["id"]}]}
+    ).to_list(500)
+
+    week_buckets = [0.0, 0.0, 0.0, 0.0]
+    current_week_spent = 0.0
+
+    for t in trips:
+        my_member_id = next((m["id"] for m in t.get("members", []) if m.get("user_id") == user["id"]), None)
+        if not my_member_id:
+            continue
+        for exp in t.get("expenses", []):
+            if exp.get("is_settlement"):
+                continue
+            if exp.get("paid_by") != my_member_id:
+                continue
+            try:
+                ts = exp.get("created_at")
+                if isinstance(ts, str):
+                    exp_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                else:
+                    exp_dt = ts
+                if exp_dt and exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            if not exp_dt:
+                continue
+            amt = float(exp.get("amount_base", exp.get("amount", 0)))
+            if exp_dt >= week_start:
+                current_week_spent += amt
+            elif exp_dt >= history_start:
+                weeks_ago = int((week_start - exp_dt).total_seconds() // (7 * 86400))
+                if 0 <= weeks_ago < 4:
+                    week_buckets[weeks_ago] += amt
+
+    has_history = any(b > 0 for b in week_buckets)
+    avg_weekly = sum(week_buckets) / 4 if has_history else 0.0
+    budget = round(avg_weekly * 1.1, 2) if has_history and avg_weekly > 0 else 5000.0
+    pct = min(150, round((current_week_spent / budget) * 100, 1)) if budget > 0 else 0
+
+    return {
+        "current_week_spent": round(current_week_spent, 2),
+        "weekly_budget": budget,
+        "percent": pct,
+        "history_weeks": [round(b, 2) for b in week_buckets],
+        "currency": "INR",
+        "has_history": has_history,
+    }
+
+
+# ===== Reminders =====
+class ReminderCreate(BaseModel):
+    title: str
+    amount: Optional[float] = None
+    due_date: Optional[str] = None  # ISO date
+    trip_id: Optional[str] = None
+
+
+@api.get("/reminders")
+async def list_reminders(user=Depends(get_current_user)):
+    items = await db.reminders.find(
+        {"user_id": user["id"], "completed": {"$ne": True}}
+    ).sort("due_date", 1).to_list(200)
+    out = []
+    for r in items:
+        r.pop("_id", None)
+        out.append(r)
+    return out
+
+
+@api.post("/reminders")
+async def create_reminder(req: ReminderCreate, user=Depends(get_current_user)):
+    r = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "title": req.title.strip(),
+        "amount": req.amount,
+        "due_date": req.due_date,
+        "trip_id": req.trip_id,
+        "completed": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.reminders.insert_one(r)
+    r.pop("_id", None)
+    return r
+
+
+@api.patch("/reminders/{reminder_id}/complete")
+async def complete_reminder(reminder_id: str, user=Depends(get_current_user)):
+    res = await db.reminders.update_one(
+        {"id": reminder_id, "user_id": user["id"]},
+        {"$set": {"completed": True, "completed_at": datetime.now(timezone.utc)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return {"ok": True}
+
+
+@api.delete("/reminders/{reminder_id}")
+async def delete_reminder(reminder_id: str, user=Depends(get_current_user)):
+    res = await db.reminders.delete_one({"id": reminder_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return {"ok": True}
+
+
+# ===== Scan Bill (OpenAI vision via emergentintegrations) =====
+class ScanBillReq(BaseModel):
+    image_base64: str
+
+
+@api.post("/scan-bill")
+async def scan_bill(req: ScanBillReq, user=Depends(get_current_user)):
+    img = (req.image_base64 or "").strip()
+    if "," in img and img.startswith("data:"):
+        img = img.split(",", 1)[1]
+    if not img or len(img) < 100:
+        raise HTTPException(status_code=400, detail="Image is missing or too small")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    except Exception as e:
+        logger.exception(f"emergentintegrations import failed: {e}")
+        raise HTTPException(status_code=500, detail="LLM library unavailable")
+
+    system = (
+        "You are an expert receipt OCR and structured-data extractor. "
+        "From a bill or receipt image, extract a single JSON object with keys: "
+        "vendor (short merchant name), amount (final paid amount as a number, no currency symbol), "
+        "currency (3-letter ISO code like INR, USD, EUR, GBP, JPY, AUD, CAD, AED, SGD, THB), "
+        "category (one of: food, trip, home, friends, shopping, bills, other), "
+        "date (YYYY-MM-DD; if not visible use today's date), "
+        "suggested_name (a short 2-4 word expense name like 'Pizza dinner' or 'Hotel night'). "
+        "Output ONLY the JSON object, no commentary, no markdown fences."
+    )
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=f"scan-{user['id']}-{uuid.uuid4()}",
+        system_message=system,
+    ).with_model("openai", "gpt-4o-mini")
+
+    msg = UserMessage(
+        text="Extract the receipt data as a single JSON object only.",
+        file_contents=[ImageContent(image_base64=img)],
+    )
+
+    try:
+        response = await chat.send_message(msg)
+    except Exception as e:
+        logger.exception(f"LLM scan-bill failed: {e}")
+        raise HTTPException(status_code=502, detail="Could not analyse image, please try a clearer photo")
+
+    raw = (response or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.startswith("json"):
+            raw = raw[4:].strip()
+    # find json substring if there is extra text
+    import json as _json
+    parsed: Dict[str, Any] = {}
+    try:
+        parsed = _json.loads(raw)
+    except Exception:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                parsed = _json.loads(raw[start : end + 1])
+            except Exception:
+                parsed = {}
+
+    if not parsed or "amount" not in parsed:
+        raise HTTPException(status_code=422, detail="Could not parse the receipt. Try a clearer photo.")
+
+    valid_cats = {"food", "trip", "home", "friends", "shopping", "bills", "other"}
+    cat = str(parsed.get("category", "other")).lower()
+    if cat not in valid_cats:
+        cat = "other"
+
+    try:
+        amount_val = float(parsed.get("amount") or 0)
+    except Exception:
+        amount_val = 0.0
+
+    return {
+        "vendor": str(parsed.get("vendor") or "").strip()[:80],
+        "amount": amount_val,
+        "currency": str(parsed.get("currency") or "INR").upper()[:3],
+        "category": cat,
+        "date": str(parsed.get("date") or datetime.now(timezone.utc).date().isoformat()),
+        "suggested_name": str(parsed.get("suggested_name") or parsed.get("vendor") or "Bill").strip()[:60],
+    }
+
+
 @api.get("/")
 async def root():
     return {"app": "Merizo", "version": "1.0", "ok": True}
@@ -737,6 +950,33 @@ async def seed_demo():
     logger.info(f"Seeded demo user with {len(DEMO_SPLITS)} splits.")
 
 
+async def seed_demo_reminders():
+    user = await db.users.find_one({"email": DEMO_EMAIL})
+    if not user:
+        return
+    existing = await db.reminders.count_documents({"user_id": user["id"]})
+    if existing > 0:
+        return
+    now = datetime.now(timezone.utc)
+    samples = [
+        {"title": "Pay Aman for Goa flights", "amount": 4000, "days": 2},
+        {"title": "Settle Karan for Manali stay", "amount": 3400, "days": 5},
+        {"title": "Collect from Neha for pizza", "amount": 600, "days": 7},
+    ]
+    for s in samples:
+        await db.reminders.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "title": s["title"],
+            "amount": s["amount"],
+            "due_date": (now + timedelta(days=s["days"])).date().isoformat(),
+            "trip_id": None,
+            "completed": False,
+            "created_at": now,
+        })
+    logger.info(f"Seeded {len(samples)} demo reminders.")
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -744,7 +984,9 @@ async def on_startup():
         await db.trips.create_index("id", unique=True)
         await db.trips.create_index("invite_token")
         await db.fx_cache.create_index("pair", unique=True)
+        await db.reminders.create_index("user_id")
         await seed_demo()
+        await seed_demo_reminders()
     except Exception as e:
         logger.exception(f"Startup error: {e}")
 

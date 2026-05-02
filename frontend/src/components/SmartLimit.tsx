@@ -4,12 +4,28 @@ import Svg, { Polygon, Line, Circle } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 import { DotNum, SmartNum } from "./DotNum";
 
-export function SmartLimitWidget({ percent = 74, testID }: { percent?: number; testID?: string }) {
+export function SmartLimitWidget({
+  percent = 74,
+  spent,
+  budget,
+  currency = "INR",
+  hasHistory = true,
+  testID,
+}: {
+  percent?: number;
+  spent?: number;
+  budget?: number;
+  currency?: string;
+  hasHistory?: boolean;
+  testID?: string;
+}) {
   const { c, isDark } = useTheme();
 
-  const left = Math.max(0, percent - 1);
-  const right = Math.min(99, percent + 1);
-  const pctClamped = Math.max(0, Math.min(100, percent));
+  const display = Math.max(0, Math.min(150, Math.round(percent)));
+  const left = Math.max(0, display - 1);
+  const right = Math.min(149, display + 1);
+  const pctClamped = Math.min(100, display);
+  const overBudget = display > 100;
 
   return (
     <View
@@ -18,21 +34,26 @@ export function SmartLimitWidget({ percent = 74, testID }: { percent?: number; t
     >
       <View style={styles.header}>
         <Text style={[styles.label, { color: c.textSecondary }]}>Smart Limit</Text>
-        <Text style={[styles.subLabel, { color: c.textMuted }]}>Weekly</Text>
+        <Text style={[styles.subLabel, { color: c.textMuted }]}>{hasHistory ? "Weekly" : "AI Default"}</Text>
       </View>
 
       <View style={styles.center}>
         <View style={styles.percRow}>
           <DotNum value={String(left)} size="sm" color="muted" />
           <View style={{ width: 10 }} />
-          <SmartNum value={`${pctClamped}%`} size="lg" color="indigo" />
+          <SmartNum value={`${display}%`} size="lg" color={overBudget ? "red" : "indigo"} />
           <View style={{ width: 10 }} />
           <DotNum value={String(right)} size="sm" color="muted" />
         </View>
       </View>
 
       <View style={{ marginTop: 14 }}>
-        <ProgressBar percent={pctClamped} isDark={isDark} accent={c.indigo} muted={isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.18)"} />
+        <ProgressBar
+          percent={pctClamped}
+          isDark={isDark}
+          accent={overBudget ? c.negative : c.indigo}
+          muted={isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.18)"}
+        />
         <View style={styles.range}>
           <Text style={[styles.rangeTxt, { color: c.textMuted }]}>Min</Text>
           <Text style={[styles.rangeTxt, { color: c.textMuted }]}>Max</Text>

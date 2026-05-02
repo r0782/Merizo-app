@@ -307,10 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
+    boxShadow: "0 12px 18px rgba(0,0,0,0.18)",
     elevation: 8,
   },
   empty: {

@@ -23,14 +23,25 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [trips, setTrips] = useState<any[]>([]);
+  const [smartLimit, setSmartLimit] = useState<any>({ percent: 74, has_history: false });
+  const [reminderCount, setReminderCount] = useState(0);
+  const [insightCount, setInsightCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const r = await api.get("/trips");
-      setTrips(r.data || []);
+      const [tripsRes, smartRes, remRes, insRes] = await Promise.all([
+        api.get("/trips"),
+        api.get("/smart-limit").catch(() => ({ data: { percent: 0, has_history: false } })),
+        api.get("/reminders").catch(() => ({ data: [] })),
+        api.get("/insights", { params: { period: "week" } }).catch(() => ({ data: { by_category: [] } })),
+      ]);
+      setTrips(tripsRes.data || []);
+      setSmartLimit(smartRes.data || { percent: 0 });
+      setReminderCount((remRes.data || []).length);
+      setInsightCount((insRes.data?.by_category || []).length);
     } catch (e) {
       // ignore
     }
@@ -197,7 +208,10 @@ export default function HomeScreen() {
               icon="scan-outline"
               label="Scan Bill"
               testID="quick-scan"
-              onPress={() => {}}
+              onPress={() => {
+                const tripId = trips[activeIndex]?.id;
+                router.push({ pathname: "/scan", params: tripId ? { trip_id: tripId } : {} });
+              }}
             />
             <QuickAction
               icon="share-social-outline"
@@ -218,12 +232,19 @@ export default function HomeScreen() {
         {/* Widget row */}
         <View style={{ paddingHorizontal: 24, marginTop: 22 }}>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <SmartLimitWidget testID="smart-limit" percent={74} />
+            <SmartLimitWidget
+              testID="smart-limit"
+              percent={smartLimit.percent ?? 0}
+              spent={smartLimit.current_week_spent}
+              budget={smartLimit.weekly_budget}
+              currency={smartLimit.currency || "INR"}
+              hasHistory={!!smartLimit.has_history}
+            />
             <View style={{ flex: 1, gap: 12 }}>
               <MiniWidget
                 testID="widget-insights"
                 label="Insights"
-                value="7 new"
+                value={insightCount > 0 ? `${insightCount} new` : "Tap to view"}
                 icon="bar-chart-outline"
                 onPress={() => router.push("/(tabs)/insights")}
                 accent={isDark ? c.indigo : "#0A0A0A"}
@@ -231,9 +252,9 @@ export default function HomeScreen() {
               <MiniWidget
                 testID="widget-reminders"
                 label="Reminders"
-                value="3 active"
+                value={reminderCount > 0 ? `${reminderCount} active` : "Tap to add"}
                 icon="notifications-outline"
-                onPress={() => {}}
+                onPress={() => router.push("/reminders")}
                 accent={isDark ? "#F5C842" : "#0A0A0A"}
               />
             </View>
