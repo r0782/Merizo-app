@@ -1,0 +1,103 @@
+{
+  "theme": "Both (Light and Dark Mode Required)",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) / Premium Fintech",
+  "typography": {
+    "headings": {
+      "family": "Syne",
+      "weights": ["700", "800"],
+      "usage": "Screen titles, prominent text elements"
+    },
+    "body": {
+      "family": "Inter",
+      "weights": ["400", "500", "700", "900"],
+      "usage": "Body text, primary numbers in light mode, general UI elements"
+    },
+    "custom": {
+      "component": "DotNum",
+      "description": "Custom 5x7 SVG dot-matrix number renderer used for huge amounts and prominent statistics, especially in dark mode.",
+      "variants": {
+        "primary": "indigo (#7C5CFF)",
+        "secondary": "white",
+        "positive": "green (#4ADE80)",
+        "negative": "red (#F87171)"
+      }
+    }
+  },
+  "colors": {
+    "light": {
+      "background": "#F5F5F5",
+      "surface": "#FFFFFF",
+      "textPrimary": "#0A0A0A",
+      "textSecondary": "#888888",
+      "accent": "#7C5CFF",
+      "positive": "#4ADE80",
+      "negative": "#F87171"
+    },
+    "dark": {
+      "background": "#0D0D0D",
+      "surface": "#1A1A1A",
+      "textPrimary": "#FFFFFF",
+      "textSecondary": "#555555",
+      "accent": "#7C5CFF",
+      "positive": "#4ADE80",
+      "negative": "#F87171"
+    }
+  },
+  "layout_and_spacing": {
+    "border_radius": {
+      "card": "16px",
+      "small": "12px",
+      "pill": "999px"
+    },
+    "carousel": {
+      "main_card_width": "55%",
+      "animations": "Spring physics via react-native-reanimated",
+      "stack_transforms": [
+        { "index": 0, "opacity": 1, "scale": 1, "offset": 0 },
+        { "index": 1, "opacity": 0.88, "scale": 0.94, "offset": "Translate offsets" },
+        { "index": 2, "opacity": 0.75, "scale": 0.88, "offset": "Translate offsets" }
+      ]
+    }
+  },
+  "components": {
+    "StackedCardCarousel": "iOS widget style, main card 55% screen width, swipe left/right with spring physics. Dark mode active card has indigo glow.",
+    "SmartLimitWidget": "DotNum 74% center + tiny ghost % either side + solid+dotted hybrid progress line with triangle pointer.",
+    "GaugeDial": "Circular gauge dial, tick marks like speedometer (Insights and Split Detail dark mode).",
+    "DonutChart": "Light mode equivalent for Insight/Split Detail overview.",
+    "QuickActionsGrid": "Row of 4 squares: Add Expense, Settle Up, Scan Bill, Invite."
+  },
+  "screens": {
+    "Login_Register": "Centered layout. App name 'Merizo' in Syne 800 large, tagline 'Split smarter. Settle faster.'. Contains email+password inputs, primary Sign In btn, Google ghost btn.",
+    "Home": "Top bar (avatar + add btn). Greetings. 'YOU ARE OWED' + huge amount (Inter 900 light / DotNum dark). Stacked Carousel. Quick Actions row. Smart Limit widget (Left). Insights/Reminders (Right stacked). Bottom nav.",
+    "Category_Select": "2x3 grid (Trip, Food, Home, Friends, Shopping, Bills) with emoji+label+description on dark gradient cards. Includes back arrow and 'What are you splitting?' Syne 700 header.",
+    "Create_Split": "3 steps with 1-2-3 indicator. Includes name/dates/dest chips, members chip input (auto-include unsubmitted text), currency+cover image auto-resolved.",
+    "Split_Detail": "180px hero image cover, frosted back+settings+share icons. 4 tabs: Overview, Expenses, Members, Settle. Contains FAB +.",
+    "Add_Expense": "Bottom sheet modal. Name, large centered amount input, currency pill, auto category, paid by chips, split among checkboxes + Select All.",
+    "Insights": "'TOTAL SPENT' huge amount, period toggle (Week/Month/All). Gauge dial (dark) / donut (light). Category list with hybrid progress bars.",
+    "Profile": "Avatar, stats (DotNum dark / Inter 900 light), prominent theme toggle (sun/moon), logout button."
+  },
+  "tech_stack": [
+    "React Native Expo",
+    "react-native-reanimated",
+    "react-native-svg",
+    "expo-google-fonts/inter",
+    "expo-google-fonts/syne",
+    "AsyncStorage"
+  ],
+  "image_urls": {
+    "goa_beach": "https://images.unsplash.com/photo-1760119097349-2f2dbc0de62a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwzfHx0cm9waWNhbCUyMGJlYWNoJTIwdmFjYXRpb24lMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzc3NzA0MjI4fDA&ixlib=rb-4.1.0&q=85",
+    "bali_maldives": "https://images.unsplash.com/photo-1776325070949-cb8eba9d40cf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwyfHx0cm9waWNhbCUyMGJlYWNoJTIwdmFjYXRpb24lMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzc3NzA0MjI4fDA&ixlib=rb-4.1.0&q=85",
+    "paris_tokyo_nyc": "https://images.unsplash.com/photo-1688674966559-fe9f9d661c80?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwyfHxmYW1vdXMlMjBjaXR5JTIwc2t5bGluZSUyMGxhbmRtYXJrc3xlbnwwfHx8fDE3Nzc3MDQyMjh8MA&ixlib=rb-4.1.0&q=85",
+    "dubai_singapore": "https://images.unsplash.com/photo-1683041134049-28843fae8c1f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxmYW1vdXMlMjBjaXR5JTIwc2t5bGluZSUyMGxhbmRtYXJrc3xlbnwwfHx8fDE3Nzc3MDQyMjh8MA&ixlib=rb-4.1.0&q=85",
+    "food_party": "https://images.unsplash.com/photo-1772724317468-eff72885ce90?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxsaWZlc3R5bGUlMjBmb29kJTIwYXBhcnRtZW50JTIwcGFydHklMjBmcmllbmRzfGVufDB8fHx8MTc3NzcwNDIyOHww&ixlib=rb-4.1.0&q=85",
+    "apartment_friends": "https://images.unsplash.com/photo-1772724317732-3942ffb02e28?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxsaWZlc3R5bGUlMjBmb29kJTIwYXBhcnRtZW50JTIwcGFydHklMjBmcmllbmRzfGVufDB8fHx8MTc3NzcwNDIyOHww&ixlib=rb-4.1.0&q=85",
+    "dark_bills": "https://images.unsplash.com/photo-1607728285698-8db0895be4a5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwbW9vZHklMjBtb25leSUyMGJpbGxzfGVufDB8fHx8MTc3NzcwNDIyOHww&ixlib=rb-4.1.0&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Use react-native-reanimated for all complex animations including the spring physics on the carousel.",
+    "Use react-native-svg to build the 5x7 DotNum component.",
+    "Persist theme choice in AsyncStorage.",
+    "Ensure 180px hero images in Split Detail map correctly to auto-resolved cover keywords using provided image_urls.",
+    "Ensure all interactive and key informational elements have a data-testid attribute for automated testing."
+  ]
+}
