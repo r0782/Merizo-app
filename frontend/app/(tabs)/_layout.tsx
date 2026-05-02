@@ -1,29 +1,17 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform, View } from "react-native";
+import { Platform } from "react-native";
 import { useTheme } from "../../src/lib/theme";
 
 function GroupsIcon({ color, focused }: any) {
-  return (
-    <View testID="tab-groups">
-      <Ionicons name={focused ? "albums" : "albums-outline"} color={color} size={22} />
-    </View>
-  );
+  return <Ionicons name={focused ? "albums" : "albums-outline"} color={color} size={22} />;
 }
 function InsightsIcon({ color, focused }: any) {
-  return (
-    <View testID="tab-insights">
-      <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} color={color} size={22} />
-    </View>
-  );
+  return <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} color={color} size={22} />;
 }
 function ProfileIcon({ color, focused }: any) {
-  return (
-    <View testID="tab-profile">
-      <Ionicons name={focused ? "person" : "person-outline"} color={color} size={22} />
-    </View>
-  );
+  return <Ionicons name={focused ? "person" : "person-outline"} color={color} size={22} />;
 }
 
 export default function TabsLayout() {

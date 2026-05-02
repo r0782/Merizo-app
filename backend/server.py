@@ -210,8 +210,10 @@ def compute_balances(trip: dict) -> Dict[str, Any]:
 
     for exp in expenses:
         amt = float(exp.get("amount_base", exp.get("amount", 0)))
-        total += amt
-        by_category[exp.get("category", "other")] = by_category.get(exp.get("category", "other"), 0) + amt
+        is_settlement = bool(exp.get("is_settlement"))
+        if not is_settlement:
+            total += amt
+            by_category[exp.get("category", "other")] = by_category.get(exp.get("category", "other"), 0) + amt
         if exp.get("paid_by") in paid:
             paid[exp["paid_by"]] += amt
         split = exp.get("split_among") or [m["id"] for m in members]

@@ -314,7 +314,7 @@ function OverviewTab({ trip }: { trip: any }) {
 // --- Expenses Tab ---
 function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
   const { c } = useTheme();
-  const expenses = (trip.expenses || []).slice().reverse();
+  const expenses = (trip.expenses || []).filter((e: any) => !e.is_settlement).slice().reverse();
   const currency = trip.currency || "INR";
   const memberMap = new Map((trip.members || []).map((m: any) => [m.id, m.name]));
 

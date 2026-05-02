@@ -263,7 +263,7 @@ function CardLayer({
   return (
     <GestureDetector gesture={pan}>
       <Animated.View style={[wrapperStyle, animStyle]}>
-        <Pressable onPress={onPress}>{cardContent}</Pressable>
+        <Pressable testID={`home-card-${trip.id}`} onPress={onPress}>{cardContent}</Pressable>
       </Animated.View>
     </GestureDetector>
   );
