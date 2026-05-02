@@ -8,6 +8,7 @@ import os
 import uuid
 import logging
 import secrets
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
@@ -419,6 +420,7 @@ async def add_expense(trip_id: str, req: ExpenseCreateReq, user=Depends(get_curr
     }
     await db.trips.update_one({"id": trip_id}, {"$push": {"expenses": expense}})
     trip = await db.trips.find_one({"id": trip_id})
+    await invalidate_smart_limit_for_trip(trip)
     return serialize_trip(trip, user["id"])
 
 
@@ -428,6 +430,7 @@ async def delete_expense(trip_id: str, expense_id: str, user=Depends(get_current
     if res.modified_count == 0:
         raise HTTPException(status_code=404, detail="Expense not found")
     trip = await db.trips.find_one({"id": trip_id})
+    await invalidate_smart_limit_for_trip(trip)
     return serialize_trip(trip, user["id"])
 
 
@@ -484,6 +487,7 @@ async def settle(trip_id: str, req: SettleReq, user=Depends(get_current_user)):
     }
     await db.trips.update_one({"id": trip_id}, {"$push": {"expenses": expense}})
     trip = await db.trips.find_one({"id": trip_id})
+    await invalidate_smart_limit_for_trip(trip)
     return serialize_trip(trip, user["id"])
 
 
@@ -596,27 +600,22 @@ async def fx_endpoint(base: str, target: str):
 
 
 # ===== Smart Limit (AI-suggested weekly budget) =====
-@api.get("/smart-limit")
-async def smart_limit(user=Depends(get_current_user)):
-    """
-    Compute the user's current week spending vs an AI-suggested weekly budget.
-    Budget = average weekly spend over the last 4 full weeks (excluding the current week),
-    bumped up by 10% as a soft buffer. Falls back to 5000 (in user's primary currency) if no history.
-    """
+async def compute_smart_limit_for_user(user_id: str) -> dict:
+    """Pure compute helper used by both the endpoint and the background pre-warm task."""
     now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
     history_start = week_start - timedelta(days=28)
 
     trips = await db.trips.find(
-        {"$or": [{"owner_id": user["id"]}, {"members.user_id": user["id"]}]}
+        {"$or": [{"owner_id": user_id}, {"members.user_id": user_id}]}
     ).to_list(500)
 
     week_buckets = [0.0, 0.0, 0.0, 0.0]
     current_week_spent = 0.0
 
     for t in trips:
-        my_member_id = next((m["id"] for m in t.get("members", []) if m.get("user_id") == user["id"]), None)
+        my_member_id = next((m["id"] for m in t.get("members", []) if m.get("user_id") == user_id), None)
         if not my_member_id:
             continue
         for exp in t.get("expenses", []):
@@ -657,6 +656,75 @@ async def smart_limit(user=Depends(get_current_user)):
         "currency": "INR",
         "has_history": has_history,
     }
+
+
+async def invalidate_smart_limit_for_trip(trip: dict):
+    """Invalidate the smart_limit_cache for every registered user that is a member of this trip."""
+    try:
+        user_ids = [m.get("user_id") for m in trip.get("members", []) if m.get("user_id")]
+        if trip.get("owner_id") and trip["owner_id"] not in user_ids:
+            user_ids.append(trip["owner_id"])
+        if user_ids:
+            await db.smart_limit_cache.delete_many({"user_id": {"$in": list(set(user_ids))}})
+    except Exception:
+        pass
+
+
+_BG_TASKS: List[Any] = []
+
+
+async def smart_limit_prewarm_loop():
+    """Background task: every 6 hours recompute & cache smart-limit for every user.
+    Runs forever in-process. The first pass also runs ~30 seconds after startup."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            users = await db.users.find({}, {"_id": 0, "id": 1}).to_list(5000)
+            now = datetime.now(timezone.utc)
+            for u in users:
+                uid = u.get("id")
+                if not uid:
+                    continue
+                try:
+                    payload = await compute_smart_limit_for_user(uid)
+                    await db.smart_limit_cache.update_one(
+                        {"user_id": uid},
+                        {"$set": {"user_id": uid, "payload": payload, "computed_at": now}},
+                        upsert=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Smart-limit prewarm failed for {uid}: {e}")
+            logger.info(f"Smart-limit pre-warm completed for {len(users)} users.")
+        except Exception as e:
+            logger.exception(f"Smart-limit prewarm loop error: {e}")
+        await asyncio.sleep(6 * 60 * 60)  # 6 hours
+
+
+@api.get("/smart-limit")
+async def smart_limit(user=Depends(get_current_user)):
+    """
+    Compute the user's current week spending vs an AI-suggested weekly budget.
+    Reads from db.smart_limit_cache when fresh (<6h), otherwise recomputes and refreshes the cache.
+    A background task (see startup) also keeps the cache warm for active users every ~6 hours.
+    """
+    now = datetime.now(timezone.utc)
+    cached = await db.smart_limit_cache.find_one({"user_id": user["id"]}, {"_id": 0})
+    if cached:
+        ts = cached.get("computed_at")
+        if isinstance(ts, datetime):
+            ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+            if (now - ts_utc) < timedelta(hours=6):
+                payload = cached.get("payload") or {}
+                if payload:
+                    return {**payload, "cache": "hit"}
+
+    payload = await compute_smart_limit_for_user(user["id"])
+    await db.smart_limit_cache.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"user_id": user["id"], "payload": payload, "computed_at": now}},
+        upsert=True,
+    )
+    return {**payload, "cache": "miss"}
 
 
 # ===== Reminders =====
@@ -988,8 +1056,16 @@ async def on_startup():
         await db.trips.create_index("invite_token")
         await db.fx_cache.create_index("pair", unique=True)
         await db.reminders.create_index("user_id")
+        await db.smart_limit_cache.create_index("user_id", unique=True)
         await seed_demo()
         await seed_demo_reminders()
+        # Start background pre-warm loop (in-process). It won't run during pytest because that lifecycle
+        # uses a different event loop, but sub-second start-up cost in production.
+        try:
+            task = asyncio.create_task(smart_limit_prewarm_loop())
+            _BG_TASKS.append(task)
+        except Exception as e:
+            logger.warning(f"Could not start smart-limit prewarm task: {e}")
     except Exception as e:
         logger.exception(f"Startup error: {e}")
 

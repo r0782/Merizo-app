@@ -7,12 +7,14 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { SmartNum } from "../../src/components/DotNum";
 import { currencySymbol } from "../../src/lib/tokens";
+import { getOverbudgetAlerts, setOverbudgetAlerts } from "../../src/lib/settings";
 
 export default function ProfileScreen() {
   const { c, isDark, mode, setMode } = useTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState({ count: 0, settled: 0 });
+  const [alertsOn, setAlertsOnState] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -30,6 +32,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     load();
+    getOverbudgetAlerts().then(setAlertsOnState);
   }, [load]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -89,6 +92,51 @@ export default function ProfileScreen() {
             <ThemePill label="Light" active={mode === "light"} onPress={() => setMode("light")} icon="sunny-outline" testID="theme-light" />
             <ThemePill label="Dark" active={mode === "dark"} onPress={() => setMode("dark")} icon="moon-outline" testID="theme-dark" />
           </View>
+        </View>
+
+        {/* Settings card */}
+        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 16 }]}>
+          <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>SETTINGS</Text>
+
+          <TouchableOpacity
+            testID="overbudget-toggle"
+            onPress={async () => {
+              const next = !alertsOn;
+              setAlertsOnState(next);
+              await setOverbudgetAlerts(next);
+            }}
+            style={styles.settingRow}
+          >
+            <View style={styles.settingIcon}>
+              <Ionicons name={alertsOn ? "alert-circle-outline" : "alert-circle"} size={20} color={alertsOn ? c.negative : c.textMuted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>
+                Overbudget alerts
+              </Text>
+              <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
+                {alertsOn
+                  ? "Smart Limit turns red when you exceed your weekly budget"
+                  : "Stay calm — Smart Limit always shows indigo even over budget"}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.switchTrack,
+                { backgroundColor: alertsOn ? (isDark ? c.indigo : "#0A0A0A") : c.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.switchThumb,
+                  {
+                    backgroundColor: "#fff",
+                    transform: [{ translateX: alertsOn ? 18 : 2 }],
+                  },
+                ]}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -188,6 +236,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingVertical: 4,
+  },
+  settingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  switchTrack: {
+    width: 40,
+    height: 22,
+    borderRadius: 999,
+    justifyContent: "center",
+    marginLeft: 10,
+  },
+  switchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
   },
   logoutBtn: {
     marginTop: 24,

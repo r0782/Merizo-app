@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Svg, { Polygon, Line, Circle } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 import { DotNum, SmartNum } from "./DotNum";
+import { getOverbudgetAlerts } from "../lib/settings";
 
 export function SmartLimitWidget({
   percent = 74,
@@ -20,12 +21,23 @@ export function SmartLimitWidget({
   testID?: string;
 }) {
   const { c, isDark } = useTheme();
+  const [alertsOn, setAlertsOn] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    getOverbudgetAlerts().then((v) => {
+      if (mounted) setAlertsOn(v);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const display = Math.max(0, Math.min(150, Math.round(percent)));
   const left = Math.max(0, display - 1);
   const right = Math.min(149, display + 1);
   const pctClamped = Math.min(100, display);
-  const overBudget = display > 100;
+  const overBudget = display > 100 && alertsOn;
 
   return (
     <View

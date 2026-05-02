@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 3 of Merizo (smart-limit caching + invalidation + pre-warm, overbudget alerts toggle, expo-notifications cancellation on complete/delete). Backend: 38/38 pytest pass (16 iter1 + 11 iter2 + 11 new iter3). New iter3 tests cover: smart-limit response shape with cache field, pre-warm warming the cache for demo user (cache='hit' on first call), idempotent hit on subsequent calls with identical payload, cache invalidation on add-expense / delete-expense / settle. Pre-warm log line confirmed in /var/log/supervisor/backend.err.log: 'Smart-limit pre-warm completed for 10 users.' Frontend mobile (390x844): Profile screen shows new 'SETTINGS' card with overbudget-toggle (testID present), default state ON (localStorage '1' after first tap), persists across full reload, label text flips between 'Smart Limit turns red…' and 'Stay calm — Smart Limit always shows indigo even over budget', toggle thumb visibly translates. Theme toggle, stats (3 splits / ₹49,000 total spent), and logout still work. Reminders complete flow runs without JS exceptions (Platform.OS=='web' short-circuits both scheduleReminder and cancelScheduledFor before AsyncStorage popNotifId is called — expected on web).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3.py",
+    "/app/test_reports/pytest/iteration3_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "[Optional] If main agent wants the notif map to also be cleared on web (for parity / multi-device sync), move the popNotifId() call ABOVE the `if (Platform.OS === 'web') return;` guard inside cancelScheduledFor. Today on web the early return means the map entry persists, but since scheduleReminder also returns early on web nothing was ever written, so there is no observable bug.",
+    "[Optional from iter2 still open] yarn expo install --check still flags expo-image-picker / expo-notifications / expo-linear-gradient / @react-native-async-storage/async-storage / react-native-svg version drift. Web works; native build may need bumps."
+  ],
+  "critical_code_review_comments": [
+    "server.py compute_smart_limit_for_user is now a pure helper used by both the endpoint and the bg task — clean separation. The endpoint reads/writes db.smart_limit_cache with 6h TTL and tags responses with cache='hit'/'miss'. invalidate_smart_limit_for_trip wipes cache for every member.user_id — used in add_expense / delete_expense / settle. Verified by tests.",
+    "smart_limit_prewarm_loop: 30s warm-up delay then 6h interval. Logs 'Smart-limit pre-warm completed for N users.' Confirmed line present twice in backend.err.log for the demo run. Background asyncio.create_task is appended to _BG_TASKS (prevents GC). Good.",
+    "settings.ts (frontend): getOverbudgetAlerts default is true (returns true when key is null) — matches spec. setNotifId/popNotifId mutate the JSON map atomically by re-reading then writing. No race-safety issue for single-tab usage; on native this is fine.",
+    "reminders.tsx cancelScheduledFor returns early on web BEFORE popNotifId runs. Symmetric with scheduleReminder also returning early on web (so nothing is ever stored on web in the first place). On native both paths execute. Documented above as optional polish.",
+    "server.py is now 1076 lines — split-threshold (700) breached. Same comment as iter2 — consider splitting into routers/auth.py, routers/trips.py, routers/reminders.py, routers/ai.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3.py (new — 11 tests, all green)"
+  ],
+  "success_rate": {"backend": "100% (38/38: 16 iter1 + 11 iter2 + 11 iter3)", "frontend": "100% (overbudget toggle persists & flips label, theme toggle, stats, logout, reminder complete with 0 JS errors)"},
+  "seed_data_creation": "Iter3 tests create-and-cleanup their own expenses (TEST_invalidate_add, TEST_invalidate_del) and the settlement-expense (1.0 INR) inside the College Buddies / Goa Trip — all deleted in finally blocks so demo state is unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run `python -m pytest backend/tests/ -v` to re-run all 38 backend tests. Iter3-specific suite is /app/backend/tests/test_iteration3.py (TestSmartLimitCache, TestSmartLimitInvalidation, TestRegression). Frontend testIDs added in iter3: overbudget-toggle (Profile/Settings card). Pre-warm log to grep for in backend.err.log: 'Smart-limit pre-warm completed for'. AsyncStorage keys checked via localStorage on web: 'merizo_overbudget_alerts' (values '0'/'1'/null=default-ON), 'merizo_notif_map' (Record<reminder_id, notif_id>, only written/read on native).",
+  "rca_of_issue": "N/A — all iteration-3 features verified end-to-end. Smart-limit cache/invalidation/pre-warm work as specified; overbudget toggle persists; reminder complete/delete is exception-free on web."
+}

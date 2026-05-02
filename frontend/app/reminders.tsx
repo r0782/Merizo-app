@@ -20,6 +20,7 @@ import { useTheme } from "../src/lib/theme";
 import { api } from "../src/lib/api";
 import { SmartNum } from "../src/components/DotNum";
 import { currencySymbol } from "../src/lib/tokens";
+import { setNotifId, popNotifId } from "../src/lib/settings";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -89,7 +90,7 @@ export default function RemindersScreen() {
     try {
       const date = new Date(rem.due_date + "T09:00:00");
       if (date.getTime() <= Date.now()) return;
-      await Notifications.scheduleNotificationAsync({
+      const notifId = await Notifications.scheduleNotificationAsync({
         content: {
           title: "Merizo reminder",
           body: rem.amount
@@ -99,6 +100,19 @@ export default function RemindersScreen() {
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
       });
+      await setNotifId(rem.id, notifId);
+    } catch {
+      // best effort
+    }
+  };
+
+  const cancelScheduledFor = async (reminderId: string) => {
+    if (Platform.OS === "web") return;
+    try {
+      const nid = await popNotifId(reminderId);
+      if (nid) {
+        await Notifications.cancelScheduledNotificationAsync(nid);
+      }
     } catch {
       // best effort
     }
@@ -107,6 +121,7 @@ export default function RemindersScreen() {
   const onComplete = async (id: string) => {
     try {
       await api.patch(`/reminders/${id}/complete`);
+      await cancelScheduledFor(id);
       setItems((arr) => arr.filter((x) => x.id !== id));
     } catch {
       Alert.alert("Error", "Could not update");
@@ -122,6 +137,7 @@ export default function RemindersScreen() {
         onPress: async () => {
           try {
             await api.delete(`/reminders/${id}`);
+            await cancelScheduledFor(id);
             setItems((arr) => arr.filter((x) => x.id !== id));
           } catch {
             Alert.alert("Error", "Could not delete");
