@@ -75,8 +75,42 @@ Merizo is a mobile-first expense splitting app that lets friends and roommates c
 10. Cover image auto-resolves from destination + category, user can override from 8 thumbnails ✅
 
 ## Status
-- Backend: 38/38 pytest tests passing (16 MVP + 11 iteration 2 + 11 iteration 3)
-- Frontend: All key screens render correctly. Demo login → Home with carousel + real Smart Limit (~77%) + 3 reminders count works. Theme toggle, Insights donut/gauge, Profile with overbudget-alerts toggle, Category Select, Create Split wizard, Split Detail tabs, Add Expense sheet, Scan Bill OCR, Reminders with notification scheduling — all working.
+- Backend: 54/54 pytest tests passing (38 prior + 10 iter4 + 6 iter5 hotfix). All endpoints live, all Gemini calls live (no mocks).
+- Frontend: All key screens render correctly in light + dark mode. Demo login → Home with carousel + Smart Limit + 3 reminders. Theme toggle, Insights GaugeDial, Profile horizontal stats + overbudget toggle, Category Select, Create Split (3-step wizard with conditional date fields), Split Detail (4 tabs + Settings sheet with currency change + AI Insights), Add Expense (full-width amount, auto-tag chip, UPI parser with indigo AI-filled highlights), Scan Bill, Reminders with notifications. Sign out + Delete confirmed working via the new Platform-aware confirmAction helper.
+
+## Iteration 4 (Big batch — 7 bug fixes + 3 improvements + 8 AI features)
+
+### Bug fixes
+1. **Add Expense overflow** — amount input is now full-width inside a wrapped row, currency pills moved to the AMOUNT label row; placeholder is "0.00".
+2. **Settings missing currency change** — new `Change currency · INR` row in Settings sheet with searchable picker. `PATCH /api/trips/{id}/currency` re-converts every expense's `amount_base` and the budget via the cached FX rate.
+3. **Profile total spent scroll** — stats are now a horizontal `ScrollView` of 3 fixed-width cards (SPLITS / TOTAL SPENT / ACTIVE).
+4. **Light-mode numbers as DotNum** — `SmartNum` always renders `<DotNum>`; in light mode `indigo`/`white` colors are mapped to `black` (black dots on off-white). No Inter bold fallback anywhere.
+5. **Delete split** — relaxed to "any member can delete" on backend; new `confirmAction` helper unblocks the previously-broken native confirm flow on web.
+6. **Sign out** — same `confirmAction` helper makes the destructive button onPress fire on web. AsyncStorage `merizo_token` is cleared, `authHooks.onUnauthorized` invalidates user state, root `/index` redirects to `/login`. A new 401 axios interceptor auto-logs out on any expired/invalid token across the app.
+7. **Create Split date fields by category** — Trip → Start + End date with calendar icon button + Today / +1wk / +1mo presets. Other categories → single "Due date reminder" field that also auto-creates a reminder when the split is created.
+
+### Improvements
+1. **Smart Limit progress bar** — already had DotNum percent + ghost siblings + solid+dotted hybrid bar with triangle pointer. Now also shrinks/grows with the AI-suggested limit.
+2. **Stacked card carousel** — already used Reanimated spring physics. Indigo glow border on dark front card.
+3. **Auto-tag category chip** — Add Expense detects category from the name as the user types (swiggy → 🍽️, uber → ✈️, netflix → ⚡, etc.) and shows it as a tappable chip with full override row of all 6 categories.
+
+### AI Features (Gemini 2.5 Flash via emergentintegrations)
+1. **Place Fun Facts** (trip) — `GET /api/trips/{id}/ai/overview` returns `place_facts: { place, facts[4] }`, cached forever in `trip.ai_cache.place_facts`. Frontend: horizontal scroll of 4 cards with 📍 + Syne fact + place label.
+2. **Food Insight** (food) — same endpoint returns `food_insight: { sig, text }` cached by expense signature; refreshes when expenses change. Renders as a card with AI badge.
+3. **Recurring detector** (home) — `POST /api/trips/{id}/expenses` returns `recurring_suggestion` when a similar-named home expense exists >25 days ago. Frontend: confirm dialog "Looks like a recurring expense — set a monthly reminder?" → on Yes, creates a `/api/reminders` entry +30d.
+4. **UPI Parser** (all) — `POST /api/expenses/parse-upi` body `{text}` → Gemini returns `{amount, merchant, category, currency}`. Frontend: "Paste UPI Message" button in Add Expense → modal with textarea → parsed fields are written into the form with **indigo highlight borders** that clear when the user edits each field manually.
+5. **Budget Forecast** (all) — same overview endpoint returns `forecast: { sig, text }` ending with ✅ / ⚠️ / 🚨. Renders as a pill chip below the gauge dial. Only when start_date + end_date + ≥2 expenses are present.
+6. **Group Personality** (friends) — same overview endpoint returns `personality: { title, emoji, description }`. Renders as an indigo card in dark mode / black card in light mode with emoji + Syne title + description.
+7. **Subscription conflict warning** (bills, no AI) — on Add Expense submit, if the name matches `netflix|spotify|disney|prime|youtube` and member count exceeds the platform's typical screen limit, a confirm toast warns the user.
+8. **Smart Limit AI suggestion** — `compute_smart_limit_for_user` now asks Gemini for a sensible weekly limit based on the last 30 days of expenses, cached on the user doc as `ai_weekly_limit` (refresh every 7 days). Falls back to the statistical avg×1.1 if Gemini fails. Response surfaces `ai_source: 'ai_fresh' | 'ai_cache' | 'statistical'`.
+
+### Implementation rules honoured
+- All Gemini calls pass through one `gemini_chat()` helper with an 18s timeout that returns None on any failure → endpoints gracefully omit the failed field.
+- Loading skeletons render while the AI overview endpoint is in-flight.
+- All AI responses cached in MongoDB with signature-based invalidation when underlying data changes.
+- AI cards adapt to light/dark theme.
+- Numbers inside AI cards render as DotNum via SmartNum.
+- AI cards never block page load — main content renders first, AI section appears as it resolves.
 
 ## Iteration 3 (Polish layer)
 
