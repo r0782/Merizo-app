@@ -116,6 +116,16 @@ export default function CreateSplitScreen() {
         start_date: start || null,
         end_date: end || null,
       });
+      // For non-trip categories, the "Start" field is repurposed as a Due Date Reminder.
+      if (category !== "trip" && start) {
+        try {
+          await api.post("/reminders", {
+            title: `Settle: ${name.trim()}`,
+            due_date: start,
+            trip_id: res.data.id,
+          });
+        } catch {}
+      }
       router.replace({ pathname: "/split/[id]", params: { id: res.data.id } });
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
@@ -170,14 +180,30 @@ export default function CreateSplitScreen() {
           <View>
             <Heading>Name & dates</Heading>
             <Field label="Split name" value={name} setValue={setName} placeholder="e.g. Goa Trip" testID="create-name" />
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Field label="Start" value={start} setValue={setStart} placeholder="YYYY-MM-DD" testID="create-start" />
+
+            {category === "trip" ? (
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <DateField label="Start date" value={start} setValue={setStart} testID="create-start" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <DateField label="End date" value={end} setValue={setEnd} testID="create-end" />
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Field label="End" value={end} setValue={setEnd} placeholder="YYYY-MM-DD" testID="create-end" />
+            ) : (
+              <View>
+                <DateField
+                  label="Due date reminder"
+                  value={start}
+                  setValue={setStart}
+                  testID="create-duedate"
+                />
+                <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 6 }}>
+                  We'll remind you to settle this split on the due date.
+                </Text>
               </View>
-            </View>
+            )}
+
             <ChipInput
               label="Destinations"
               value={destInput}
@@ -303,6 +329,107 @@ function Heading({ children }: { children: React.ReactNode }) {
     >
       {children}
     </Text>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  setValue,
+  testID,
+}: {
+  label: string;
+  value: string;
+  setValue: (s: string) => void;
+  testID?: string;
+}) {
+  const { c, isDark } = useTheme();
+  const today = new Date();
+  const minDate = today.toISOString().slice(0, 10);
+
+  // Quick presets so it works without a heavy native picker
+  const presets = [
+    { label: "Today", days: 0 },
+    { label: "+1 wk", days: 7 },
+    { label: "+1 mo", days: 30 },
+  ];
+
+  const setPreset = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setValue(d.toISOString().slice(0, 10));
+  };
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: 8, fontWeight: "600", letterSpacing: 0.4 }}>
+        {label.toUpperCase()}
+      </Text>
+      <View
+        style={[
+          styles.input,
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            paddingVertical: 0,
+            paddingHorizontal: 0,
+          },
+        ]}
+      >
+        <TextInput
+          testID={testID}
+          value={value}
+          onChangeText={setValue}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={c.textMuted}
+          // @ts-ignore — RNW honors the html input type for date pickers
+          dataDetectorTypes={"none" as any}
+          style={{
+            flex: 1,
+            color: c.textPrimary,
+            fontSize: 15,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+          }}
+          // @ts-ignore — pass through to RNW input
+          type={Platform.OS === "web" ? "date" : undefined}
+          // @ts-ignore — cap min on web to today
+          min={Platform.OS === "web" ? minDate : undefined}
+        />
+        <TouchableOpacity
+          testID={`${testID}-pick`}
+          onPress={() => {
+            // On web, focus the input to expose the native browser picker.
+            // On native we just bump to today as a quick default.
+            if (Platform.OS !== "web" && !value) setPreset(0);
+          }}
+          style={{ paddingHorizontal: 12, paddingVertical: 12 }}
+        >
+          <Ionicons name="calendar-outline" size={18} color={c.textPrimary} />
+        </TouchableOpacity>
+      </View>
+      <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
+        {presets.map((p) => (
+          <TouchableOpacity
+            key={p.label}
+            testID={`${testID}-preset-${p.days}`}
+            onPress={() => setPreset(p.days)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 999,
+              backgroundColor: c.surface,
+              borderColor: c.border,
+              borderWidth: 1,
+            }}
+          >
+            <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700" }}>{p.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
   );
 }
 

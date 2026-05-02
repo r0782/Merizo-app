@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, setToken, getToken } from "./api";
+import { api, setToken, getToken, authHooks } from "./api";
 
 type User = { id: string; email: string; name: string; avatar?: string | null };
 type AuthCtx = {
@@ -37,6 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await refresh();
       setLoading(false);
     })();
+    // Wire the api 401 interceptor: when token is invalid/expired anywhere in the app,
+    // clear the in-memory user so all guarded routes redirect to /login automatically.
+    authHooks.onUnauthorized = () => {
+      setUser(null);
+    };
+    return () => {
+      authHooks.onUnauthorized = undefined;
+    };
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {

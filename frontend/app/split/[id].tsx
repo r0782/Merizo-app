@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -186,13 +186,198 @@ export default function SplitDetailScreen() {
             setShowSettings(false);
             setShowMember(true);
           }}
+          onCurrencyChanged={async () => {
+            setShowSettings(false);
+            await load();
+          }}
           onDeleted={() => {
             setShowSettings(false);
-            router.back();
+            router.replace("/(tabs)/home");
           }}
         />
       </Modal>
     </View>
+  );
+}
+
+// --- AI Overview Section (forecast / fun facts / food insight / personality) ---
+function AIOverviewSection({ trip }: { trip: any }) {
+  const { c, isDark } = useTheme();
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const sigKey = useMemo(() => {
+    return (trip.expenses || []).filter((e: any) => !e.is_settlement).length + ":" + (trip.split_category || "");
+  }, [trip]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setFailed(false);
+        const r = await api.get(`/trips/${trip.id}/ai/overview`);
+        if (!alive) return;
+        setData(r.data);
+      } catch {
+        if (!alive) return;
+        setFailed(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [trip.id, sigKey]);
+
+  if (failed) return null;
+
+  const indigo = isDark ? c.indigo : "#0A0A0A";
+  const indigoBg = isDark ? "rgba(124,92,255,0.16)" : "#0A0A0A";
+  const personalityFg = isDark ? "#fff" : "#fff";
+
+  const showAnything =
+    loading ||
+    (data && (data.forecast || data.place_facts || data.food_insight || data.personality));
+
+  if (!showAnything) return null;
+
+  return (
+    <View style={styles.aiSection}>
+      <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6 }}>
+        AI INSIGHTS
+      </Text>
+
+      {/* Forecast chip */}
+      {(loading || data?.forecast) && (
+        <View>
+          {loading && !data?.forecast ? (
+            <Skeleton style={[styles.forecastChip, { backgroundColor: c.surface, borderColor: c.border, width: 240 }]} />
+          ) : (
+            <View
+              testID="ai-forecast-chip"
+              style={[
+                styles.forecastChip,
+                { backgroundColor: c.surface, borderColor: c.border },
+              ]}
+            >
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", textAlign: "center" }}>
+                {data.forecast.text}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Food Insight */}
+      {(data?.category === "food" && (loading || data?.food_insight)) && (
+        <View style={{ marginTop: 12 }}>
+          {loading && !data?.food_insight ? (
+            <Skeleton style={[styles.insightCard, { backgroundColor: c.surface, borderColor: c.border, height: 60 }]} />
+          ) : (
+            <View testID="ai-food-insight" style={[styles.insightCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <View style={[styles.aiBadge, { backgroundColor: isDark ? "rgba(124,92,255,0.18)" : "#EEF2FF", marginRight: 10, marginLeft: 0 }]}>
+                <Text style={{ color: indigo, fontSize: 9, fontWeight: "800" }}>AI</Text>
+              </View>
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "600", flex: 1, lineHeight: 18 }}>
+                {data.food_insight.text}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Group Personality (friends category) */}
+      {(data?.category === "friends" && (loading || data?.personality)) && (
+        <View style={{ marginTop: 12 }}>
+          {loading && !data?.personality ? (
+            <Skeleton style={[styles.personalityCard, { backgroundColor: c.surface, height: 90 }]} />
+          ) : (
+            <View
+              testID="ai-personality"
+              style={[styles.personalityCard, { backgroundColor: indigoBg }]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <Text style={{ fontSize: 24 }}>{data.personality.emoji}</Text>
+                <Text
+                  style={{
+                    color: personalityFg,
+                    fontSize: 18,
+                    fontFamily: "Syne_700Bold",
+                    marginLeft: 10,
+                    flex: 1,
+                  }}
+                >
+                  {data.personality.title}
+                </Text>
+              </View>
+              <Text style={{ color: isDark ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.9)", fontSize: 12 }}>
+                {data.personality.description}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Place Facts (trip category) */}
+      {(data?.category === "trip" && (loading || data?.place_facts)) && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", marginBottom: 8 }}>
+            Fun facts about {data?.place_facts?.place || "this place"}
+          </Text>
+          {loading && !data?.place_facts ? (
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Skeleton style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]} />
+              <Skeleton style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]} />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, paddingRight: 24 }}
+              testID="ai-place-facts"
+            >
+              {(data.place_facts.facts || []).map((f: string, i: number) => (
+                <View
+                  key={i}
+                  style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]}
+                >
+                  <Text style={{ fontSize: 16 }}>📍</Text>
+                  <Text
+                    style={{
+                      color: c.textPrimary,
+                      fontSize: 13,
+                      fontFamily: "Syne_500Medium",
+                      lineHeight: 18,
+                      marginTop: 8,
+                      flex: 1,
+                    }}
+                  >
+                    {f}
+                  </Text>
+                  <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: "700", letterSpacing: 0.6, marginTop: 8 }}>
+                    {(data.place_facts.place || "").toUpperCase()}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Skeleton({ style }: { style: any }) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        style,
+        { backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, opacity: 0.55 },
+      ]}
+    />
   );
 }
 
@@ -307,6 +492,9 @@ function OverviewTab({ trip }: { trip: any }) {
           </View>
         </>
       )}
+
+      {/* AI Insights — Forecast / Place Facts / Food Insight / Personality */}
+      <AIOverviewSection trip={trip} />
     </View>
   );
 }
@@ -489,7 +677,19 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   const [paidBy, setPaidBy] = useState(trip.members[0]?.id || "");
   const [splitAmong, setSplitAmong] = useState<string[]>(trip.members.map((m: any) => m.id));
   const [submitting, setSubmitting] = useState(false);
-  const cat = detectCategory(name);
+  const [showUpi, setShowUpi] = useState(false);
+  const [upiText, setUpiText] = useState("");
+  const [upiLoading, setUpiLoading] = useState(false);
+  const [upiFilled, setUpiFilled] = useState<{ name: boolean; amount: boolean; category: boolean }>({
+    name: false,
+    amount: false,
+    category: false,
+  });
+  const [manualCat, setManualCat] = useState<string | null>(null);
+
+  // Auto-tag — runs as user types unless they manually picked
+  const autoCat = manualCat || detectCategory(name);
+  const cat = autoCat;
   const meta = categoryMeta[cat] || categoryMeta.other;
 
   const toggleMember = (id: string) => {
@@ -508,7 +708,29 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
     }
     setSubmitting(true);
     try {
-      await api.post(`/trips/${trip.id}/expenses`, {
+      // Subscription conflict warning (frontend keyword check, no AI)
+      const subKeys = ["netflix", "spotify", "disney", "prime", "youtube"];
+      const memberCount = trip.members.length;
+      const lower = name.trim().toLowerCase();
+      const matchedSub = subKeys.find((k) => lower.includes(k));
+      const subLimits: Record<string, number> = {
+        netflix: 2,
+        spotify: 1,
+        disney: 4,
+        prime: 3,
+        youtube: 6,
+      };
+      if (matchedSub && memberCount > (subLimits[matchedSub] || 2)) {
+        const limit = subLimits[matchedSub] || 2;
+        const cap = matchedSub.charAt(0).toUpperCase() + matchedSub.slice(1);
+        Alert.alert(
+          "Heads up",
+          `${cap} typically supports ${limit} screens — splitting among ${memberCount} people may cause issues 📺`,
+          [{ text: "OK" }]
+        );
+      }
+
+      const r = await api.post(`/trips/${trip.id}/expenses`, {
         name: name.trim(),
         amount: amt,
         currency,
@@ -517,6 +739,34 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         paid_by: paidBy,
         split_among: splitAmong,
       });
+
+      // Recurring expense detector toast (Home category)
+      const suggestion = r.data?.recurring_suggestion;
+      if (suggestion) {
+        Alert.alert(
+          "Looks like a recurring expense",
+          `Want to set a monthly reminder for "${suggestion.name}"?`,
+          [
+            { text: "No", style: "cancel" },
+            {
+              text: "Yes",
+              onPress: async () => {
+                try {
+                  const due = new Date();
+                  due.setMonth(due.getMonth() + 1);
+                  await api.post("/reminders", {
+                    title: `Recurring: ${suggestion.name}`,
+                    amount: amt,
+                    due_date: due.toISOString().slice(0, 10),
+                    trip_id: trip.id,
+                  });
+                } catch {}
+              },
+            },
+          ]
+        );
+      }
+
       onAdded();
     } catch (e: any) {
       Alert.alert("Error", "Could not add expense");
@@ -525,11 +775,59 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
     }
   };
 
+  const onParseUpi = async () => {
+    if (!upiText.trim()) {
+      Alert.alert("Paste a message", "Paste your UPI / SMS text first.");
+      return;
+    }
+    setUpiLoading(true);
+    try {
+      const r = await api.post("/expenses/parse-upi", { text: upiText });
+      const d = r.data;
+      const filled = { name: false, amount: false, category: false };
+      if (d.merchant) {
+        setName(d.merchant);
+        filled.name = true;
+      }
+      if (d.amount && d.amount > 0) {
+        setAmount(String(d.amount));
+        filled.amount = true;
+      }
+      if (d.category) {
+        setManualCat(d.category);
+        filled.category = true;
+      }
+      if (d.currency) setCurrency(d.currency);
+      setUpiFilled(filled);
+      setShowUpi(false);
+      setUpiText("");
+    } catch (e: any) {
+      Alert.alert("Could not parse", "Please type the expense manually.");
+    } finally {
+      setUpiLoading(false);
+    }
+  };
+
+  const onChangeName = (t: string) => {
+    setName(t);
+    if (upiFilled.name) setUpiFilled((f) => ({ ...f, name: false }));
+    // user is typing — clear manual category override so auto-tag kicks back in
+    if (manualCat && !upiFilled.category) setManualCat(null);
+  };
+
+  const onChangeAmount = (t: string) => {
+    setAmount(t.replace(/[^0-9.]/g, ""));
+    if (upiFilled.amount) setUpiFilled((f) => ({ ...f, amount: false }));
+  };
+
   const allSelected = splitAmong.length === trip.members.length;
   const toggleAll = () => {
     if (allSelected) setSplitAmong([]);
     else setSplitAmong(trip.members.map((m: any) => m.id));
   };
+
+  const indigo = isDark ? c.indigo : "#0A0A0A";
+  const aiHighlight = isDark ? "rgba(124,92,255,0.45)" : c.indigo;
 
   return (
     <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -546,41 +844,109 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
             </TouchableOpacity>
           </View>
 
-          <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+          {/* Paste UPI button */}
+          <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+            <TouchableOpacity
+              testID="add-exp-paste-upi"
+              onPress={() => setShowUpi(true)}
+              style={[styles.upiBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+            >
+              <Text style={{ fontSize: 16 }}>📋</Text>
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", marginLeft: 8 }}>
+                Paste UPI Message
+              </Text>
+              <View style={[styles.aiBadge, { backgroundColor: isDark ? "rgba(124,92,255,0.18)" : "#EEF2FF" }]}>
+                <Text style={{ color: indigo, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 }}>AI</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Name field */}
+          <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
+            <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>NAME</Text>
             <TextInput
               testID="add-exp-name"
               value={name}
-              onChangeText={setName}
+              onChangeText={onChangeName}
               placeholder="What is this for?"
               placeholderTextColor={c.textMuted}
-              style={[styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: c.surface,
+                  borderColor: upiFilled.name ? aiHighlight : c.border,
+                  borderWidth: upiFilled.name ? 1.5 : 1,
+                  color: c.textPrimary,
+                },
+              ]}
             />
-
-            {/* Big centered amount */}
-            <View style={{ alignItems: "center", marginTop: 26 }}>
-              <Text style={{ color: c.textSecondary, fontSize: 11, letterSpacing: 1.6, fontWeight: "700" }}>AMOUNT</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
-                <Text style={{ color: c.textPrimary, fontSize: 42, fontWeight: "900" }}>
-                  {currencySymbol(currency)}
+            {/* Auto-tag chip */}
+            {(name.length > 0 || manualCat) && (
+              <View style={{ flexDirection: "row", marginTop: 8, alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                <View
+                  testID="add-exp-cat-chip"
+                  style={[
+                    styles.catTag,
+                    {
+                      backgroundColor: meta.tint + "22",
+                      borderColor: upiFilled.category ? aiHighlight : meta.tint + "55",
+                      borderWidth: upiFilled.category ? 1.5 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 13 }}>{meta.emoji}</Text>
+                  <Text style={{ color: c.textPrimary, fontSize: 11, fontWeight: "700", marginLeft: 5 }}>
+                    {meta.label}
+                  </Text>
+                </View>
+                <Text style={{ color: c.textMuted, fontSize: 10 }}>
+                  {upiFilled.category ? "(AI)" : "(auto · tap to change)"}
                 </Text>
-                <TextInput
-                  testID="add-exp-amount"
-                  value={amount}
-                  onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ""))}
-                  placeholder="0"
-                  placeholderTextColor={c.textMuted}
-                  keyboardType="decimal-pad"
-                  style={{
-                    fontSize: 48,
-                    fontWeight: "900",
-                    color: c.textPrimary,
-                    minWidth: 100,
-                    textAlign: "left",
-                    padding: 0,
-                  }}
-                />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 14 }}>
+            )}
+            {/* Category override picker */}
+            {(name.length > 0 || manualCat) && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, marginTop: 8 }}
+              >
+                {Object.entries(categoryMeta)
+                  .filter(([k]) => k !== "settlement" && k !== "other")
+                  .map(([k, m]) => {
+                    const active = cat === k;
+                    return (
+                      <TouchableOpacity
+                        key={k}
+                        testID={`add-exp-cat-${k}`}
+                        onPress={() => {
+                          setManualCat(k);
+                          if (upiFilled.category) setUpiFilled((f) => ({ ...f, category: false }));
+                        }}
+                        style={[
+                          styles.catPick,
+                          {
+                            backgroundColor: active ? m.tint + "22" : c.surface,
+                            borderColor: active ? m.tint : c.border,
+                          },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 12 }}>{m.emoji}</Text>
+                        <Text style={{ color: c.textPrimary, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>
+                          {m.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Amount field — full width with currency pill on the label row */}
+          <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>AMOUNT</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                 {currencyOptions.slice(0, 8).map((cur) => {
                   const active = currency === cur;
                   return (
@@ -588,25 +954,58 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       key={cur}
                       testID={`add-exp-cur-${cur}`}
                       onPress={() => setCurrency(cur)}
-                      style={[styles.curMini, { backgroundColor: active ? (isDark ? c.indigo : "#0A0A0A") : c.surface, borderColor: c.border }]}
+                      style={[
+                        styles.curMini,
+                        {
+                          backgroundColor: active ? indigo : c.surface,
+                          borderColor: active ? "transparent" : c.border,
+                        },
+                      ]}
                     >
-                      <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 11, fontWeight: "700" }}>{cur}</Text>
+                      <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 11, fontWeight: "700" }}>
+                        {cur}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
             </View>
-
-            {/* Auto category */}
-            <View style={[styles.catChip, { backgroundColor: c.surface, borderColor: c.border, alignSelf: "center", marginTop: 18 }]}>
-              <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
-              <Text style={{ color: c.textSecondary, fontSize: 11, marginLeft: 6 }}>auto:</Text>
-              <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>{meta.label}</Text>
+            <View
+              style={[
+                styles.amountInputWrap,
+                {
+                  backgroundColor: c.surface,
+                  borderColor: upiFilled.amount ? aiHighlight : c.border,
+                  borderWidth: upiFilled.amount ? 1.5 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "900", marginRight: 6 }}>
+                {currencySymbol(currency)}
+              </Text>
+              <TextInput
+                testID="add-exp-amount"
+                value={amount}
+                onChangeText={onChangeAmount}
+                placeholder="0.00"
+                placeholderTextColor={c.textMuted}
+                keyboardType="decimal-pad"
+                style={{
+                  flex: 1,
+                  fontSize: 22,
+                  fontWeight: "800",
+                  color: c.textPrimary,
+                  padding: 0,
+                  minWidth: 60,
+                }}
+              />
             </View>
+          </View>
 
-            {/* Paid by */}
-            <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginTop: 22 }}>PAID BY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 10 }}>
+          {/* Paid by */}
+          <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+            <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>PAID BY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {trip.members.map((m: any) => {
                 const active = paidBy === m.id;
                 return (
@@ -614,19 +1013,21 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                     key={m.id}
                     testID={`add-exp-payer-${m.id}`}
                     onPress={() => setPaidBy(m.id)}
-                    style={[styles.payerChip, { backgroundColor: active ? (isDark ? c.indigo : "#0A0A0A") : c.surface, borderColor: c.border }]}
+                    style={[styles.payerChip, { backgroundColor: active ? indigo : c.surface, borderColor: c.border }]}
                   >
                     <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 12, fontWeight: "700" }}>{m.name}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+          </View>
 
-            {/* Split among */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
-              <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>SPLIT AMONG</Text>
+          {/* Split among */}
+          <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>SPLIT AMONG</Text>
               <TouchableOpacity testID="add-exp-toggle-all" onPress={toggleAll}>
-                <Text style={{ color: isDark ? c.indigo : "#0A0A0A", fontSize: 12, fontWeight: "700" }}>
+                <Text style={{ color: indigo, fontSize: 12, fontWeight: "700" }}>
                   {allSelected ? "Clear all" : "Select all"}
                 </Text>
               </TouchableOpacity>
@@ -645,7 +1046,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       style={[
                         styles.checkbox,
                         {
-                          backgroundColor: checked ? (isDark ? c.indigo : "#0A0A0A") : "transparent",
+                          backgroundColor: checked ? indigo : "transparent",
                           borderColor: checked ? "transparent" : c.border,
                         },
                       ]}
@@ -662,13 +1063,61 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               testID="add-exp-submit"
               disabled={submitting}
               onPress={onSubmit}
-              style={[styles.primaryBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", marginTop: 22, opacity: submitting ? 0.7 : 1 }]}
+              style={[styles.primaryBtn, { backgroundColor: indigo, marginTop: 22, opacity: submitting ? 0.7 : 1 }]}
             >
               {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Add expense</Text>}
             </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
+
+      {/* UPI Parser Modal */}
+      <Modal visible={showUpi} animationType="fade" transparent onRequestClose={() => setShowUpi(false)}>
+        <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
+          <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border }]}>
+            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>
+              Paste your UPI message
+            </Text>
+            <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
+              AI will fill the fields for you. You can edit before saving.
+            </Text>
+            <TextInput
+              testID="upi-text"
+              value={upiText}
+              onChangeText={setUpiText}
+              multiline
+              autoFocus
+              placeholder="e.g. Rs 350 debited to Swiggy on 02 May…"
+              placeholderTextColor={c.textMuted}
+              style={[
+                styles.upiInput,
+                { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary },
+              ]}
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                testID="upi-cancel"
+                onPress={() => setShowUpi(false)}
+                style={[styles.upiBtnSecondary, { borderColor: c.border, backgroundColor: c.surface }]}
+              >
+                <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="upi-parse"
+                onPress={onParseUpi}
+                disabled={upiLoading}
+                style={[styles.upiBtnPrimary, { backgroundColor: indigo, opacity: upiLoading ? 0.6 : 1 }]}
+              >
+                {upiLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Parse with AI</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -736,11 +1185,12 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
 }
 
 // --- Settings sheet ---
-function SettingsSheet({ trip, isOwner, onClose, onShare, onAddMember, onDeleted }: any) {
+function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember, onDeleted, onCurrencyChanged }: any) {
   const { c } = useTheme();
+  const [showCur, setShowCur] = useState(false);
 
   const onDelete = () => {
-    Alert.alert("Delete split?", `"${trip.name}" will be removed for everyone.`, [
+    Alert.alert("Are you sure?", "This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -758,27 +1208,96 @@ function SettingsSheet({ trip, isOwner, onClose, onShare, onAddMember, onDeleted
     ]);
   };
 
+  const changeCurrency = async (cur: string) => {
+    setShowCur(false);
+    try {
+      await api.patch(`/trips/${trip.id}/currency`, { currency: cur });
+      onCurrencyChanged?.();
+    } catch {
+      Alert.alert("Error", "Could not change currency");
+    }
+  };
+
   return (
     <View style={styles.modalRoot}>
       <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: c.bg, borderColor: c.border, maxHeight: 420 }]}>
+      <View style={[styles.sheet, { backgroundColor: c.bg, borderColor: c.border, maxHeight: 480 }]}>
         <View style={styles.sheetHandle}>
           <View style={[styles.handleBar, { backgroundColor: c.textMuted }]} />
         </View>
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>{trip.name}</Text>
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
-            {trip.members.length} members · {trip.expenses?.length || 0} expenses
+            {trip.members.length} members · {(trip.expenses || []).filter((e: any) => !e.is_settlement).length} expenses · {trip.currency || "INR"}
           </Text>
 
           <View style={{ marginTop: 18, gap: 8 }}>
             <SettingsRow label="Add member" icon="person-add-outline" onPress={onAddMember} testID="settings-add-member" />
             <SettingsRow label="Invite via link" icon="link-outline" onPress={onShare} testID="settings-invite" />
-            {isOwner && (
-              <SettingsRow label="Delete split" icon="trash-outline" danger onPress={onDelete} testID="settings-delete" />
-            )}
+            <SettingsRow
+              label={`Change currency · ${trip.currency || "INR"}`}
+              icon="swap-horizontal-outline"
+              onPress={() => setShowCur(true)}
+              testID="settings-change-currency"
+            />
+            <SettingsRow label="Delete split" icon="trash-outline" danger onPress={onDelete} testID="settings-delete" />
           </View>
         </View>
+      </View>
+
+      <Modal visible={showCur} animationType="fade" transparent onRequestClose={() => setShowCur(false)}>
+        <CurrencyPicker
+          current={trip.currency || "INR"}
+          onPick={changeCurrency}
+          onClose={() => setShowCur(false)}
+        />
+      </Modal>
+    </View>
+  );
+}
+
+function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick: (c: string) => void; onClose: () => void }) {
+  const { c, isDark } = useTheme();
+  const [query, setQuery] = useState("");
+  const list = currencyOptions.filter((cu) => cu.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
+      <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border, maxWidth: 420, padding: 18 }]}>
+        <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>Change currency</Text>
+        <TextInput
+          testID="cur-search"
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search…"
+          placeholderTextColor={c.textMuted}
+          style={[styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary, marginTop: 12 }]}
+        />
+        <ScrollView style={{ maxHeight: 280, marginTop: 12 }} showsVerticalScrollIndicator={false}>
+          {list.map((cu) => {
+            const active = cu === current;
+            return (
+              <TouchableOpacity
+                key={cu}
+                testID={`cur-pick-${cu}`}
+                onPress={() => onPick(cu)}
+                style={[
+                  styles.curRow,
+                  {
+                    backgroundColor: active ? (isDark ? "rgba(124,92,255,0.18)" : "#F5F5F5") : "transparent",
+                    borderColor: c.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", flex: 1 }}>{cu}</Text>
+                <Text style={{ color: c.textSecondary, fontSize: 13 }}>{currencySymbol(cu)}</Text>
+                {active && <Ionicons name="checkmark" size={18} color={isDark ? c.indigo : "#0A0A0A"} style={{ marginLeft: 8 }} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity onPress={onClose} style={{ marginTop: 14, alignItems: "center" }}>
+          <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: "700" }}>Cancel</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -998,5 +1517,122 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
+  },
+  upiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  aiBadge: {
+    marginLeft: "auto",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  catTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  catPick: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  amountInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    width: "100%",
+  },
+  upiModal: {
+    margin: 24,
+    padding: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    width: "85%",
+    maxWidth: 420,
+    alignSelf: "center",
+    marginTop: "auto",
+    marginBottom: "auto",
+  },
+  upiInput: {
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 14,
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  upiBtnSecondary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  upiBtnPrimary: {
+    flex: 1.5,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // AI Overview section
+  aiSection: { marginTop: 22 },
+  aiSkel: {
+    height: 60,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  forecastChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignSelf: "center",
+    marginTop: 12,
+    maxWidth: "100%",
+  },
+  insightCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  personalityCard: {
+    padding: 18,
+    borderRadius: 18,
+  },
+  factCard: {
+    width: 220,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 110,
+  },
+  curRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 6,
   },
 });

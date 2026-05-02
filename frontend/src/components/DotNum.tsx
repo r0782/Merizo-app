@@ -313,12 +313,14 @@ export function DotNum({ value, size = "md", color = "indigo", showOff = true, t
   );
 }
 
-// Auto-switch: light mode -> bold Inter text, dark mode -> DotNum
+// Auto-switch SmartNum: always renders DotNum, but maps "indigo"/"white" colors to
+// "black" in light mode so dot-matrix is dark on the off-white background.
 export function SmartNum({
   value,
   size = "md",
   color = "indigo",
-  lightStyle,
+  // lightStyle kept for backwards-compat callers that may still pass it (ignored now)
+  lightStyle: _lightStyle,
   testID,
 }: {
   value: string | number;
@@ -327,22 +329,13 @@ export function SmartNum({
   lightStyle?: any;
   testID?: string;
 }) {
-  const { isDark, c } = useTheme();
-  if (isDark) return <DotNum value={value} size={size} color={color} testID={testID} />;
-  const fontSizeMap: Record<DotNumSize, number> = { xs: 14, sm: 18, md: 24, lg: 32, xl: 44, xxl: 64 };
-  let textColor = c.textPrimary;
-  if (color === "green") textColor = c.positive;
-  else if (color === "red") textColor = c.negative;
-  else if (color === "muted") textColor = c.textSecondary;
-  else if (color === "indigo") textColor = c.indigo;
-  return (
-    <Text
-      testID={testID}
-      style={[{ fontSize: fontSizeMap[size], color: textColor, fontWeight: "900", letterSpacing: -1 }, lightStyle]}
-    >
-      {String(value)}
-    </Text>
-  );
+  const { isDark } = useTheme();
+  let resolved: DotNumColor = color;
+  if (!isDark) {
+    if (color === "indigo" || color === "white") resolved = "black";
+    if (color === "muted") resolved = "muted";
+  }
+  return <DotNum value={value} size={size} color={resolved} testID={testID} />;
 }
 
 const styles = StyleSheet.create({

@@ -79,11 +79,17 @@ export default function ProfileScreen() {
           <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 4 }}>{user?.email || ""}</Text>
         </View>
 
-        {/* Stats */}
-        <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+        {/* Stats - horizontal scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 16, marginHorizontal: -24 }}
+          contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+        >
           <StatCard label="SPLITS" value={String(stats.count)} testID="stat-splits" />
           <StatCard label="TOTAL SPENT" value={`${currencySymbol("INR")}${stats.settled.toLocaleString("en-IN")}`} testID="stat-settled" />
-        </View>
+          <StatCard label="ACTIVE" value={String(Math.min(stats.count, 99))} testID="stat-active" />
+        </ScrollView>
 
         {/* Theme card */}
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 16 }]}>
@@ -212,7 +218,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   statCard: {
-    flex: 1,
+    width: 160,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,

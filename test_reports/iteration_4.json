@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 4 of Merizo (7 bug fixes + 3 improvements + 8 AI features). Backend: 10/10 new pytest pass (test_iteration4.py) + earlier 38/38 still green = 48/48 total. Verified live Gemini-2.5-flash calls for /api/trips/{id}/ai/overview returning place_facts (Goa Trip: place + >=2 facts) and personality (College Buddies: title/emoji/description); cached on second call (place_facts identical). Verified POST /api/expenses/parse-upi returns {amount:350.0, merchant:'Swiggy', category:'food', currency:'INR'} for the canonical SMS, 400 for empty/short text. Verified PATCH /api/trips/{id}/currency converts amount_base + budget by FX (INR->USD shrinks by ~83x; round-trip back to INR within 5%). Verified DELETE /api/trips/{id} now allows non-owner members (fresh user joined via invite then deleted -> 200), still 403 for non-members. Verified GET /api/smart-limit payload now includes ai_source ('ai_cache' on demo user, weekly_budget=6113.0 != statistical fallback 5830) and cache='hit' on repeat. Frontend smoke: login -> home -> profile flow, demo login works, Profile shows horizontal-scroll stats (SPLITS / TOTAL SPENT / ACTIVE — 3rd card visible past the scroll), DotNum dot-matrix numbers render BOTH the YOU ARE OWED ₹1,400 on Home AND the SPLITS/TOTAL SPENT on Profile in LIGHT mode (black dots on off-white). Overbudget toggle present (testID=overbudget-toggle), Sign out button visible.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/trips/{id}/expenses (HOME category)",
+        "issue": "Spec says response should include recurring_suggestion when adding a duplicate-name expense whose previous one is >25 days old, but the recurring_suggestion code is currently placed inside the SETTLE endpoint (server.py lines 496-538), NOT inside add_expense. Worse, the block accesses req.category and req.name which DO NOT exist on SettleReq (only from_member/to_member/amount). For a home-category trip, calling /settle would throw AttributeError -> 500 since the `if (split_category=='home' and req.category=='home')` line is reached. The block must be moved to add_expense and use req.name / req.category from ExpenseCreateReq.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4.py",
+    "/app/test_reports/pytest/iteration4_results.xml"
+  ],
+  "action_items": [
+    "[CRITICAL] Move the recurring_suggestion detection block out of the settle() endpoint and into add_expense(). The current code in settle() references req.category and req.name which are not fields on SettleReq -> would 500 on any home-category settlement. Once moved, also re-test that add_expense returns recurring_suggestion for >25-day-old duplicates (cannot fully verify via public API since there is no backdate endpoint; main agent should add a unit/integration test that seeds an old expense directly in Mongo).",
+    "[Minor] Several stale test trips visible on demo home screen ('America', 'canada', 'TEST_member_delete_trip'). My pytest cleanup deleted what it created in this run, but earlier iterations leaked. Consider a cleanup endpoint or a targeted prune of TEST_* and 1-letter trip names so demo home is always pristine.",
+    "[Minor / inherited from iter3] server.py is now 1474 lines — even further past the 700-line split threshold. Consider routers/auth.py, routers/trips.py, routers/ai.py, routers/reminders.py, routers/smart_limit.py."
+  ],
+  "critical_code_review_comments": [
+    "ai_overview() (server.py:1051): clean separation of place_facts (cached forever for trips), forecast (sig-keyed cache, regenerated when expense_signature changes), food_insight (food cat), personality (friends cat). _expense_signature() md5s the sorted (id|amount_base) pairs — correct invalidation when an expense is added/deleted/edited. _parse_json strips ```json fences and falls back to first {...} substring — robust.",
+    "parse_upi() (server.py:1193): returns 400 only when text < 6 chars; if Gemini returns garbage it 422s. Could also strict-validate that amount > 0 to surface 422 for the {'amount':0,'merchant':''} fallback object. Currently a malformed message could return amount=0 with status 200 — main agent may want a validation pass.",
+    "change_trip_currency() (server.py:1236): correctly applies FX rate to every expense.amount_base and to budget; clears ai_cache and invalidates smart_limit cache for all members. Verified end-to-end with INR->USD->INR round trip.",
+    "delete_trip() (server.py:383): membership check now uses owner_id OR any member.user_id — correctly allows joined users (not just trip-creator) to delete. Verified.",
+    "smart_limit (server.py:807) + compute_smart_limit_for_user (647): ai_source field present in payload ('ai_fresh' | 'ai_cache' | 'statistical'). Live demo run returned ai_source='ai_cache' weekly_budget=6113.0 (≠ statistical fallback 5830) — confirming Gemini round-trip + cache hit.",
+    "BUG: recurring_suggestion block (server.py:496-538) is in the wrong endpoint (settle) and references fields that don't exist on SettleReq. Move to add_expense.",
+    "server.py is 1474 lines — split-threshold (700) breached by >2x."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration4.py (new — 10 tests, all green)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 iter4 + 38/38 prior = 48/48). Note: iter4 only verifies recurring_suggestion is NOT returned on first/non-duplicate adds; the >25-day-old duplicate path could not be exercised via public API and is also currently broken in code (see RCA).",
+    "frontend": "smoke OK — login, home, profile, theme, DotNum in light mode all confirmed. Did not exhaustively test create-split / add-expense / split-detail flows due to >15 UI scenarios in spec; main agent should self-verify those screens."
+  },
+  "seed_data_creation": "test_iteration4.py creates and self-cleans: TEST_member_delete_trip (deleted by joined member), TEST_home_recurring (deleted in finally). Two fresh registered users (test_member_*@merizo.app and test_outsider_*@merizo.app) leak into the user collection — uuid-suffixed so no collisions; main agent may want to drop them periodically.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run `python -m pytest backend/tests/test_iteration4.py -v` (10 tests, ~7s, all should pass). Iter4 covers: TestAIOverview (3), TestParseUPI (2), TestCurrencyChange (1, mutates Goa Trip currency twice with restore), TestMemberDelete (1, creates trip + 2 fresh users + invite + delete), TestRecurringSuggestion (1, only verifies absence of field — full path needs DB-level seed), TestSmartLimitAiSource (2). After main agent moves recurring_suggestion to add_expense, add a test that uses a Mongo direct-write to backdate an expense, then re-add the same name, and assert response.recurring_suggestion has expense_id/name/previous_at fields.",
+  "rca_of_issue": "BUG (recurring_suggestion in wrong endpoint): /app/backend/server.py settle() at lines 496-538 contains the recurring detector. SettleReq has only {from_member, to_member, amount} so `req.category` and `req.name` accesses on lines 499 and 501 raise AttributeError. Because the outer guard `if (trip.split_category=='home') and req.category=='home'` short-circuits on the AttributeError, the request would fail with HTTP 500 for ANY home-category settle. Even worse, the spec wanted this on add_expense, not settle, so add_expense never returns recurring_suggestion at all. Mitigation: cut lines 496-538 from settle(), paste them inside add_expense() right before `return serialize_trip(trip, user['id'])`, change `req.category` -> `req.category` (already correct on ExpenseCreateReq), keep `req.name` -> req.name, and re-check that target = req.name.strip().lower() and the new expense.id is excluded from the prev loop."
+}
