@@ -107,9 +107,10 @@ export default function RemindersScreen() {
   };
 
   const cancelScheduledFor = async (reminderId: string) => {
-    if (Platform.OS === "web") return;
     try {
+      // Always clean up the AsyncStorage entry, even on web (for parity if a stray entry exists).
       const nid = await popNotifId(reminderId);
+      if (Platform.OS === "web") return;
       if (nid) {
         await Notifications.cancelScheduledNotificationAsync(nid);
       }

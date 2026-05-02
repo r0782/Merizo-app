@@ -75,8 +75,26 @@ Merizo is a mobile-first expense splitting app that lets friends and roommates c
 10. Cover image auto-resolves from destination + category, user can override from 8 thumbnails ✅
 
 ## Status
-- Backend: 26/26 pytest tests passing (16 from MVP + 10 from iteration 2: smart-limit, reminders CRUD, scan-bill auth + format + real OCR)
-- Frontend: All key screens render correctly. Demo login → Home with carousel + real Smart Limit (~77%) + 3 reminders count works. Theme toggle, Insights donut/gauge, Profile, Category Select, Create Split wizard, Split Detail tabs and Add Expense sheet all working.
+- Backend: 38/38 pytest tests passing (16 MVP + 11 iteration 2 + 11 iteration 3)
+- Frontend: All key screens render correctly. Demo login → Home with carousel + real Smart Limit (~77%) + 3 reminders count works. Theme toggle, Insights donut/gauge, Profile with overbudget-alerts toggle, Category Select, Create Split wizard, Split Detail tabs, Add Expense sheet, Scan Bill OCR, Reminders with notification scheduling — all working.
+
+## Iteration 3 (Polish layer)
+
+### 1. Notification cancellation on complete/delete
+- New `src/lib/settings.ts` exposes a reminder-id → scheduled-notification-id map persisted in AsyncStorage `merizo_notif_map`.
+- `scheduleReminder` stores the returned notif id via `setNotifId`. `cancelScheduledFor` calls `popNotifId` (always cleans the map, even on web) then `Notifications.cancelScheduledNotificationAsync`.
+- Hooked into both `onComplete` and `onDelete` in `app/reminders.tsx`.
+
+### 2. Settings toggle to opt out of overbudget red alerts
+- AsyncStorage key `merizo_overbudget_alerts` (default ON).
+- Toggle in Profile → "SETTINGS" card with switch UI (testID `overbudget-toggle`).
+- `SmartLimitWidget` reads the flag on mount; when OFF, the percent and progress bar stay indigo even when over 100%.
+
+### 3. Smart-limit pre-warm + cache layer
+- `compute_smart_limit_for_user(user_id)` is now a pure helper.
+- `GET /api/smart-limit` reads `db.smart_limit_cache` (TTL 6h). Returns `cache: "hit"|"miss"` so callers can introspect.
+- `invalidate_smart_limit_for_trip(trip)` deletes the cache for every member of a trip after add/delete expense and after settle — verified live (cache=miss right after a mutation, cache=hit thereafter).
+- A background `asyncio.create_task(smart_limit_prewarm_loop())` is launched on FastAPI startup. After a 30s grace it loops over every user, recomputes & writes the cache, then sleeps 6h. Logs `Smart-limit pre-warm completed for N users.` per pass. Verified running in production logs.
 
 ## Iteration 2 (Feature additions on top of MVP)
 
