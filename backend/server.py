@@ -1222,6 +1222,10 @@ async def parse_upi(req: ParseUpiReq, user=Depends(get_current_user)):
     merchant = str(parsed.get("merchant") or "").strip()[:60]
     currency = str(parsed.get("currency") or "INR").upper()[:3]
 
+    # Reject obviously garbage input — both amount missing and no merchant means we couldn't read it.
+    if amount_val <= 0 and not merchant:
+        raise HTTPException(422, detail="Could not parse this message — try a clearer SMS or paste the actual UPI text.")
+
     return {
         "amount": round(amount_val, 2),
         "merchant": merchant,

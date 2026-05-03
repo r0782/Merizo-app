@@ -452,6 +452,9 @@ function OverviewTab({ trip }: { trip: any }) {
         })}
       </View>
 
+      {/* AI Insights — Forecast / Place Facts / Food Insight / Personality (above categories so it's visible without scrolling) */}
+      <AIOverviewSection trip={trip} />
+
       {/* Category breakdown */}
       {cats.length > 0 && (
         <>
@@ -492,9 +495,6 @@ function OverviewTab({ trip }: { trip: any }) {
           </View>
         </>
       )}
-
-      {/* AI Insights — Forecast / Place Facts / Food Insight / Personality */}
-      <AIOverviewSection trip={trip} />
     </View>
   );
 }
