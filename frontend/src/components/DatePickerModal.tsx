@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Modal, Platform, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from "react-native";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme";
@@ -13,7 +13,7 @@ type Props = {
 };
 
 export function DatePickerField({ value, onChange, label, minDate, testID }: Props) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
     value ? new Date(value) : new Date()

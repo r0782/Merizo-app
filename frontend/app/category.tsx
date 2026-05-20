@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../src/lib/theme";
-import { categoryMeta } from "../src/lib/tokens";
 
 const items = [
   { key: "trip", emoji: "✈️", label: "Trip / Travel", description: "Beach, mountains, road trips", grad: ["#0EA5E9", "#0369A1"] },

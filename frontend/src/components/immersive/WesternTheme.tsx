@@ -8,9 +8,9 @@
  * NOT a dark fintech app. A different presentation system entirely.
  */
 
-import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
-import Svg, { Path, Line, Circle, Rect, G } from "react-native-svg";
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import Svg, { Path, Circle } from "react-native-svg";
 import { currencySymbol } from "../../lib/tokens";
 
 // ── Color constants ───────────────────────────────────────────────────────────

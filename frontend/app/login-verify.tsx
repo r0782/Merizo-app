@@ -159,7 +159,6 @@ export default function LoginVerifyOTPScreen() {
                   backgroundColor: c.surface,
                   borderColor: error ? "#EF4444" : c.border,
                   color: c.textPrimary,
-                  outlineStyle: "none",
                 },
               ]}
             />
@@ -195,7 +194,7 @@ export default function LoginVerifyOTPScreen() {
 
           <View style={{ marginTop: 20, alignItems: "center" }}>
             <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-              Didn't receive the code?{" "}
+              Didn&apos;t receive the code?{" "}
               <TouchableOpacity
                 testID="verify-resend"
                 disabled={resendTimer > 0}
@@ -233,7 +232,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 8,
     textAlign: "center",
-    outlineStyle: "none",
   },
   primaryBtn: {
     paddingVertical: 16,

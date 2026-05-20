@@ -14,7 +14,6 @@ export function confirmAction(
 ): Promise<boolean> {
   if (Platform.OS === "web") {
     const text = message ? `${title}\n\n${message}` : title;
-    // eslint-disable-next-line no-alert
     const ok = typeof window !== "undefined" && window.confirm(text);
     return Promise.resolve(!!ok);
   }

@@ -88,8 +88,7 @@ export function StackedCarousel({ trips, onPressCard, onIndexChange }: Props) {
 
   useEffect(() => {
     onIndexChange?.(index);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
+  }, [index, onIndexChange]);
 
   const advance = (dir: 1 | -1) => {
     setIndex((i) => Math.max(0, Math.min(trips.length - 1, i + dir)));
@@ -158,7 +157,7 @@ function CardLayer({
   onPress: () => void;
   pan: ReturnType<typeof Gesture.Pan>;
 }) {
-  const { c, isDark } = useTheme();
+  const { isDark } = useTheme();
 
   const scaleBase = layerIndex === 0 ? 1 : layerIndex === 1 ? 0.93 : 0.86;
   const yBase = layerIndex * 10;

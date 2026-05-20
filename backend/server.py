@@ -573,18 +573,31 @@ async def get_trip(trip_id: str, current_user: dict = Depends(get_current_user))
     for s in settlements:
         s["_id"] = str(s["_id"])
 
+    all_member_ids = trip.get("members", [])
     members_list = []
-    for member_id in trip.get("members", []):
+    for member_id in all_member_ids:
         member = await db.users.find_one({"id": member_id}, {"_id": 0, "password_hash": 0})
         if member:
-            # Compute balance per member
             paid = sum(e.get("amount", 0) for e in expenses if e.get("paid_by") == member_id and not e.get("is_settlement"))
-            n = max(len(trip.get("members", [])), 1)
-            share = sum(e.get("amount", 0) for e in expenses if not e.get("is_settlement")) / n
-            net = round(paid - share, 2)
-            members_list.append({**member, "paid": paid, "share": round(share, 2), "net": net})
+            member_share = 0.0
+            for e in expenses:
+                if e.get("is_settlement"):
+                    continue
+                split_ids = e.get("split_among") or all_member_ids
+                if member_id in split_ids and len(split_ids) > 0:
+                    member_share += e.get("amount", 0) / len(split_ids)
+            member_share = round(member_share, 2)
+            net = round(paid - member_share, 2)
+            members_list.append({**member, "paid": paid, "share": member_share, "net": net})
 
     trip["split_category"] = trip.get("split_category") or trip.get("category") or "trip"
+    # Enrich expenses with paid_by_name and split_among_names for frontend
+    member_name_map = {m["id"]: m["name"] for m in members_list if "id" in m}
+    for e in expenses:
+        if not e.get("paid_by_name"):
+            e["paid_by_name"] = member_name_map.get(e.get("paid_by", ""), "")
+        split_ids = e.get("split_among") or all_member_ids
+        e["split_among_names"] = [member_name_map.get(sid, sid) for sid in split_ids if sid in member_name_map]
     trip["expenses"] = expenses
     trip["settlements"] = settlements
     trip["members"] = members_list
@@ -726,11 +739,20 @@ async def add_expense_to_trip(trip_id: str, request: Request, current_user: dict
         raise HTTPException(status_code=404, detail="Trip not found")
     data = await request.json()
     expense_id = str(uuid.uuid4())
+    paid_by_id = data.get("paid_by", current_user["id"])
+    payer_doc = await db.users.find_one({"id": paid_by_id}, {"name": 1})
+    paid_by_name = payer_doc.get("name", "") if payer_doc else current_user.get("name", "")
+    split_among = data.get("split_among", trip.get("members", []))
+    if not split_among:
+        split_among = trip.get("members", [])
     expense_doc = {
         "id": expense_id,
         "trip_id": trip_id,
-        "paid_by": data.get("paid_by", current_user["id"]),
+        "paid_by": paid_by_id,
+        "paid_by_name": paid_by_name,
+        "split_among": split_among,
         "description": data.get("name") or data.get("description") or "Expense",
+        "name": data.get("name") or data.get("description") or "Expense",
         "amount": float(data.get("amount", 0)),
         "currency": data.get("currency", trip.get("currency", "INR")),
         "split_type": data.get("split_type", "equal"),

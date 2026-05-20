@@ -48,7 +48,6 @@ function ThemeCard({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { c } = useTheme();
   const tp = theme.palette;
 
   return (
@@ -173,7 +172,7 @@ export function CurrencyThemeList({
 }) {
   const { c } = useTheme();
 
-  const options: Array<{ id: CurrencyThemeId | "none"; label: string; sub: string; emoji: string; accent: string }> = [
+  const options: { id: CurrencyThemeId | "none"; label: string; sub: string; emoji: string; accent: string }[] = [
     { id: "none",          label: "Standard",        sub: "Light / Dark mode",       emoji: "🌓", accent: c.accent },
     { id: "westernLedger", label: "Western Ledger",  sub: "USD — Frontier Finance",  emoji: "🤠", accent: "#8C6A3B" },
     { id: "festivalLedger",label: "Festival Ledger", sub: "INR — Festive Elegance",  emoji: "🪔", accent: "#F4B400" },

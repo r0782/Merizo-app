@@ -10,7 +10,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
-import Svg, { Path, Circle, Ellipse, G, Line } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
 import { currencySymbol } from "../../lib/tokens";
 
 // ── Color constants ───────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export function FestivalTicker({ value, currency = "INR", size = "card" }:
         Animated.timing(scale, { toValue: 1,   duration: 2200, useNativeDriver: true }),
       ]),
     ])).start();
-  }, []);
+  }, [glow, scale]);
 
   const amtSz = size === "balance" ? 34 : size === "card" ? 24 : 16;
   const symSz = size === "balance" ? 26 : size === "card" ? 18 : 13;

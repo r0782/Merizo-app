@@ -102,13 +102,12 @@ export default function LoginOTPScreen() {
                   {
                     color: c.textPrimary,
                     flex: 1,
-                    outlineStyle: "none",
                   },
                 ]}
               />
             </View>
             <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 6 }}>
-              We'll send you a 6-digit code via SMS
+              We&apos;ll send you a 6-digit code via SMS
             </Text>
           </View>
 
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
   },
-  input: { fontSize: 15, outlineStyle: "none" },
+  input: { fontSize: 15 },
   primaryBtn: {
     paddingVertical: 16,
     borderRadius: 14,

@@ -10,7 +10,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
-import Svg, { Path, Circle, Line, Rect } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { currencySymbol } from "../../lib/tokens";
 
 // ── Color constants ───────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export function ZenTicker({ value, currency = "JPY", size = "card" }:
   useEffect(() => {
     opacity.setValue(0);
     Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }).start();
-  }, [value]);
+  }, [opacity, value]);
 
   const amtSz = size === "balance" ? 34 : size === "card" ? 26 : 16;
   const symSz = size === "balance" ? 18 : size === "card" ? 14 : 11;

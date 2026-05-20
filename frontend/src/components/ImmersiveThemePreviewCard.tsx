@@ -37,7 +37,7 @@ export function ImmersiveThemePreviewCard({ theme, compact = false }: Props) {
     );
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, [shimmer]);
 
   const accentOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 

@@ -110,7 +110,7 @@ function CurrencyPill({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CurrencyOnboardingScreen() {
-  const { c, isDark, setDefaultCurrency, setImmersiveEnabled, setSelectedCurrencyThemeId } = useTheme();
+  const { c, setDefaultCurrency, setImmersiveEnabled, setSelectedCurrencyThemeId } = useTheme();
   const router = useRouter();
 
   const [selectedCurrency, setSelectedCurrency] = useState("INR");

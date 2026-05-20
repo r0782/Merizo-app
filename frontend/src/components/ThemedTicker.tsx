@@ -123,7 +123,7 @@ function TempleTicker({ value, currency = "INR", size = "card" }: TickerProps) {
         ]),
       ])
     ).start();
-  }, []);
+  }, [glow, scale]);
 
   const amtSize = size === "balance" ? 32 : size === "card" ? 24 : 16;
   const symSize = size === "balance" ? 24 : size === "card" ? 18 : 13;
@@ -184,7 +184,7 @@ function ZenTicker({ value, currency = "JPY", size = "card" }: TickerProps) {
   useEffect(() => {
     opacity.setValue(0);
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
-  }, [value]);
+  }, [opacity, value]);
 
   const amtSize = size === "balance" ? 32 : size === "card" ? 26 : 16;
   const symSize = size === "balance" ? 18 : size === "card" ? 14 : 11;

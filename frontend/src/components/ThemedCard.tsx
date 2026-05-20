@@ -17,7 +17,7 @@
 
 import React from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
-import Svg, { Circle, Line, Path, Rect, G } from "react-native-svg";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 
 type CardProps = {

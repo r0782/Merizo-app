@@ -200,7 +200,7 @@ export default function CreateSplitScreen() {
                   testID="create-duedate"
                 />
                 <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 6 }}>
-                  We'll remind you to settle this split on the due date.
+                  We&apos;ll remind you to settle this split on the due date.
                 </Text>
               </View>
             )}
@@ -242,11 +242,15 @@ export default function CreateSplitScreen() {
 
             {/* Add from contacts */}
             <ContactPickerButton
-              onSelect={(contact) => {
-                const name = contact.name?.trim();
-                if (name && !members.includes(name)) {
-                  setMembers((prev) => [...prev, name]);
-                }
+              onSelectContacts={(contacts) => {
+                setMembers((prev) => {
+                  const next = new Set(prev);
+                  contacts.forEach((contact) => {
+                    const value = contact.trim();
+                    if (value) next.add(value);
+                  });
+                  return Array.from(next);
+                });
               }}
             />
 
@@ -362,7 +366,7 @@ function DateField({
   setValue: (s: string) => void;
   testID?: string;
 }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const today = new Date();
   const minDate = today.toISOString().slice(0, 10);
 

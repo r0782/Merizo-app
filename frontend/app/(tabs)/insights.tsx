@@ -4,9 +4,9 @@ import { useFocusEffect } from "expo-router";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { GaugeDial, HybridBar } from "../../src/components/Charts";
-import { SmartNum, DotNum } from "../../src/components/DotNum";
+import { SmartNum } from "../../src/components/DotNum";
 import { categoryMeta, currencySymbol } from "../../src/lib/tokens";
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from "react-native-reanimated";
+import { useSharedValue, withRepeat, withTiming, Easing } from "react-native-reanimated";
 import { NumberTicker } from "../../src/components/NumberTicker";
 
 type Period = "week" | "month" | "all";
@@ -42,17 +42,13 @@ export default function InsightsScreen() {
 
   const tickerScrollX = useSharedValue(0);
 
-useEffect(() => {
-  tickerScrollX.value = withRepeat(
-    withTiming(-80, { duration: 3500, easing: Easing.linear }),
-    -1,
-    true
-  );
-}, [total]);
-
-const tickerAnimatedStyle = useAnimatedStyle(() => ({
-  transform: [{ translateX: tickerScrollX.value }],
-}));
+  useEffect(() => {
+    tickerScrollX.value = withRepeat(
+      withTiming(-80, { duration: 3500, easing: Easing.linear }),
+      -1,
+      true
+    );
+  }, [tickerScrollX, total]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>

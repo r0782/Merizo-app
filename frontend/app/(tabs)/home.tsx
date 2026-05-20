@@ -15,7 +15,7 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { StackedCarousel } from "../../src/components/StackedCarousel";
 import { SmartLimitWidget } from "../../src/components/SmartLimit";
-import { SmartNum, DotNum } from "../../src/components/DotNum";
+import { SmartNum } from "../../src/components/DotNum";
 import { currencySymbol } from "../../src/lib/tokens";
 
 export default function HomeScreen() {
@@ -42,7 +42,7 @@ export default function HomeScreen() {
       setSmartLimit(smartRes.data || { percent: 0 });
       setReminderCount((remRes.data || []).length);
       setInsightCount((insRes.data?.by_category || []).length);
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, []);

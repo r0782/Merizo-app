@@ -10,7 +10,7 @@
 
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import Svg, { Path, Circle, Line, G } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
 import { currencySymbol } from "../../lib/tokens";
 
 // ── Color constants ───────────────────────────────────────────────────────────

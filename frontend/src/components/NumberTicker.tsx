@@ -5,7 +5,7 @@
  * Keeps the 60fps linear animation, drops the dot-matrix rendering.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 
 type Props = {
@@ -24,9 +24,10 @@ export function NumberTicker({
   testID,
 }: Props) {
   const [displayValue, setDisplayValue] = React.useState(0);
+  const displayValueRef = useRef(0);
 
   useEffect(() => {
-    const startValue = displayValue;
+    const startValue = displayValueRef.current;
     const diff       = value - startValue;
     const steps      = Math.max(60, Math.floor(duration / 16));
     let   currentStep = 0;
@@ -35,9 +36,11 @@ export function NumberTicker({
       currentStep++;
       const progress = currentStep / steps;   // linear — all digits move at same speed
       const newValue = startValue + diff * progress;
+      displayValueRef.current = newValue;
       setDisplayValue(newValue);
 
       if (currentStep >= steps) {
+        displayValueRef.current = value;
         setDisplayValue(value);
         clearInterval(interval);
       }

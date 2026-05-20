@@ -1,31 +1,33 @@
 export const palette = {
+  // Warm ledger paper — a living financial notebook
   light: {
-    bg: "#F5F5F5",
-    surface: "#FFFFFF",
-    surfaceAlt: "#FAFAFA",
-    border: "rgba(0,0,0,0.06)",
-    textPrimary: "#0A0A0A",
-    textSecondary: "#888888",
-    textMuted: "#B8B8B8",
-    accent: "#0A0A0A",
-    accentSoft: "#0A0A0A",
-    positive: "#16A34A",
-    negative: "#DC2626",
-    indigo: "#7C5CFF",
+    bg:           "#F5F1E8",  // warm ledger paper
+    surface:      "#EDE7D8",  // aged receipt paper
+    surfaceAlt:   "#E4DBCA",  // deeper paper
+    border:       "#C4B89A",  // faded accounting lines
+    textPrimary:  "#1F1A17",  // dark ink
+    textSecondary:"#5C4F3A",  // faded ink
+    textMuted:    "#9A8970",  // very faded ink
+    accent:       "#1F1A17",  // ink black
+    accentSoft:   "rgba(31,26,23,0.07)",
+    positive:     "#3D6B3D",  // ledger green ink
+    negative:     "#9C3D32",  // accounting red ink
+    indigo:       "#5B4A8A",  // muted purple (for brand)
   },
+  // Dark leather — aged accounting book at night
   dark: {
-    bg: "#0D0D0D",
-    surface: "#1A1A1A",
-    surfaceAlt: "#141414",
-    border: "rgba(255,255,255,0.07)",
-    textPrimary: "#FFFFFF",
-    textSecondary: "#777777",
-    textMuted: "#3F3F3F",
-    accent: "#7C5CFF",
-    accentSoft: "rgba(124,92,255,0.18)",
-    positive: "#4ADE80",
-    negative: "#F87171",
-    indigo: "#7C5CFF",
+    bg:           "#1C1712",  // dark leather
+    surface:      "#252018",  // dark paper
+    surfaceAlt:   "#2E2820",  // raised dark surface
+    border:       "rgba(196,184,154,0.12)",
+    textPrimary:  "#F0EAD6",  // aged paper white
+    textSecondary:"#A89878",  // faded page text
+    textMuted:    "#6B5D4A",  // very faded
+    accent:       "#7C5CFF",  // indigo (original brand color)
+    accentSoft:   "rgba(124,92,255,0.15)",
+    positive:     "#6BAE6B",  // green ink
+    negative:     "#C25B52",  // red ink
+    indigo:       "#7C5CFF",
   },
 };
 

@@ -40,7 +40,7 @@ export default function ScanBillScreen() {
       setTrips(r.data || []);
       if (!selectedTripId && r.data?.[0]) setSelectedTripId(r.data[0].id);
     }).catch(() => {});
-  }, []);
+  }, [selectedTripId]);
 
   const pickFromGallery = async () => {
     if (Platform.OS !== "web") {
@@ -130,7 +130,7 @@ export default function ScanBillScreen() {
         split_among: trip.members.map((m: any) => m.id),
       });
       router.replace({ pathname: "/split/[id]", params: { id: selectedTripId } });
-    } catch (e: any) {
+    } catch {
       Alert.alert("Error", "Could not add expense");
     } finally {
       setAdding(false);

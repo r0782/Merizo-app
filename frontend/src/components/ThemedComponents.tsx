@@ -10,7 +10,7 @@ import {
   View, Text, TouchableOpacity,
   StyleSheet, ViewStyle, TextStyle,
 } from "react-native";
-import Svg, { Path, Line, Circle, G, Rect } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme";
 

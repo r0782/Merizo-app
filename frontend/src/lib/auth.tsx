@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, setToken, getToken, authHooks } from "./api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type User = { id: string; email: string; name: string; avatar?: string | null };
 type AuthCtx = {
@@ -90,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLoading(false);
-      return true;
     } catch (e) {
       console.error("Token login failed:", e);
       await setToken(null);

@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import Svg, { Circle, Line, Path } from "react-native-svg";
+import Svg, { Circle, Line } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 
 // Big speedometer-style gauge (dark mode)

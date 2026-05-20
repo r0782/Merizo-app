@@ -16,15 +16,12 @@ import {
   Switch,
   TouchableOpacity,
   StyleSheet,
-  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useTheme } from "../lib/theme";
 import { CurrencyThemeList } from "./CurrencyThemeSelector";
 import { ImmersiveThemePreviewCard } from "./ImmersiveThemePreviewCard";
 import type { CurrencyThemeId } from "../lib/currencyThemes";
-import { currencyOptions } from "../lib/tokens";
 
 // ── Currency picker row ────────────────────────────────────────────────────────
 
@@ -83,7 +80,7 @@ function CurrencyRow({
 
 export function FinancialRealmsSettings() {
   const {
-    c, isDark, isImmersive,
+    c,
     currencyTheme,
     immersiveEnabled,       setImmersiveEnabled,
     selectedCurrencyThemeId, setSelectedCurrencyThemeId,
@@ -92,7 +89,6 @@ export function FinancialRealmsSettings() {
   } = useTheme();
 
   const [showThemeList, setShowThemeList] = useState(false);
-  const router = useRouter();
 
   return (
     <View style={[styles.container, { backgroundColor: c.surface, borderColor: c.border }]}>
