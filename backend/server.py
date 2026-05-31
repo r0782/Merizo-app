@@ -3,10 +3,12 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-import os, uuid, json, logging, secrets, asyncio, hashlib, base64, random, string, csv, io
+import os
+import json, uuid, json, logging, secrets, asyncio, hashlib, base64, random, string, csv, io
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import bcrypt, jwt, httpx
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
@@ -186,6 +188,73 @@ async def compute_trip_summary(trip: dict, user_id: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
+
+class SocialLoginReq(BaseModel):
+    supabase_token: str
+    email: str = ""
+    phone: str = ""
+    name:  str = "User"
+
+@api.post("/auth/social-login")
+async def social_login(req: SocialLoginReq):
+    """Exchange Supabase OTP/OAuth token for our app JWT."""
+    # Verify with Supabase by fetching the user
+    try:
+        result = await asyncio.to_thread(
+            lambda: sb.auth.get_user(req.supabase_token)
+        )
+        sb_user = result.user
+        if not sb_user:
+            raise HTTPException(401, "Invalid Supabase token")
+    except Exception as e:
+        raise HTTPException(401, f"Token verification failed: {e}")
+
+    # Determine identifier
+    identifier = sb_user.email or req.email or sb_user.phone or req.phone
+    if not identifier:
+        raise HTTPException(400, "No email or phone from auth provider")
+
+    # Get or create user in our database
+    user = None
+    if sb_user.email or req.email:
+        em = sb_user.email or req.email
+        user = await sb_one("users", email=em)
+        if not user:
+            uid  = str(uuid.uuid4())
+            name = req.name or sb_user.user_metadata.get("full_name","") or em.split("@")[0]
+            await sb_insert("users", {
+                "id": uid, "email": em, "name": name,
+                "password_hash": hash_pw(str(uuid.uuid4())),  # random, login via OTP
+                "created_at": datetime.utcnow().isoformat(),
+            })
+            user = await sb_one("users", email=em)
+    elif sb_user.phone or req.phone:
+        ph = sb_user.phone or req.phone
+        user = await sb_one("users", phone=ph)
+        if not user:
+            uid  = str(uuid.uuid4())
+            name = req.name or "User"
+            em   = f"phone_{ph.replace('+','')}@merizo.app"
+            await sb_insert("users", {
+                "id": uid, "email": em, "name": name, "phone": ph,
+                "password_hash": hash_pw(str(uuid.uuid4())),
+                "created_at": datetime.utcnow().isoformat(),
+            })
+            user = await sb_one("users", phone=ph)
+
+    if not user:
+        raise HTTPException(500, "Could not create user")
+
+    token = make_jwt(user["id"])
+    return {
+        "token": token,
+        "user": {
+            "id":    user["id"],
+            "name":  user.get("name",""),
+            "email": user.get("email",""),
+        }
+    }
+
 @api.post("/auth/login")
 async def login(req: LoginRequest):
     user = await sb_one("users", email=req.email)
@@ -645,6 +714,125 @@ async def scan_bill(request: Request, current_user: dict = Depends(get_current_u
 # ══════════════════════════════════════════════════════════════════════════════
 # STARTUP
 # ══════════════════════════════════════════════════════════════════════════════
+
+class SmartSplitReq(BaseModel):
+    conversation: str
+
+@api.post("/smart-split")
+async def smart_split(req: SmartSplitReq):
+    """AI expense splitting — parses natural language in any language."""
+    import httpx
+    ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not ANTHROPIC_KEY:
+        raise HTTPException(500, "AI not configured")
+
+    system = """You are Smart Split inside Merizo, an AI expense splitting assistant.
+You understand ANY language: English, Hindi, Telugu, Tamil, Kannada, Hinglish, mixed languages.
+
+CRITICAL: Always look at the FULL conversation history. If the user gives a single number like "3" or "5",
+it is answering your previous question (e.g. how many people). Use that number accordingly.
+
+Examples:
+- "i paid 5000 for lunch with four people" → total=5000, INR, people=4, done=true
+- "neynu 500 pay cheysa 5 members ki" → total=500, INR, people=5, done=true (Telugu)
+- "bhai 4200 ka dinner tha hum 6 the" → total=4200, INR, people=6, done=true (Hinglish)
+- "2k petrol split 3 ways" → total=2000, INR, people=3, done=true
+- "hotel 6000 five people" → total=6000, INR, people=5, done=true
+- Previous AI asked "How many people?" → User says "3" → people=3, use last known amount
+
+Number words: two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9, ten=10
+Telugu: rendu=2, moodu=3, nalugu=4, aidu=5, aaru=6
+Hindi: do=2, teen=3, char=4, paanch=5, chhe=6
+"2k"=2000, "1.5k"=1500, "1L"/"1 lakh"=100000
+
+Rules:
+1. done=true when you have BOTH total amount AND number of people
+2. done=false: ask ONE short question (max 10 words)
+3. If conversation shows AI already asked for people count and user replied with a number → use it
+4. Rows: use names if given, else "Person 1", "Person 2" etc
+5. Reply when done=true: "₹X each for N people ✓" (short, warm)
+6. ONLY output JSON. No markdown. No extra text.
+
+JSON: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR","people":number,"description":"string","each":number,"rows":[{"name":"string","amount":number}],"tip":number|null}}"""
+
+    try:
+        gemini_key = os.environ.get("GEMINI_KEY", "")
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": system + "\n\n" + req.conversation}]}],
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 600},
+                }
+            )
+        data = r.json()
+        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+        # Extract JSON
+        import re
+        m = re.search(r'\{.*\}', text, re.DOTALL)
+        if m:
+            return JSONResponse(content=json.loads(m.group()))
+        return {"done": False, "reply": "Could not understand. Try again?"}
+    except Exception as e:
+        logger.error(f"smart-split error: {e}")
+        return {"done": False, "reply": "AI unavailable. Try: '₹500 for 3 people'"}
+
+
+class SmartSplitReq(BaseModel):
+    conversation: str
+
+@api.post("/smart-split")
+async def smart_split(req: SmartSplitReq):
+    """AI expense parser — uses Google Gemini Flash (FREE: 1M tokens/day)."""
+    import httpx, os, re as re2
+    key = os.environ.get("GEMINI_KEY", "")
+    if not key:
+        raise HTTPException(500, "GEMINI_KEY not set in environment")
+
+    system = """You are Smart Split inside Merizo, an AI expense splitting assistant.
+Understand ANY language or informal text: English, Hindi, Telugu, Tamil, Kannada, Hinglish.
+
+Examples you MUST understand:
+- "i paid 5000 usd for lunch with four people"
+- "neynu 500 pay cheysa total 5 memebrs" (Telugu)
+- "hotel 6000 rupees 5 log" (Hindi)
+- "bhai 4200 ka dinner tha hum 6 the" (Hinglish)
+- "cab 850 with ramu and priya" (3 people: me+ramu+priya)
+- "2k petrol 3 ways" (2k=2000)
+- user says just "3" or "5" as reply = number of people
+- user says just "500" or "₹500" as reply = amount
+
+Number understanding: 2k=2000, 1L=100000, "four"=4, "paanch"=5, "aidu"=5(Telugu)
+Typos are fine: "memebrs"=members, "peple"=people, "toal"=total
+
+Rules:
+1. amount + people both known → done:true, compute each = total/people
+2. missing people → ask only "How many people?"
+3. missing amount → ask only "What was the total amount?"
+4. done reply should be: "₹X each for N people ✓"
+5. ALWAYS return valid JSON only, no markdown
+
+Format: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR","people":number,"description":"string","each":number,"rows":[{"name":"string","amount":number}],"tip":null}}"""
+
+    try:
+        prompt = system + "\n\nConversation:\n" + req.conversation + "\n\nRespond with JSON only:"
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 600},
+                }
+            )
+        data = r.json()
+        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+        m = re2.search(r"\{[\s\S]*\}", text)
+        return {"ok": True, "data": m.group() if m else "{}"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.on_event("startup")
 async def startup():
     logger.info("Merizo API starting (Supabase backend)...")
