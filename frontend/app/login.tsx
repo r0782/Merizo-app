@@ -46,7 +46,7 @@ export default function LoginScreen() {
       const r = await api.post("/auth/login", {
         email: email.trim().toLowerCase(), password,
       });
-      await login(r.data.token, r.data.user);
+      await login(r.data.access_token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
       Alert.alert("Login failed", e?.response?.data?.detail || "Check your credentials");
@@ -111,7 +111,7 @@ export default function LoginScreen() {
              || session?.user?.email?.split("@")[0]
              || "User",
       });
-      await login(r.data.token, r.data.user);
+      await login(r.data.access_token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
       Alert.alert("Invalid code", e?.message || "Try again");
