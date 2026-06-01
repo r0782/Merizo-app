@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: merizo-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DEMO_EMAIL
+        value: demo@merizo.app
+      - key: DEMO_PASSWORD
+        value: Demo@123
+      - key: DEMO_NAME
+        value: Demo User
+      - key: PORT
+        value: 8000

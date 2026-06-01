@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,14 +13,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Share,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SkeletonGroupDetail, SkeletonExpenseCard, FadeIn } from "../../src/components/Skeleton";
+import { EmptyExpenses } from "../../src/components/EmptyStates";
+import { cache, CK, TTL } from "../../src/lib/cache";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { confirmAction } from "../../src/lib/confirm";
-import { VoiceExpenseSheet } from "../../src/components/Voiceexpensesheet";
+import { GaugeDial, HybridBar } from "../../src/components/Charts";
+import { AnimatedSmartNum } from "../../src/components/AnimatedSmartNum";
 import {
   resolveCover,
   categoryMeta,
@@ -28,12 +33,64 @@ import {
   currencyOptions,
   detectCategory,
 } from "../../src/lib/tokens";
+import { SmartNum } from "../../src/components/DotNum";
+import { ExpandingFAB } from "../../src/components/ExpandingFAB";
+import { VoiceExpenseSheet } from "../../src/components/VoiceExpenseSheet";
+import * as Print from "expo-print";
+import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 
-type Tab = "ledger" | "balances" | "insights" | "members";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// ── UPI payment deep link ─────────────────────────────────────────────────────
+function openUPI(upiId: string, name: string, amount: number, note: string) {
+  const url = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}&mode=02`;
+  Linking.canOpenURL(url).then(can => {
+    if (can) Linking.openURL(url);
+    else Alert.alert("No UPI App", "Install GPay, PhonePe or Paytm to pay directly.", [
+      { text: "OK" },
+    ]);
+  });
+}
+
+// ── Share summary — WhatsApp on mobile, web URL on browser, native share fallback ─
+async function shareGroupSummary(tripId: string, tripName: string, mode: "whatsapp" | "share" = "whatsapp") {
+  try {
+    const r = await api.get("/trips/" + tripId + "/share-summary");
+    const text = r.data.text;
+
+    if (Platform.OS === "web") {
+      if (mode === "whatsapp") {
+        // WhatsApp Web API
+        (window as any).open("https://api.whatsapp.com/send?text=" + encodeURIComponent(text), "_blank");
+      } else {
+        // Copy to clipboard + alert
+        try {
+          await (navigator as any).clipboard.writeText(text);
+          Alert.alert("Copied!", "Summary copied to clipboard. Paste it anywhere.");
+        } catch {
+          // Fallback: open in new tab
+          const blob = new Blob([text], { type: "text/plain" });
+          const url  = URL.createObjectURL(blob);
+          (window as any).open(url, "_blank");
+        }
+      }
+    } else {
+      // Native: try WhatsApp deep link first
+      const wa = "whatsapp://send?text=" + encodeURIComponent(text);
+      const canWA = await Linking.canOpenURL(wa);
+      if (canWA && mode === "whatsapp") {
+        await Linking.openURL(wa);
+      } else {
+        await Share.share({ message: text, title: tripName + " — Merizo Summary" });
+      }
+    }
+  } catch {
+    Alert.alert("Error", "Could not generate summary. Make sure you're connected.");
+  }
+}
+
+type Tab = "journal" | "settle" | "insights" | "members";
+
 export default function SplitDetailScreen() {
   const { c, isDark } = useTheme();
   const { user } = useAuth();
@@ -43,20 +100,33 @@ export default function SplitDetailScreen() {
 
   const [trip, setTrip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>((params.tab as Tab) || "ledger");
+  const [tab, setTab] = useState<Tab>((params.tab as Tab) || "journal");
   const [showAdd, setShowAdd] = useState(params.action === "add");
   const [showMember, setShowMember] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showVoice, setShowVoice] = useState(false);
+  const [showSettings,  setShowSettings]  = useState(false);
+  const [showVoice,     setShowVoice]     = useState(false);
+  const [reportData,    setReportData]    = useState<any>(null);
+  const [pdfLoading,    setPdfLoading]    = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const r = await api.get(`/trips/${tripId}`);
+      const { data: cached, isStale } = cache.get(CK.trip(tripId));
+      if (cached) {
+        setTrip(cached);
+        if (!silent) setLoading(false);
+        if (!isStale) return;
+      }
+      const r = await api.get("/trips/" + tripId);
+      cache.set(CK.trip(tripId), r.data, TTL.TRIP_DETAIL);
       setTrip(r.data);
-    } catch {
-      Alert.alert("Error", "Could not load split");
+    } catch (e: any) {
+      if (e?.response?.status === 401) router.replace("/login");
     }
+    if (!silent) setLoading(false);
   }, [tripId]);
+
+  const silentLoad = useCallback(() => { load(true); }, [load]);
 
   useEffect(() => {
     (async () => {
@@ -66,13 +136,7 @@ export default function SplitDetailScreen() {
     })();
   }, [load]);
 
-  if (loading || !trip) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
-        <ActivityIndicator color={c.indigo} size="large" />
-      </View>
-    );
-  }
+  if (loading || !trip) { return <SkeletonGroupDetail />; }
 
   const cover = resolveCover(trip.destinations, trip.split_category, trip.cover_key);
   const isOwner = trip.owner_id === user?.id;
@@ -115,26 +179,24 @@ export default function SplitDetailScreen() {
           </View>
         </View>
 
-        {/* Tabs */}
-        <View style={[styles.tabBar, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {/* Cinematic tab bar */}
+        <View style={{ flexDirection: "row", backgroundColor: isDark ? "#14110F" : c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
           {([
-            { id: "ledger",   label: "Ledger"   },
-            { id: "balances", label: "Balances" },
-            { id: "insights", label: "Insights" },
-            { id: "members",  label: "Members"  },
-          ] as { id: Tab; label: string }[]).map(({ id: t, label }) => {
+            { id: "journal",  label: "JOURNAL",  icon: "book-outline"       },
+            { id: "settle",   label: "SETTLE",   icon: "swap-horizontal-outline" },
+            { id: "insights", label: "AI",       icon: "sparkles-outline"   },
+            { id: "members",  label: "MEMBERS",  icon: "people-outline"     },
+          ] as { id: Tab; label: string; icon: any }[]).map(({ id: t, label, icon }) => {
             const active = tab === t;
             return (
               <TouchableOpacity
                 key={t}
                 testID={`tab-${t}`}
                 onPress={() => setTab(t)}
-                style={[
-                  styles.tab,
-                  { backgroundColor: active ? (isDark ? c.indigo : "#0A0A0A") : "transparent" },
-                ]}
+                style={{ flex: 1, paddingVertical: 11, alignItems: "center", borderBottomWidth: active ? 2 : 0, borderBottomColor: isDark ? c.accent : "#1F1A17", gap: 3 }}
               >
-                <Text style={{ color: active ? "#fff" : c.textSecondary, fontWeight: "700", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                <Ionicons name={icon} size={14} color={active ? (isDark ? c.accent : "#1F1A17") : c.textMuted} />
+                <Text style={{ color: active ? (isDark ? c.accent : "#1F1A17") : c.textMuted, fontSize: 7, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular" }}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -142,22 +204,21 @@ export default function SplitDetailScreen() {
           })}
         </View>
 
-        {tab === "ledger"   && <LedgerTab   trip={trip} onChange={load} userId={user?.id || ""} />}
-        {tab === "balances" && <BalancesTab  trip={trip} onChange={load} userId={user?.id || ""} />}
-        {tab === "insights" && <InsightsTab  trip={trip} />}
-        {tab === "members"  && <MembersTab   trip={trip} onAdd={() => setShowMember(true)} onShare={onShareInvite} onUpdate={load} />}
+        {tab === "journal"  && <LedgerTab   trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
+        {tab === "settle"   && <BalancesTab trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
+        {tab === "insights" && <InsightsTab trip={trip} />}
+        {tab === "members"  && <MembersTab  trip={trip} onAdd={() => setShowMember(true)} onShare={onShareInvite} onUpdate={load} />}
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        testID="split-fab"
-        onPress={() => setShowAdd(true)}
-        style={[styles.fab, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+      {/* Expanding FAB — all actions */}
+      <ExpandingFAB options={[
+        { label: "Quick Add",       sublabel: "Type expense manually",    icon: "create-outline",           onPress: () => setShowAdd(true) },
+        { label: "Speak Expense",   sublabel: "Say it, AI parses it",     icon: "mic-outline",              onPress: () => setShowVoice(true) },
+        { label: "Scan Receipt",    sublabel: "Camera · auto-fill",       icon: "camera-outline",           onPress: () => setShowAdd(true) },
+        { label: "Download Report", sublabel: "AI insights PDF",          icon: "document-text-outline",    onPress: onDownloadPDF },
+      ]} />
 
-      {/* Voice Expense Modal */}
+      {/* Voice Expense modal */}
       {showVoice && (
         <VoiceExpenseSheet
           trip={trip}
@@ -215,21 +276,202 @@ export default function SplitDetailScreen() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEDGER TAB
-// ─────────────────────────────────────────────────────────────────────────────
+// --- AI Overview Section (forecast / fun facts / food insight / personality) ---
+function AIOverviewSection({ trip }: { trip: any }) {
+  const { c, isDark } = useTheme();
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const sigKey = useMemo(() => {
+    return (trip.expenses || []).filter((e: any) => !e.is_settlement).length + ":" + (trip.split_category || "");
+  }, [trip]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setFailed(false);
+        const r = await api.get(`/trips/${trip.id}/ai/overview`);
+        if (!alive) return;
+        setData(r.data);
+      } catch {
+        if (!alive) return;
+        setFailed(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [trip.id, sigKey]);
+
+  if (failed) return null;
+
+  const indigo = isDark ? c.indigo : "#0A0A0A";
+  const indigoBg = isDark ? "rgba(124,92,255,0.16)" : "#0A0A0A";
+  const personalityFg = isDark ? "#fff" : "#fff";
+
+  const showAnything =
+    loading ||
+    (data && (data.forecast || data.place_facts || data.food_insight || data.personality));
+
+  if (!showAnything) return null;
+
+  return (
+    <View style={styles.aiSection}>
+      <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6 }}>
+        AI INSIGHTS
+      </Text>
+
+      {/* Forecast chip */}
+      {(loading || data?.forecast) && (
+        <View>
+          {loading && !data?.forecast ? (
+            <Skeleton style={[styles.forecastChip, { backgroundColor: c.surface, borderColor: c.border, width: 240 }]} />
+          ) : (
+            <View
+              testID="ai-forecast-chip"
+              style={[
+                styles.forecastChip,
+                { backgroundColor: c.surface, borderColor: c.border },
+              ]}
+            >
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", textAlign: "center" }}>
+                {data.forecast.text}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Food Insight */}
+      {(data?.category === "food" && (loading || data?.food_insight)) && (
+        <View style={{ marginTop: 12 }}>
+          {loading && !data?.food_insight ? (
+            <Skeleton style={[styles.insightCard, { backgroundColor: c.surface, borderColor: c.border, height: 60 }]} />
+          ) : (
+            <View testID="ai-food-insight" style={[styles.insightCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <View style={[styles.aiBadge, { backgroundColor: isDark ? "rgba(124,92,255,0.18)" : "#EEF2FF", marginRight: 10, marginLeft: 0 }]}>
+                <Text style={{ color: indigo, fontSize: 9, fontWeight: "800" }}>AI</Text>
+              </View>
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "600", flex: 1, lineHeight: 18 }}>
+                {data.food_insight.text}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Group Personality (friends category) */}
+      {(data?.category === "friends" && (loading || data?.personality)) && (
+        <View style={{ marginTop: 12 }}>
+          {loading && !data?.personality ? (
+            <Skeleton style={[styles.personalityCard, { backgroundColor: c.surface, height: 90 }]} />
+          ) : (
+            <View
+              testID="ai-personality"
+              style={[styles.personalityCard, { backgroundColor: indigoBg }]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <Text style={{ fontSize: 24 }}>{data.personality.emoji}</Text>
+                <Text
+                  style={{
+                    color: personalityFg,
+                    fontSize: 18,
+                    fontFamily: "Syne_700Bold",
+                    marginLeft: 10,
+                    flex: 1,
+                  }}
+                >
+                  {data.personality.title}
+                </Text>
+              </View>
+              <Text style={{ color: isDark ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.9)", fontSize: 12 }}>
+                {data.personality.description}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Place Facts (trip category) */}
+      {(data?.category === "trip" && (loading || data?.place_facts)) && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", marginBottom: 8 }}>
+            Fun facts about {data?.place_facts?.place || "this place"}
+          </Text>
+          {loading && !data?.place_facts ? (
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Skeleton style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]} />
+              <Skeleton style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]} />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, paddingRight: 24 }}
+              testID="ai-place-facts"
+            >
+              {(data.place_facts.facts || []).map((f: string, i: number) => (
+                <View
+                  key={i}
+                  style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]}
+                >
+                  <Text style={{ fontSize: 16 }}>📍</Text>
+                  <Text
+                    style={{
+                      color: c.textPrimary,
+                      fontSize: 13,
+                      fontFamily: "Syne_500Medium",
+                      lineHeight: 18,
+                      marginTop: 8,
+                      flex: 1,
+                    }}
+                  >
+                    {f}
+                  </Text>
+                  <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: "700", letterSpacing: 0.6, marginTop: 8 }}>
+                    {(data.place_facts.place || "").toUpperCase()}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Skeleton({ style }: { style: any }) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={[
+        style,
+        { backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, opacity: 0.55 },
+      ]}
+    />
+  );
+}
+
+// --- Overview Tab ---
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEDGER TAB — chronological financial timeline
+// ═══════════════════════════════════════════════════════════════════════════════
 function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void; userId: string }) {
   const { c, isDark } = useTheme();
-  const expenses: any[] = [...(trip.expenses || [])].sort(
-    (a: any, b: any) => (b.date || "").localeCompare(a.date || "")
-  );
+  const expenses: any[] = trip.expenses || [];
   const currency = trip.currency || "INR";
   const sym = currencySymbol(currency);
-  const allMembers: any[] = trip.members || [];
-  const nameMap = new Map(allMembers.map((m: any) => [m.id, m.name]));
+  const memberCount = (trip.members || []).length || 1;
 
+  // Group by date
   const grouped: Record<string, any[]> = {};
-  for (const e of expenses) {
+  for (const e of [...expenses].sort((a, b) => b.date?.localeCompare(a.date ?? "") ?? 0)) {
     const day = (e.date || "").split("T")[0] || "Unknown";
     if (!grouped[day]) grouped[day] = [];
     grouped[day].push(e);
@@ -237,128 +479,133 @@ function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void
 
   const formatDay = (d: string) => {
     try {
-      return new Date(d).toLocaleDateString("en-GB", {
-        weekday: "short", day: "numeric", month: "long", year: "numeric",
-      }).toUpperCase();
+      return new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase();
     } catch { return d; }
   };
 
   const deleteExpense = async (expId: string) => {
-    const ok = await confirmAction("Remove entry", "Delete this ledger entry?", "Delete", true);
-    if (!ok) return;
-    try { await api.delete("/expenses/" + expId); onChange(); }
-    catch { Alert.alert("Error", "Could not delete"); }
+    try {
+      await api.delete(`/expenses/${expId}`);
+      onChange();
+    } catch { Alert.alert("Error", "Could not delete"); }
   };
 
   if (expenses.length === 0) {
-    return (
-      <View style={{ paddingHorizontal: 24, paddingTop: 40, alignItems: "center", gap: 12 }}>
-        <Text style={{ color: c.textMuted, fontSize: 13, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" }}>NO ENTRIES YET</Text>
-        <Text style={{ color: c.textSecondary, fontSize: 13, textAlign: "center", lineHeight: 20 }}>
-          Tap + to add your first expense to the ledger.
-        </Text>
-      </View>
-    );
+    return <EmptyExpenses onPrimary={() => {}} />;
   }
 
   return (
-    <View style={{ paddingHorizontal: 20 }}>
+    <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
       {Object.entries(grouped).map(([day, dayExps]) => (
-        <View key={day}>
-          <View style={{ marginTop: 24, marginBottom: 14 }}>
-            <View style={{ height: 1, backgroundColor: c.border }} />
-            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2.5, marginTop: 7, fontFamily: "RobotoMono_400Regular" }}>
-              {formatDay(day)}
-            </Text>
+        <View key={day} style={{ marginBottom: 24 }}>
+          {/* Date header */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12, marginTop: 8 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+            <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: "700", letterSpacing: 2 }}>{formatDay(day)}</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
           </View>
 
-          {dayExps.map((exp: any) => {
-            const catInfo   = categoryMeta[exp.category] || { emoji: "💸", label: "Other" };
-            const payerId   = exp.paid_by || "";
-            const payerName = exp.paid_by_name || nameMap.get(payerId) || "Someone";
-            const isYouPaid = payerId === userId;
+          {dayExps.map((exp) => {
+            /* ── Use ONLY the actual split members, not all trip members ── */
+            const allMems: any[] = trip.members || [];
+            const nMap = new Map(allMems.map((m: any) => [m.id, m.name]));
 
-            const splitIds: string[]   = exp.split_among || allMembers.map((m: any) => m.id);
-            const splitNames: string[] = exp.split_among_names?.length
-              ? exp.split_among_names
-              : splitIds.map((id: string) => nameMap.get(id) || id);
+            /* splitIds = who is actually in this expense's split */
+            const splitIds: string[] =
+              exp.split_among && exp.split_among.length > 0
+                ? exp.split_among
+                : allMems.map((m: any) => m.id);
+
             const splitCount = Math.max(splitIds.length, 1);
-            const perPerson  = Math.round(exp.amount / splitCount);
-            const amIInSplit = splitIds.includes(userId);
+            const perPerson  = Math.round(exp.amount / splitCount); // ← uses actual split size
+
+            const payerId    = exp.paid_by || "";
+            const payerName  = exp.paid_by_name || nMap.get(payerId) || "—";
+            const isYouPaid  = payerId === userId;
+
+            /* Build display list from splitIds only */
+            const splitDisplay = splitIds.map((id: string) => ({
+              id,
+              name: id === userId ? "You" : (nMap.get(id) || id),
+              isPayer: id === payerId,
+              isYou: id === userId,
+            }));
+
+            const doDelete = () => {
+              if (Platform.OS === "web") {
+                if ((window as any).confirm("Remove this expense from the ledger?")) {
+                  deleteExpense(exp.id);
+                }
+              } else {
+                Alert.alert("Delete", "Remove this expense?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: () => deleteExpense(exp.id) },
+                ]);
+              }
+            };
 
             return (
-              <View key={exp.id} style={{ marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: c.border, borderStyle: "dashed" as any }}>
+              <View key={exp.id} style={{ marginBottom: 12, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: "hidden" }}>
                 {/* Header */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", padding: 14, paddingBottom: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0F0F0", alignItems: "center", justifyContent: "center", marginRight: 10, flexShrink: 0 }}>
+                    <Text style={{ fontSize: 17 }}>{categoryMeta[exp.category]?.emoji || "💸"}</Text>
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular", marginBottom: 4 }}>
-                      {catInfo.emoji}  {catInfo.label?.toUpperCase() || "OTHER"}
+                    <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", letterSpacing: -0.2 }} numberOfLines={1}>
+                      {exp.description || exp.name}
                     </Text>
-                    <Text style={{ color: c.textPrimary, fontSize: 17, fontFamily: "Syne_700Bold", letterSpacing: -0.3, lineHeight: 22 }}>
-                      {exp.description || exp.name || "Expense"}
+                    <Text style={{ color: isYouPaid ? c.positive : c.textMuted, fontSize: 11, marginTop: 2 }}>
+                      {isYouPaid ? "✓ You paid" : `Paid by ${payerName}`}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => deleteExpense(exp.id)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ marginLeft: 8 }}>
-                    <Text style={{ color: c.textMuted, fontSize: 14 }}>×</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Who paid */}
-                <View style={{ marginTop: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-                  <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular", marginBottom: 5 }}>WHO PAID</Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: isYouPaid ? c.positive : c.textPrimary, fontSize: 14, fontFamily: "RobotoMono_700Bold", fontWeight: "700" }}>
-                        {isYouPaid ? "You" : payerName}
-                      </Text>
-                      <Text style={{ color: c.textMuted, fontSize: 10, fontFamily: "RobotoMono_400Regular", marginTop: 2 }}>
-                        {isYouPaid ? "You covered the full bill" : `${payerName} covered the full bill`}
-                      </Text>
-                    </View>
-                    <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "RobotoMono_700Bold", fontVariant: ["tabular-nums"] as any }}>
+                  <View style={{ alignItems: "flex-end", flexShrink: 0, marginLeft: 8 }}>
+                    <Text style={{ fontFamily: "RobotoMono_700Bold", fontSize: 18, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
                       {sym}{Math.round(exp.amount).toLocaleString("en-IN")}
                     </Text>
+                    <TouchableOpacity onPress={doDelete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Ionicons name="trash-outline" size={14} color={c.textMuted} style={{ marginTop: 4 }} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Split among */}
-                <View style={{ marginTop: 2, paddingVertical: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" }}>
-                      SPLIT AMONG {splitCount} {splitCount === 1 ? "PERSON" : "PEOPLE"}
-                    </Text>
-                    <Text style={{ color: c.textSecondary, fontSize: 9, fontFamily: "RobotoMono_400Regular" }}>
-                      {sym}{perPerson.toLocaleString("en-IN")} each
-                    </Text>
-                  </View>
-
-                  {splitNames.map((name: string, i: number) => {
-                    const memberId    = splitIds[i] || "";
-                    const isThemPayer = memberId === payerId;
-                    const isYou       = memberId === userId;
-                    return (
-                      <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isThemPayer ? c.positive : c.textMuted, marginRight: 8, flexShrink: 0 }} />
-                        <Text style={{ flex: 1, color: isYou ? c.indigo : c.textPrimary, fontSize: 12, fontFamily: "RobotoMono_400Regular" }}>
-                          {isYou ? "You" : name}{isThemPayer ? " (paid)" : ""}
-                        </Text>
-                        <Text style={{ fontFamily: "RobotoMono_700Bold", fontSize: 12, color: isThemPayer ? c.positive : (isYou ? c.indigo : c.textSecondary), fontVariant: ["tabular-nums"] as any, minWidth: 55, textAlign: "right" }}>
-                          {sym}{perPerson.toLocaleString("en-IN")}
-                        </Text>
-                        <Text style={{ fontSize: 9, fontFamily: "RobotoMono_400Regular", marginLeft: 8, color: isThemPayer ? c.positive : c.textMuted, minWidth: 48, textAlign: "right" }}>
-                          {isThemPayer ? "✓ paid" : "pending"}
+                {/* Split — shows ONLY actual split members */}
+                <View style={{ paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 }}>
+                  <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: "700", letterSpacing: 1.5, marginBottom: 6 }}>
+                    SPLIT AMONG {splitCount} · {sym}{perPerson.toLocaleString("en-IN")} EACH
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {splitDisplay.slice(0, 4).map((m) => (
+                      <View key={m.id} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
+                        backgroundColor: m.isPayer
+                          ? (isDark ? "rgba(74,222,128,0.12)" : "#F0FFF4")
+                          : m.isYou
+                            ? (isDark ? "rgba(124,92,255,0.12)" : "#F0EDFF")
+                            : (isDark ? "rgba(255,255,255,0.06)" : "#F5F5F5"),
+                        borderWidth: 1,
+                        borderColor: m.isPayer
+                          ? (isDark ? "rgba(74,222,128,0.3)" : "#A7F3D0")
+                          : m.isYou
+                            ? (isDark ? "rgba(124,92,255,0.3)" : "#D4CAFF")
+                            : c.border,
+                      }}>
+                        <Text style={{ fontSize: 9 }}>{m.isPayer ? "✓" : "·"}</Text>
+                        <Text style={{ color: m.isPayer ? c.positive : m.isYou ? c.indigo : c.textSecondary, fontSize: 11, fontWeight: (m.isPayer || m.isYou) ? "700" : "400" }}>
+                          {m.name}
                         </Text>
                       </View>
-                    );
-                  })}
-                </View>
-
-                {/* Plain English summary */}
-                <View style={{ marginTop: 8, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: isDark ? "rgba(255,255,255,0.03)" : c.surfaceAlt, borderRadius: 4, borderLeftWidth: 2, borderLeftColor: isYouPaid ? c.positive : c.indigo }}>
-                  <Text style={{ color: c.textSecondary, fontSize: 11, lineHeight: 18, fontFamily: "RobotoMono_400Regular" }}>
+                    ))}
+                    {splitDisplay.length > 4 && (
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
+                        <Text style={{ color: c.textMuted, fontSize: 11 }}>+{splitDisplay.length - 4} more</Text>
+                      </View>
+                    )}
+                  </View>
+                  {/* One-line plain English summary */}
+                  <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 7, lineHeight: 15 }}>
                     {isYouPaid
-                      ? `You paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount} ${splitCount === 1 ? "person" : "people"}. Each person owes you ${sym}${perPerson.toLocaleString("en-IN")}.${!amIInSplit ? " You are NOT in this split." : ""}`
-                      : `${payerName} paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount} ${splitCount === 1 ? "person" : "people"}. ${amIInSplit ? `You owe ${payerName} ${sym}${perPerson.toLocaleString("en-IN")}.` : "You are not in this split."}`
+                      ? `You paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount} ${splitCount === 1 ? "person" : "people"} — each owes you ${sym}${perPerson.toLocaleString("en-IN")}.`
+                      : `${payerName} paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount} ${splitCount === 1 ? "person" : "people"}.${splitIds.includes(userId) ? ` You owe ${sym}${perPerson.toLocaleString("en-IN")}.` : " You are not in this split."}`
                     }
                   </Text>
                 </View>
@@ -367,206 +614,342 @@ function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void
           })}
         </View>
       ))}
-      <View style={{ height: 60 }} />
+      <View style={{ height: 20 }} />
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BALANCES TAB
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// BALANCES TAB — who owes whom, human language with arrows
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// INSIGHTS TAB — AI financial storytelling
+// ═══════════════════════════════════════════════════════════════════════════════
+// --- Expenses Tab ---
+// --- Members Tab ---
+// --- Members Tab ---
+// --- Settle Tab ---
+// --- Add Expense bottom sheet ---
+// --- Add Member sheet ---
+// --- Settings sheet ---
+// SETTLE TAB — human language + action cards
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// INSIGHTS TAB — AI financial storytelling
+// ═══════════════════════════════════════════════════════════════════════════════
+// --- Expenses Tab ---
+// --- Members Tab ---
+// --- Members Tab ---
+// --- Settle Tab ---
+// --- Add Expense bottom sheet ---
+// --- Add Member sheet ---
+// --- Settings sheet ---
+// SETTLE TAB — ultra-clear human settlement instructions
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTLE TAB — My Tab · All · Leaderboard
+// ═══════════════════════════════════════════════════════════════════════════════
 function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => void; userId: string }) {
   const { c, isDark } = useTheme();
-  const currency  = trip.currency || "INR";
-  const sym       = currencySymbol(currency);
-  const txns: any[]     = trip.settlement_transactions || [];
-  const balances: any[] = trip.balances || [];
+  const sym       = currencySymbol(trip.currency || "INR");
+  const txns: any[]= trip.settlement_transactions || [];
+  const bals: any[]= trip.balances || [];
   const total     = trip.total_spent || 0;
-  const unsettled = txns.reduce((s: number, t: any) => s + (t.amount || 0), 0);
-  const myBalance = balances.find((b: any) => b.id === userId || b.member_id === userId);
-  const myPaid    = myBalance?.paid || 0;
-  const myShare   = myBalance?.share || 0;
-  const myNet     = myBalance?.net || 0;
-  const nMembers  = balances.length || 1;
-  const maxPaid   = Math.max(...balances.map((b: any) => b.paid || 0), 0);
-  const avgPaid   = total / nMembers;
-  const isUneven  = maxPaid > avgPaid * 1.5 && txns.length > 0;
-  const topPayer  = balances.find((b: any) => b.paid === maxPaid);
+  const me        = bals.find((b: any) => b.id === userId || b.member_id === userId);
+  const myNet     = me?.net || 0;
+  const [view,    setView]    = React.useState<"mine"|"all"|"board">("mine");
+  const [marking, setMarking] = React.useState<string | null>(null);
+  const [localPaid, setLocalPaid] = React.useState<Record<string, boolean>>({});
 
-  const markPaid = async (t: any) => {
+  const myPay  = txns.filter((t: any) => t.from_id === userId);
+  const myRec  = txns.filter((t: any) => t.to_id   === userId);
+  const totalExpenses = (trip.expenses || []).filter((e: any) => !e.is_settlement).length;
+
+  // Sorted for leaderboard
+  const owes    = [...bals].filter((b: any) => (b.net||0) < -0.5).sort((a: any,b: any) => a.net - b.net);
+  const gets    = [...bals].filter((b: any) => (b.net||0) >  0.5).sort((a: any,b: any) => b.net - a.net);
+  const maxAbs  = Math.max(...bals.map((b: any) => Math.abs(b.net||0)), 1);
+
+  const mark = async (t: any) => {
+    const key = t.from_id + t.to_id;
+    setMarking(key);
+    // Optimistic update — mark instantly, sync in background
+    setLocalPaid(prev => ({ ...prev, [key]: true }));
     try {
-      await api.post("/trips/" + trip.id + "/settle", { from_member: t.from_id, to_member: t.to_id, amount: t.amount });
-      onChange();
-    } catch { Alert.alert("Error", "Could not settle"); }
+      await api.post("/trips/" + trip.id + "/settle", {
+        from_member: t.from_id, to_member: t.to_id, amount: t.amount,
+      });
+      onChange(); // silent refresh, no await
+    } catch (e: any) {
+      setLocalPaid(prev => ({ ...prev, [key]: false })); // revert
+      Alert.alert("Error", e?.response?.data?.detail || "Could not record");
+    } finally { setMarking(null); }
   };
 
-  const explainSettlement = (t: any) => {
-    const youPay     = t.from_id === userId;
-    const youReceive = t.to_id === userId;
-    if (youPay)     return `You owe ${t.to_name} for expenses they covered that include you.`;
-    if (youReceive) return `${t.from_name} owes you for expenses you covered that include them.`;
-    return `${t.from_name} owes ${t.to_name} for shared expenses.`;
+  // ── Sub tab bar ────────────────────────────────────────────────────────────
+  const subTabs = [
+    { id: "mine" as const, label: "My Tab"      },
+    { id: "all"  as const, label: "All"         },
+    { id: "board"as const, label: "Leaderboard" },
+  ];
+
+  const TransactionCard = ({ t, showMark }: { t: any; showMark: boolean }) => {
+    const key   = t.from_id + t.to_id;
+    const yPay  = t.from_id === userId;
+    const yRec  = t.to_id   === userId;
+    const done  = localPaid[key];
+    const busy  = marking === key;
+    const color = yPay ? c.negative : yRec ? c.positive : c.textSecondary;
+    const payee = (trip.members || []).find((m: any) => m.id === t.to_id);
+
+    return (
+      <View style={{ backgroundColor: done ? (isDark ? "rgba(255,255,255,0.02)" : "#F9F9F9") : (isDark ? "#1B1612" : c.surface), borderRadius: 14, borderWidth: 1.5, borderColor: done ? c.border : (yPay ? c.negative + "50" : yRec ? c.positive + "50" : c.border), marginBottom: 10, overflow: "hidden", opacity: done ? 0.45 : 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12 }}>
+          {/* Avatar */}
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: yPay ? (isDark ? "rgba(255,139,123,0.2)" : "#FFE8E8") : yRec ? (isDark ? "rgba(126,211,139,0.15)" : "#E8F5E9") : (isDark ? "rgba(255,255,255,0.07)" : "#F0F0F0"), alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color, fontSize: 16, fontWeight: "800" }}>{(yPay ? t.to_name : t.from_name).charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{yPay ? t.to_name : t.from_name}</Text>
+              <Text style={{ color: c.textMuted, fontSize: 11 }}>{yPay ? "receives" : yRec ? "sends you" : (t.from_name + " → " + t.to_name)}</Text>
+            </View>
+            <Text style={{ color: done ? c.positive : color, fontSize: 18, fontFamily: "RobotoMono_700Bold" as any, marginTop: 2, fontVariant: ["tabular-nums"] as any }}>
+              {done ? "✓ Settled" : (yPay ? "−" : yRec ? "+" : "") + sym + Math.round(t.amount).toLocaleString("en-IN")}
+            </Text>
+          </View>
+          {showMark && !done && (
+            <TouchableOpacity onPress={() => mark(t)} disabled={!!busy}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: yPay ? (isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8") : (isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9"), alignItems: "center", justifyContent: "center" }}>
+              {busy ? <ActivityIndicator size="small" color={color} /> : <Ionicons name="checkmark-circle-outline" size={20} color={color} />}
+            </TouchableOpacity>
+          )}
+          {done && <Ionicons name="checkmark-circle" size={22} color={c.positive} />}
+        </View>
+
+        {/* UPI button if you pay */}
+        {showMark && !done && yPay && payee?.upi_id && (
+          <TouchableOpacity
+            onPress={() => openUPI(payee.upi_id, t.to_name, t.amount, trip.name + " via Merizo")}
+            style={{ borderTopWidth: 1, borderTopColor: c.border, paddingVertical: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: isDark ? "rgba(157,123,255,0.06)" : "#F5F3FF" }}
+          >
+            <Ionicons name="phone-portrait-outline" size={14} color={isDark ? "#9D7BFF" : "#6D28D9"} />
+            <Text style={{ color: isDark ? "#9D7BFF" : "#6D28D9", fontSize: 12, fontWeight: "700" }}>Pay via UPI</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
   return (
-    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+    <View style={{ flex: 1 }}>
+      {/* Sub-tab bar */}
+      <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingTop: 14, gap: 6, paddingBottom: 4 }}>
+        {subTabs.map(tab => (
+          <TouchableOpacity key={tab.id} onPress={() => setView(tab.id)}
+            style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: view === tab.id ? (isDark ? "#9D7BFF" : "#1F1A17") : (isDark ? "#1B1612" : c.surface), alignItems: "center", borderWidth: 1, borderColor: view === tab.id ? "transparent" : c.border }}>
+            <Text style={{ color: view === tab.id ? "#fff" : c.textSecondary, fontSize: 12, fontWeight: "700" }}>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {/* Section 1: Group totals */}
-        <View>
-          <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular", marginBottom: 8 }}>
-            BALANCE SHEET
-          </Text>
-          <View style={{ height: 1, backgroundColor: c.border, marginBottom: 10 }} />
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 80, gap: 12 }}>
 
-          {[
-            { label: "Total group spending", sub: "All expenses combined", value: Math.round(total), color: c.textPrimary },
-            { label: "Your fair share", sub: "Based on expenses you're part of", value: Math.round(myShare), color: c.textPrimary },
-            { label: "You actually paid", sub: "Bills you covered for the group", value: Math.round(myPaid), color: myPaid >= myShare ? c.positive : c.negative },
-          ].map(({ label, sub, value, color }) => (
-            <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: c.border }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: c.textPrimary, fontSize: 13, fontFamily: "RobotoMono_400Regular" }}>{label}</Text>
-                <Text style={{ color: c.textMuted, fontSize: 9, fontFamily: "RobotoMono_400Regular", marginTop: 1 }}>{sub}</Text>
-              </View>
-              <Text style={{ color, fontSize: 14, fontFamily: "RobotoMono_700Bold", fontVariant: ["tabular-nums"] as any }}>{sym}{value.toLocaleString("en-IN")}</Text>
-            </View>
-          ))}
-
-          <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, marginTop: 2 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: myNet > 0.5 ? c.positive : myNet < -0.5 ? c.negative : c.textPrimary, fontSize: 14, fontFamily: "RobotoMono_700Bold" }}>
-                {myNet > 0.5 ? "You are owed" : myNet < -0.5 ? "You owe" : "You are square"}
-              </Text>
-              <Text style={{ color: c.textMuted, fontSize: 9, fontFamily: "RobotoMono_400Regular", marginTop: 2 }}>
-                {myNet > 0.5 ? "Others covered less than you. They owe you the difference."
-                  : myNet < -0.5 ? "You covered less than your share. You owe the difference."
-                  : "Your payments exactly match your share. Nothing to settle!"}
-              </Text>
-            </View>
-            <Text style={{ color: myNet > 0.5 ? c.positive : myNet < -0.5 ? c.negative : c.textMuted, fontSize: 18, fontFamily: "RobotoMono_700Bold", fontVariant: ["tabular-nums"] as any, marginLeft: 8 }}>
-              {myNet !== 0 ? (myNet > 0 ? "+" : "") : ""}{sym}{Math.round(Math.abs(myNet)).toLocaleString("en-IN")}
-            </Text>
-          </View>
-        </View>
-
-        {/* Uneven notice */}
-        {isUneven && (
-          <View style={{ backgroundColor: isDark ? "rgba(156,61,50,0.12)" : "#FEF2F0", borderRadius: 4, padding: 12, borderLeftWidth: 2, borderLeftColor: c.negative, marginBottom: 16 }}>
-            <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular", marginBottom: 4 }}>NOTICE</Text>
-            <Text style={{ color: c.textPrimary, fontSize: 12, lineHeight: 18, fontFamily: "RobotoMono_400Regular" }}>
-              {topPayer?.name} has paid significantly more than others ({sym}{Math.round(topPayer?.paid || 0).toLocaleString("en-IN")} vs {sym}{Math.round(avgPaid).toLocaleString("en-IN")} avg). Settle outstanding amounts before adding more expenses.
-            </Text>
-          </View>
-        )}
-
-        {/* Section 2: Who pays whom */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular", marginBottom: 8 }}>
-            {txns.length === 0 ? "NO PAYMENTS NEEDED" : `WHAT NEEDS TO HAPPEN  ·  ${txns.length} PAYMENT${txns.length !== 1 ? "S" : ""}`}
-          </Text>
-          <View style={{ height: 1, backgroundColor: c.border, marginBottom: 10 }} />
-
-          {txns.length === 0 ? (
-            <View style={{ paddingVertical: 16 }}>
-              <Text style={{ color: c.positive, fontSize: 13, fontFamily: "RobotoMono_700Bold" }}>✓ All settled up!</Text>
-              <Text style={{ color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular", marginTop: 4 }}>
-                Everyone has paid their fair share. No payments needed.
-              </Text>
-            </View>
-          ) : txns.map((t: any, i: number) => {
-            const youPay     = t.from_id === userId;
-            const youReceive = t.to_id === userId;
-            const rowColor   = youPay ? c.negative : youReceive ? c.positive : c.textSecondary;
-            return (
-              <View key={i} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ flex: 2.5, color: youPay ? c.negative : c.textPrimary, fontSize: 13, fontFamily: "RobotoMono_700Bold" }}>
-                    {youPay ? "You" : t.from_name}
-                  </Text>
-                  <Text style={{ color: c.textMuted, fontSize: 16, marginHorizontal: 4 }}>→</Text>
-                  <Text style={{ flex: 2.5, color: youReceive ? c.positive : c.textPrimary, fontSize: 13, fontFamily: "RobotoMono_700Bold" }}>
-                    {youReceive ? "You" : t.to_name}
-                  </Text>
-                  <Text style={{ flex: 2, color: rowColor, fontSize: 16, fontFamily: "RobotoMono_700Bold", textAlign: "right", fontVariant: ["tabular-nums"] as any }}>
-                    {sym}{Math.round(t.amount).toLocaleString("en-IN")}
-                  </Text>
-                  <TouchableOpacity onPress={() => markPaid(t)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ marginLeft: 10 }}>
-                    <Ionicons name="checkmark-circle-outline" size={20} color={c.textMuted} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={{ color: c.textMuted, fontSize: 9, fontFamily: "RobotoMono_400Regular", marginTop: 5, lineHeight: 14 }}>
-                  {explainSettlement(t)}
+        {/* ══ MY TAB ══ */}
+        {view === "mine" && (
+          <>
+            {/* My net card */}
+            <View style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View>
+                <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 4 }}>NET BALANCE</Text>
+                <Text style={{ color: myNet > 0.5 ? c.positive : myNet < -0.5 ? c.negative : c.textMuted, fontSize: 28, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
+                  {myNet >= 0 ? "+" : ""}{sym}{Math.round(Math.abs(myNet)).toLocaleString("en-IN")}
+                </Text>
+                <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
+                  {myNet > 0.5 ? "Others owe you" : myNet < -0.5 ? "You owe others" : "All balanced ✓"}
                 </Text>
               </View>
-            );
-          })}
-        </View>
-
-        {/* Section 3: Full member breakdown */}
-        {balances.length > 0 && (
-          <View style={{ marginTop: 24 }}>
-            <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular", marginBottom: 8 }}>
-              FULL MEMBER BREAKDOWN
-            </Text>
-            <View style={{ height: 1, backgroundColor: c.border, marginBottom: 10 }} />
-
-            <View style={{ flexDirection: "row", paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: c.border }}>
-              {["MEMBER", "PAID", "SHARE", "BALANCE"].map((h, i) => (
-                <Text key={h} style={{ flex: i === 0 ? 2.5 : 1.5, color: c.textMuted, fontSize: 8, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular", textAlign: i === 0 ? "left" : "right" }}>{h}</Text>
-              ))}
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 1, fontFamily: "RobotoMono_400Regular" as any }}>GROUP TOTAL</Text>
+                <Text style={{ color: c.textPrimary, fontSize: 16, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>{sym}{Math.round(total).toLocaleString("en-IN")}</Text>
+              </View>
             </View>
 
-            {balances.map((b: any) => {
-              const isMe = b.id === userId || b.member_id === userId;
-              const net  = b.net || 0;
-              return (
-                <View key={b.member_id || b.id} style={{ paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ flex: 2.5, color: isMe ? c.indigo : c.textPrimary, fontSize: 12, fontFamily: "RobotoMono_400Regular", fontWeight: isMe ? "700" : "400" }}>
-                      {isMe ? "You" : b.name}
-                    </Text>
-                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular", textAlign: "right" }}>
-                      {sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}
-                    </Text>
-                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular", textAlign: "right" }}>
-                      {sym}{Math.round(b.share || 0).toLocaleString("en-IN")}
-                    </Text>
-                    <Text style={{ flex: 1.5, color: net > 0.5 ? c.positive : net < -0.5 ? c.negative : c.textMuted, fontSize: 12, fontFamily: "RobotoMono_700Bold", textAlign: "right", fontVariant: ["tabular-nums"] as any }}>
-                      {net >= 0 ? "+" : ""}{sym}{Math.round(Math.abs(net)).toLocaleString("en-IN")}
-                    </Text>
-                  </View>
-                  <Text style={{ color: c.textMuted, fontSize: 8, fontFamily: "RobotoMono_400Regular", marginTop: 3, lineHeight: 12 }}>
-                    {net > 0.5 ? `↑ Is owed ${sym}${Math.round(net).toLocaleString("en-IN")} from the group`
-                      : net < -0.5 ? `↓ Needs to pay ${sym}${Math.round(Math.abs(net)).toLocaleString("en-IN")} to the group`
-                      : "✓ Fully settled"}
-                  </Text>
-                </View>
-              );
-            })}
-
-            <View style={{ flexDirection: "row", paddingTop: 8, marginTop: 2 }}>
-              <Text style={{ flex: 2.5, color: c.textMuted, fontSize: 9, fontFamily: "RobotoMono_400Regular" }}>TOTAL</Text>
-              <Text style={{ flex: 1.5, color: c.textPrimary, fontSize: 11, fontFamily: "RobotoMono_700Bold", textAlign: "right", fontVariant: ["tabular-nums"] as any }}>
-                {sym}{Math.round(total).toLocaleString("en-IN")}
-              </Text>
-              <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular", textAlign: "right" }}></Text>
-              <Text style={{ flex: 1.5, color: unsettled > 0 ? c.negative : c.positive, fontSize: 11, fontFamily: "RobotoMono_700Bold", textAlign: "right" }}>
-                {unsettled > 0 ? `${sym}${Math.round(unsettled).toLocaleString("en-IN")} left` : "✓ clear"}
-              </Text>
+            {/* Share buttons */}
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity onPress={() => shareGroupSummary(trip.id, trip.name, "whatsapp")}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
+                <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
+                <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700" }}>WhatsApp</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => shareGroupSummary(trip.id, trip.name, "share")}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
+                <Ionicons name="copy-outline" size={15} color={c.textSecondary} />
+                <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700" }}>Copy</Text>
+              </TouchableOpacity>
             </View>
-          </View>
+
+            {/* AI note */}
+            {txns.length > 0 && totalExpenses > txns.length && (
+              <View style={{ flexDirection: "row", gap: 8, padding: 12, borderRadius: 10, backgroundColor: isDark ? "rgba(157,123,255,0.08)" : "#F5F3FF", borderWidth: 1, borderColor: isDark ? "rgba(157,123,255,0.2)" : "#E0D9FF" }}>
+                <Ionicons name="sparkles" size={13} color={isDark ? "#9D7BFF" : "#6D28D9"} />
+                <Text style={{ color: isDark ? "#C4A8FF" : "#6D28D9", fontSize: 12, flex: 1, lineHeight: 18 }}>
+                  AI simplified {totalExpenses} expenses into {txns.length} payment{txns.length !== 1 ? "s" : ""}.
+                </Text>
+              </View>
+            )}
+
+            {/* What I receive */}
+            {myRec.length > 0 && (
+              <>
+                <Text style={{ color: c.positive, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any }}>YOU RECEIVE ({myRec.length})</Text>
+                {myRec.map((t: any, i: number) => <TransactionCard key={i} t={t} showMark={true} />)}
+              </>
+            )}
+
+            {/* What I pay */}
+            {myPay.length > 0 && (
+              <>
+                <Text style={{ color: c.negative, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any, marginTop: 4 }}>YOU PAY ({myPay.length})</Text>
+                {myPay.map((t: any, i: number) => <TransactionCard key={i} t={t} showMark={true} />)}
+              </>
+            )}
+
+            {myPay.length === 0 && myRec.length === 0 && (
+              <View style={{ alignItems: "center", paddingVertical: 40, gap: 10 }}>
+                <Text style={{ fontSize: 40 }}>🎉</Text>
+                <Text style={{ color: c.positive, fontSize: 16, fontFamily: "Syne_700Bold" as any }}>You're all clear!</Text>
+                <Text style={{ color: c.textSecondary, fontSize: 13, textAlign: "center" }}>Nothing to pay or receive in this group.</Text>
+              </View>
+            )}
+          </>
         )}
 
-        <View style={{ height: 60 }} />
+        {/* ══ ALL TRANSACTIONS ══ */}
+        {view === "all" && (
+          <>
+            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any }}>
+              {txns.length} PAYMENT{txns.length !== 1 ? "S" : ""} NEEDED
+            </Text>
+            {txns.length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 40, gap: 10 }}>
+                <Ionicons name="checkmark-circle" size={48} color={c.positive} />
+                <Text style={{ color: c.positive, fontSize: 16, fontFamily: "Syne_700Bold" as any }}>All Settled!</Text>
+              </View>
+            ) : txns.map((t: any, i: number) => (
+              <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: c.negative }}>{t.from_name.charAt(0)}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={14} color={c.textMuted} />
+                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: c.positive }}>{t.to_name.charAt(0)}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: c.textPrimary, fontSize: 12 }}>
+                    <Text style={{ fontWeight: "700" }}>{t.from_id === userId ? "You" : t.from_name}</Text>
+                    <Text style={{ color: c.textMuted }}> pays </Text>
+                    <Text style={{ fontWeight: "700" }}>{t.to_id === userId ? "You" : t.to_name}</Text>
+                  </Text>
+                </View>
+                <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
+                  {sym}{Math.round(t.amount).toLocaleString("en-IN")}
+                </Text>
+              </View>
+            ))}
+
+            {/* Balance table */}
+            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginTop: 8 }}>EVERYONE'S BALANCE</Text>
+            <View style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, overflow: "hidden" }}>
+              <View style={{ flexDirection: "row", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: isDark ? "rgba(255,255,255,0.03)" : c.surfaceAlt }}>
+                {["MEMBER","PAID","SHARE","NET"].map((h, i) => (
+                  <Text key={h} style={{ flex: i === 0 ? 2.5 : 1.5, color: c.textMuted, fontSize: 7.5, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular" as any, textAlign: i === 0 ? "left" : "right" }}>{h}</Text>
+                ))}
+              </View>
+              {bals.map((b: any, i: number) => {
+                const isMe = b.id === userId || b.member_id === userId;
+                const n = b.net || 0;
+                return (
+                  <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: i < bals.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: isMe ? (isDark ? "rgba(157,123,255,0.05)" : "#FAF8FF") : "transparent" }}>
+                    <Text style={{ flex: 2.5, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 12, fontFamily: isMe ? "RobotoMono_700Bold" : "RobotoMono_400Regular" as any }}>{isMe ? "You" : b.name}</Text>
+                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular" as any, textAlign: "right" }}>{sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
+                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular" as any, textAlign: "right" }}>{sym}{Math.round(b.share || 0).toLocaleString("en-IN")}</Text>
+                    <Text style={{ flex: 1.5, color: n > 0.5 ? c.positive : n < -0.5 ? c.negative : c.textMuted, fontSize: 12, fontFamily: "RobotoMono_700Bold" as any, textAlign: "right", fontVariant: ["tabular-nums"] as any }}>
+                      {n >= 0 ? "+" : ""}{sym}{Math.round(Math.abs(n)).toLocaleString("en-IN")}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* ══ LEADERBOARD ══ */}
+        {view === "board" && (
+          <>
+            {owes.length > 0 && (
+              <>
+                <Text style={{ color: c.negative, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any }}>PAYING UP</Text>
+                {owes.map((b: any, i: number) => {
+                  const isMe = b.id === userId || b.member_id === userId;
+                  const pct  = Math.abs(b.net || 0) / maxAbs * 100;
+                  return (
+                    <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: isMe ? c.negative + "50" : c.border, padding: 14, marginBottom: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <Text style={{ color: c.textMuted, fontSize: 13, fontFamily: "RobotoMono_400Regular" as any, width: 18 }}>{i + 1}</Text>
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8", alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ color: c.negative, fontSize: 14, fontWeight: "800" }}>{(isMe ? "Y" : b.name.charAt(0)).toUpperCase()}</Text>
+                        </View>
+                        <Text style={{ flex: 1, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 13, fontWeight: isMe ? "800" : "600" }}>{isMe ? "You" : b.name}</Text>
+                        <Text style={{ color: c.negative, fontSize: 15, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
+                          −{sym}{Math.round(Math.abs(b.net || 0)).toLocaleString("en-IN")}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0F0F0", borderRadius: 4, height: 4, marginLeft: 42 }}>
+                        <View style={{ height: 4, borderRadius: 4, backgroundColor: c.negative, width: pct + "%" }} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {gets.length > 0 && (
+              <>
+                <Text style={{ color: c.positive, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any, marginTop: 8 }}>GETTING BACK</Text>
+                {gets.map((b: any, i: number) => {
+                  const isMe = b.id === userId || b.member_id === userId;
+                  const pct  = (b.net || 0) / maxAbs * 100;
+                  return (
+                    <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: isMe ? c.positive + "50" : c.border, padding: 14, marginBottom: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <Text style={{ color: c.textMuted, fontSize: 13, fontFamily: "RobotoMono_400Regular" as any, width: 18 }}>{i + 1}</Text>
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9", alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ color: c.positive, fontSize: 14, fontWeight: "800" }}>{(isMe ? "Y" : b.name.charAt(0)).toUpperCase()}</Text>
+                        </View>
+                        <Text style={{ flex: 1, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 13, fontWeight: isMe ? "800" : "600" }}>{isMe ? "You" : b.name}</Text>
+                        <Text style={{ color: c.positive, fontSize: 15, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
+                          +{sym}{Math.round(b.net || 0).toLocaleString("en-IN")}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0F0F0", borderRadius: 4, height: 4, marginLeft: 42 }}>
+                        <View style={{ height: 4, borderRadius: 4, backgroundColor: c.positive, width: pct + "%" }} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INSIGHTS TAB
-// ─────────────────────────────────────────────────────────────────────────────
+
 function InsightsTab({ trip }: { trip: any }) {
   const { c, isDark } = useTheme();
   const currency = trip.currency || "INR";
@@ -585,20 +968,22 @@ function InsightsTab({ trip }: { trip: any }) {
       .finally(() => setLoading(false));
   }, [trip.id]);
 
-  const topPayer   = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
-  const categories = trip.by_category || {};
-  const topCatKey  = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
-  const topCatPct  = topCatKey && total > 0 ? Math.round(categories[topCatKey] / total * 100) : 0;
-  const catLabel   = { food: "Food & Dining", trip: "Travel", home: "Home", friends: "Events", shopping: "Shopping", bills: "Bills", other: "Other" };
+  // Compute local stats
+  const topPayer    = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
+  const categories  = trip.by_category || {};
+  const topCatKey   = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
+  const topCatPct   = topCatKey && total > 0 ? Math.round(categories[topCatKey] / total * 100) : 0;
+  const catLabel    = { food: "Food & Dining", trip: "Travel", home: "Home", friends: "Events", shopping: "Shopping", bills: "Bills", other: "Other" };
 
+  // Group health
   const maxPaid  = Math.max(...balances.map((b: any) => b.paid || 0), 0);
   const avgPaid  = total / Math.max(balances.length, 1);
   const isUneven = maxPaid > avgPaid * 2;
   const health   = txns.length === 0
-    ? { emoji: "🟢", label: "Fully settled",           detail: "Everyone is square. Great job!",                                                           color: c.positive }
+    ? { emoji: "🟢", label: "Fully settled", detail: "Everyone is square. Great job!", color: c.positive }
     : isUneven
-    ? { emoji: "🔴", label: "Payment burden uneven",   detail: `${topPayer?.name} has covered disproportionately more than others.`,                       color: c.negative }
-    : { emoji: "🟡", label: "Pending settlements",     detail: `${txns.length} payment${txns.length !== 1 ? "s" : ""} needed to fully balance the group.`, color: "#F59E0B" };
+    ? { emoji: "🔴", label: "Payment burden uneven", detail: `${topPayer?.name} has covered disproportionately more than others.`, color: c.negative }
+    : { emoji: "🟡", label: "Pending settlements", detail: `${txns.length} payment${txns.length !== 1 ? "s" : ""} needed to fully balance the group.`, color: "#F59E0B" };
 
   const staticInsights = [
     topPayer && `${topPayer.name} covered the most — ${sym}${Math.round(topPayer.paid || 0).toLocaleString("en-IN")} paid.`,
@@ -609,6 +994,7 @@ function InsightsTab({ trip }: { trip: any }) {
 
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 16 }}>
+
       {/* AI Summary */}
       <View style={{ backgroundColor: isDark ? "rgba(124,92,255,0.1)" : "#F5F3FF", borderRadius: 14, padding: 16, borderWidth: 1, borderColor: isDark ? "rgba(124,92,255,0.25)" : "#E0D9FF" }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -636,7 +1022,7 @@ function InsightsTab({ trip }: { trip: any }) {
         </View>
       </View>
 
-      {/* Key Insights */}
+      {/* Key insights */}
       <View style={{ gap: 8 }}>
         <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2 }}>KEY INSIGHTS</Text>
         {(insights?.recommendations || staticInsights).slice(0, 5).map((ins: string, i: number) => (
@@ -647,7 +1033,7 @@ function InsightsTab({ trip }: { trip: any }) {
         ))}
       </View>
 
-      {/* Smart Settlement */}
+      {/* Smart settlement */}
       {txns.length > 0 && (
         <View style={{ backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border }}>
           <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2, marginBottom: 12 }}>SMART SETTLEMENT</Text>
@@ -669,7 +1055,7 @@ function InsightsTab({ trip }: { trip: any }) {
         </View>
       )}
 
-      {/* Savings Score */}
+      {/* Savings score */}
       {insights?.savings_score != null && (
         <View style={{ backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border, alignItems: "center" }}>
           <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2 }}>FINANCIAL SCORE</Text>
@@ -685,9 +1071,236 @@ function InsightsTab({ trip }: { trip: any }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MEMBERS TAB
-// ─────────────────────────────────────────────────────────────────────────────
+
+function OverviewTab({ trip }: { trip: any }) {
+  const { c, isDark } = useTheme();
+  const total = trip.total_spent || 0;
+  const budget = trip.budget;
+  const pct = budget && budget > 0 ? Math.min(100, (total / budget) * 100) : 50;
+  const currency = trip.currency || "INR";
+
+  const cats = Object.entries(trip.by_category || {}).map(([k, v]: any) => ({
+    category: k,
+    amount: v as number,
+    percent: total > 0 ? ((v as number) / total) * 100 : 0,
+  })).sort((a: any, b: any) => b.amount - a.amount);
+
+  return (
+    <View style={{ padding: 24 }}>
+      <View style={{ alignItems: "center" }}>
+        {(() => {
+          const pctColor: "green" | "gold" | "red" | "black" = isDark
+            ? pct >= 80 ? "red" : pct >= 50 ? "gold" : "green"
+            : "black";
+          return (
+            <GaugeDial percent={pct} size={220}>
+              <SmartNum value={`${pct.toFixed(0)}%`} size="xl" color={pctColor} />
+              <View style={{ marginTop: 6 }}>
+                <AnimatedSmartNum
+                  value={`${currencySymbol(currency)}${Math.round(total).toLocaleString("en-IN")}`}
+                  size="md"
+                  color={isDark ? "indigo" : "black"}
+                  duration={100}
+                />
+              </View>
+            </GaugeDial>
+          );
+        })()}  
+        {budget && (
+          <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
+            Budget {currencySymbol(currency)}{budget.toLocaleString("en-IN")}
+          </Text>
+        )}
+      </View>
+
+      {/* Member balances */}
+      <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6, marginTop: 28 }}>
+        BALANCES
+      </Text>
+      <View style={{ marginTop: 12, gap: 10 }}>
+        {(trip.balances || []).map((b: any) => {
+          return (
+            <View key={b.member_id} style={[styles.balRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{b.name}</Text>
+                <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
+                  Paid {currencySymbol(currency)}{Math.round(b.paid).toLocaleString("en-IN")} · Share {currencySymbol(currency)}{Math.round(b.share).toLocaleString("en-IN")}
+                </Text>
+              </View>
+              <AnimatedSmartNum 
+                value={`${currencySymbol(currency)}${Math.round(Math.abs(b.net)).toLocaleString("en-IN")}`}
+                size="lg"
+                color={b.net > 0.5 ? "green" : b.net < -0.5 ? "red" : "black"}
+                duration={100}
+              />
+            </View>
+          );
+        })}
+      </View>
+
+      {/* AI Insights — Forecast / Place Facts / Food Insight / Personality (above categories so it's visible without scrolling) */}
+      <AIOverviewSection trip={trip} />
+
+      {/* Category breakdown */}
+      {cats.length > 0 && (
+        <>
+          <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6, marginTop: 28 }}>
+            CATEGORIES
+          </Text>
+          <View style={{ marginTop: 12, gap: 8 }}>
+            {cats.map((cc: any) => {
+              const meta = categoryMeta[cc.category] || categoryMeta.other;
+              return (
+                <View
+                  key={cc.category}
+                  style={[styles.balRow, { backgroundColor: c.surface, borderColor: c.border }]}
+                >
+                  <View style={[styles.catEmojiSm, { backgroundColor: meta.tint + "22" }]}>
+                    <Text style={{ fontSize: 16 }}>{meta.emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>{meta.label}</Text>
+                      <AnimatedSmartNum
+                        value={`${currencySymbol(currency)}${Math.round(cc.amount).toLocaleString("en-IN")}`}
+                        size="md"
+                        color={isDark ? "indigo" : "black"}
+                        duration={100}
+                      />
+                    </View>
+                    <HybridBar
+                      percent={cc.percent}
+                      accent={isDark ? c.indigo : "#0A0A0A"}
+                      muted={isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}
+                      width={200}
+                      height={5}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+// --- Expenses Tab ---
+function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
+  const { c, isDark } = useTheme();
+  const [search, setSearch] = useState("");
+  const allExpenses = (trip.expenses || []).filter((e: any) => !e.is_settlement).slice().reverse();
+  const currency = trip.currency || "INR";
+  const memberMap = new Map((trip.members || []).map((m: any) => [m.id, m.name]));
+
+  const expenses = search.trim()
+    ? allExpenses.filter((e: any) =>
+        (e.name || e.description || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(e.amount).includes(search)
+      )
+    : allExpenses;
+
+  const onDelete = async (eid: string) => {
+    const ok = await confirmAction("Delete expense?", "This cannot be undone.", "Delete", true);
+    if (!ok) return;
+    try {
+      await api.delete(`/expenses/${eid}`);
+      onChange();
+    } catch {
+      Alert.alert("Error", "Could not delete");
+    }
+  };
+
+  const onExportCSV = async () => {
+    try {
+      const base = process.env.EXPO_PUBLIC_BACKEND_URL || "";
+      const token = await import("../../src/lib/api").then((m) => m.getToken());
+      const url = `${base}/api/trips/${trip.id}/export/csv`;
+      // On mobile open in browser; on web trigger download
+      await import("expo-web-browser").then((wb) =>
+        wb.openBrowserAsync(url + `?token=${token}`)
+      );
+    } catch {
+      Alert.alert("Export", "Open your browser to download the CSV.");
+    }
+  };
+
+  return (
+    <View style={{ paddingHorizontal: 24, paddingTop: 16, gap: 10 }}>
+      {/* Search + Export row */}
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 4 }}>
+        <View style={[styles.searchBox, { backgroundColor: c.surface, borderColor: c.border, flex: 1 }]}>
+          <Ionicons name="search-outline" size={16} color={c.textMuted} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search expenses…"
+            placeholderTextColor={c.textMuted}
+            style={{ flex: 1, color: c.textPrimary, fontSize: 13, marginLeft: 8 }}
+          />
+          {!!search && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={16} color={c.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={onExportCSV}
+          style={[styles.exportBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+        >
+          <Ionicons name="download-outline" size={18} color={isDark ? c.indigo : "#0A0A0A"} />
+        </TouchableOpacity>
+      </View>
+
+      {expenses.length === 0 ? (
+        <View style={{ padding: 32, alignItems: "center" }}>
+          <Text style={{ color: c.textSecondary, fontSize: 14 }}>
+            {search ? "No matching expenses" : "No expenses yet"}
+          </Text>
+          {!search && (
+            <Text style={{ color: c.textPrimary, fontSize: 16, fontWeight: "700", marginTop: 8 }}>
+              Tap + to add one
+            </Text>
+          )}
+        </View>
+      ) : (
+        expenses.map((exp: any) => (
+          <View key={exp.id} style={[styles.expRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.expEmoji, { backgroundColor: c.bg }]}>
+              <Text style={{ fontSize: 20 }}>{exp.emoji || "💸"}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>
+                {exp.name || exp.description || "Expense"}
+              </Text>
+              <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
+                {String(memberMap.get(exp.paid_by) || "—")}
+                {exp.date ? ` · ${String(exp.date).slice(0, 10)}` : ""}
+              </Text>
+            </View>
+            <AnimatedSmartNum
+              value={`${currencySymbol(currency)}${Math.round(exp.amount).toLocaleString("en-IN")}`}
+              size="lg"
+              color={isDark ? "indigo" : "black"}
+              duration={100}
+            />
+            <TouchableOpacity
+              testID={`del-exp-${exp.id}`}
+              onPress={() => onDelete(exp.id)}
+              style={{ marginLeft: 8, padding: 6 }}
+            >
+              <Ionicons name="trash-outline" size={18} color={c.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+// --- Members Tab ---
+// --- Members Tab ---
 function MembersTab({ trip, onAdd, onShare, onUpdate }: { trip: any; onAdd: () => void; onShare: () => void; onUpdate: () => Promise<void> }) {
   const { c, isDark } = useTheme();
   const { user } = useAuth();
@@ -701,20 +1314,24 @@ function MembersTab({ trip, onAdd, onShare, onUpdate }: { trip: any; onAdd: () =
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
-          style: "destructive",
           onPress: async () => {
             setDeletingId(memberId);
             try {
               await api.delete(`/trips/${trip.id}/members/${memberId}`);
+              
+              // Reload trip data
               await onUpdate();
+              
               Alert.alert("Success", `${memberName} has been removed`);
             } catch (e: any) {
+              console.error("Delete error:", e);
               const errorMsg = e.response?.data?.detail || "Failed to remove member";
               Alert.alert("Error", errorMsg);
             } finally {
               setDeletingId(null);
             }
           },
+          style: "destructive",
         },
       ]
     );
@@ -722,27 +1339,52 @@ function MembersTab({ trip, onAdd, onShare, onUpdate }: { trip: any; onAdd: () =
 
   return (
     <View style={{ padding: 24, gap: 16 }}>
+      {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ color: c.textPrimary, fontSize: 16, fontWeight: "700" }}>{trip.members.length} members</Text>
-        <TouchableOpacity testID="member-add" onPress={onAdd} style={[styles.smallBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}>
+        <Text style={{ color: c.textPrimary, fontSize: 16, fontWeight: "700" }}>
+          {trip.members.length} members
+        </Text>
+        <TouchableOpacity
+          testID="member-add"
+          onPress={onAdd}
+          style={[styles.smallBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}
+        >
           <Ionicons name="person-add-outline" size={14} color="#fff" />
-          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700", marginLeft: 6 }}>Add Member</Text>
+          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700", marginLeft: 6 }}>
+            Add Member
+          </Text>
         </TouchableOpacity>
       </View>
 
+      {/* Members List */}
       <View style={{ gap: 10 }}>
         {trip.members.map((m: any) => (
           <View
             key={m.id}
-            style={[styles.memberRow, { backgroundColor: c.surface, borderColor: c.border, opacity: deletingId === m.id ? 0.6 : 1 }]}
+            style={[
+              styles.memberRow,
+              {
+                backgroundColor: c.surface,
+                borderColor: c.border,
+                opacity: deletingId === m.id ? 0.6 : 1,
+              },
+            ]}
           >
+            {/* Avatar */}
             <View style={[styles.avatarSm, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}>
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>{m.name.charAt(0).toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{m.name}</Text>
+              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>
+                {m.name.charAt(0).toUpperCase()}
+              </Text>
             </View>
 
+            {/* Name */}
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>
+                {m.name}
+              </Text>
+            </View>
+
+            {/* Delete Button - Only for owner, not self */}
             {trip.owner_id === user?.id && m.id !== user?.id && (
               <TouchableOpacity
                 testID={`delete-member-${m.id}`}
@@ -750,15 +1392,35 @@ function MembersTab({ trip, onAdd, onShare, onUpdate }: { trip: any; onAdd: () =
                 onPress={() => deleteMember(m.id, m.name)}
                 style={{ padding: 8, opacity: deletingId === m.id ? 0.5 : 1 }}
               >
-                {deletingId === m.id
-                  ? <ActivityIndicator size="small" color="#EF4444" />
-                  : <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                }
+                {deletingId === m.id ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                )}
               </TouchableOpacity>
             )}
 
-            <View style={[styles.badge, { backgroundColor: m.registered ? (isDark ? "rgba(124,92,255,0.18)" : "#EEF2FF") : c.bg }]}>
-              <Text style={{ color: m.registered ? c.indigo : c.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 0.5 }}>
+            {/* Badge */}
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: m.registered
+                    ? isDark
+                      ? "rgba(124,92,255,0.18)"
+                      : "#EEF2FF"
+                    : c.bg,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: m.registered ? c.indigo : c.textSecondary,
+                  fontSize: 10,
+                  fontWeight: "700",
+                  letterSpacing: 0.5,
+                }}
+              >
                 {m.registered ? "REGISTERED" : "GUEST"}
               </Text>
             </View>
@@ -766,34 +1428,129 @@ function MembersTab({ trip, onAdd, onShare, onUpdate }: { trip: any; onAdd: () =
         ))}
       </View>
 
-      <TouchableOpacity testID="member-invite" onPress={onShare} style={[styles.inviteBtn, { borderColor: c.border, backgroundColor: c.surface }]}>
+      {/* Invite Button */}
+      <TouchableOpacity
+        testID="member-invite"
+        onPress={onShare}
+        style={[styles.inviteBtn, { borderColor: c.border, backgroundColor: c.surface }]}
+      >
         <Ionicons name="link-outline" size={18} color={c.textPrimary} />
-        <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", marginLeft: 8 }}>Invite via link</Text>
+        <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", marginLeft: 8 }}>
+          Invite via link
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADD EXPENSE SHEET
-// ─────────────────────────────────────────────────────────────────────────────
+// --- Settle Tab ---
+function SettleTab({ trip, onChange }: { trip: any; onChange: () => void }) {
+  const { c, isDark } = useTheme();
+  const { user } = useAuth();
+  const txns = trip.settlement_transactions || [];
+  const currency = trip.currency || "INR";
+
+  const markPaid = async (t: any) => {
+    try {
+      await api.post(`/trips/${trip.id}/settle`, {
+        from_member: t.from_id,
+        to_member: t.to_id,
+        amount: t.amount,
+      });
+      onChange();
+    } catch {
+      Alert.alert("Error", "Could not settle");
+    }
+  };
+
+  if (txns.length === 0) {
+    return (
+      <View style={{ padding: 40, alignItems: "center" }}>
+        <Ionicons name="checkmark-circle" size={48} color={c.positive} />
+        <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "800", marginTop: 12 }}>All settled up!</Text>
+        <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 6, textAlign: "center" }}>
+          No outstanding balances in this group.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ padding: 24, gap: 10 }}>
+      <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6 }}>SUGGESTED SETTLEMENTS</Text>
+      {txns.map((t: any, i: number) => (
+        <View key={i} style={[styles.settleRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>
+              {t.from_name} → {t.to_name}
+            </Text>
+            <View style={{ marginTop: 6 }}>
+              {(() => {
+                const settleColor: "red" | "green" | "indigo" | "black" = isDark
+                  ? t.from_id === user?.id ? "red"
+                    : t.to_id === user?.id ? "green"
+                    : "indigo"
+                  : "black";
+                return (
+                  <AnimatedSmartNum
+                    value={`${currencySymbol(currency)}${Math.round(t.amount).toLocaleString("en-IN")}`}
+                    size="lg"
+                    color={settleColor}
+                    duration={100}
+                  />
+                );
+              })()}
+            </View>
+          </View>
+          <TouchableOpacity
+            testID={`mark-paid-${i}`}
+            onPress={() => markPaid(t)}
+            style={[styles.markPaidBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Mark Paid</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// --- Add Expense bottom sheet ---
 function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   const { c, isDark } = useTheme();
-  const [name, setName]           = useState("");
-  const [amount, setAmount]       = useState("");
-  const [currency, setCurrency]   = useState(trip.currency || "INR");
-  const [paidBy, setPaidBy]       = useState(trip.members[0]?.id || "");
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState(trip.currency || "INR");
+  const [paidBy, setPaidBy] = useState(trip.members[0]?.id || "");
   const [splitAmong, setSplitAmong] = useState<string[]>(trip.members.map((m: any) => m.id));
+
+  // Reset to all members every time the sheet opens
+  React.useEffect(() => {
+    setSplitAmong(trip.members.map((m: any) => m.id));
+    setPaidBy(trip.members[0]?.id || "");
+    setName(""); setAmount(""); setManualCat(null);
+  }, []);
   const [submitting, setSubmitting] = useState(false);
-  const [showUpi, setShowUpi]     = useState(false);
-  const [upiText, setUpiText]     = useState("");
+  const [showUpi, setShowUpi] = useState(false);
+  const [upiText, setUpiText] = useState("");
   const [upiLoading, setUpiLoading] = useState(false);
-  const [upiFilled, setUpiFilled] = useState<{ name: boolean; amount: boolean; category: boolean }>({ name: false, amount: false, category: false });
+  const [upiFilled, setUpiFilled] = useState<{ name: boolean; amount: boolean; category: boolean }>({
+    name: false,
+    amount: false,
+    category: false,
+  });
   const [manualCat, setManualCat] = useState<string | null>(null);
 
+  // Auto-tag — runs as user types unless they manually picked
   const autoCat = manualCat || detectCategory(name);
-  const cat     = autoCat;
-  const meta    = categoryMeta[cat] || categoryMeta.other;
+  const cat = autoCat;
+  const meta = categoryMeta[cat] || categoryMeta.other;
+
+  // When payer changes, auto-add them to split if not already there
+  const handleSetPaidBy = (id: string) => {
+    setPaidBy(id);
+    setSplitAmong((prev) => prev.includes(id) ? prev : [...prev, id]);
+  };
 
   const toggleMember = (id: string) => {
     setSplitAmong((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
@@ -811,18 +1568,39 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
     }
     setSubmitting(true);
     try {
-      const subKeys: Record<string, number> = { netflix: 2, spotify: 1, disney: 4, prime: 3, youtube: 6 };
-      const lower      = name.trim().toLowerCase();
-      const matchedSub = Object.keys(subKeys).find((k) => lower.includes(k));
-      if (matchedSub && trip.members.length > subKeys[matchedSub]) {
+      // Subscription conflict warning (frontend keyword check, no AI)
+      const subKeys = ["netflix", "spotify", "disney", "prime", "youtube"];
+      const memberCount = trip.members.length;
+      const lower = name.trim().toLowerCase();
+      const matchedSub = subKeys.find((k) => lower.includes(k));
+      const subLimits: Record<string, number> = {
+        netflix: 2,
+        spotify: 1,
+        disney: 4,
+        prime: 3,
+        youtube: 6,
+      };
+      if (matchedSub && memberCount > (subLimits[matchedSub] || 2)) {
+        const limit = subLimits[matchedSub] || 2;
         const cap = matchedSub.charAt(0).toUpperCase() + matchedSub.slice(1);
-        Alert.alert("Heads up", `${cap} typically supports ${subKeys[matchedSub]} screens — splitting among ${trip.members.length} people may cause issues 📺`, [{ text: "OK" }]);
+        Alert.alert(
+          "Heads up",
+          `${cap} typically supports ${limit} screens — splitting among ${memberCount} people may cause issues 📺`,
+          [{ text: "OK" }]
+        );
       }
 
       const r = await api.post(`/trips/${trip.id}/expenses`, {
-        name: name.trim(), amount: amt, currency, category: cat, emoji: meta.emoji, paid_by: paidBy, split_among: splitAmong,
+        name: name.trim(),
+        amount: amt,
+        currency,
+        category: cat,
+        emoji: meta.emoji,
+        paid_by: paidBy,
+        split_among: splitAmong,
       });
 
+      // Recurring expense detector toast (Home category)
       const suggestion = r.data?.recurring_suggestion;
       if (suggestion) {
         Alert.alert(
@@ -836,7 +1614,12 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                 try {
                   const due = new Date();
                   due.setMonth(due.getMonth() + 1);
-                  await api.post("/reminders", { title: `Recurring: ${suggestion.name}`, amount: amt, due_date: due.toISOString().slice(0, 10), trip_id: trip.id });
+                  await api.post("/reminders", {
+                    title: `Recurring: ${suggestion.name}`,
+                    amount: amt,
+                    due_date: due.toISOString().slice(0, 10),
+                    trip_id: trip.id,
+                  });
                 } catch {}
               },
             },
@@ -845,7 +1628,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
       }
 
       onAdded();
-    } catch {
+    } catch (e: any) {
       Alert.alert("Error", "Could not add expense");
     } finally {
       setSubmitting(false);
@@ -853,20 +1636,32 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   };
 
   const onParseUpi = async () => {
-    if (!upiText.trim()) { Alert.alert("Paste a message", "Paste your UPI / SMS text first."); return; }
+    if (!upiText.trim()) {
+      Alert.alert("Paste a message", "Paste your UPI / SMS text first.");
+      return;
+    }
     setUpiLoading(true);
     try {
       const r = await api.post("/expenses/parse-upi", { text: upiText });
       const d = r.data;
       const filled = { name: false, amount: false, category: false };
-      if (d.merchant)          { setName(d.merchant);         filled.name     = true; }
-      if (d.amount && d.amount > 0) { setAmount(String(d.amount)); filled.amount   = true; }
-      if (d.category)          { setManualCat(d.category);    filled.category = true; }
-      if (d.currency)          setCurrency(d.currency);
+      if (d.merchant) {
+        setName(d.merchant);
+        filled.name = true;
+      }
+      if (d.amount && d.amount > 0) {
+        setAmount(String(d.amount));
+        filled.amount = true;
+      }
+      if (d.category) {
+        setManualCat(d.category);
+        filled.category = true;
+      }
+      if (d.currency) setCurrency(d.currency);
       setUpiFilled(filled);
       setShowUpi(false);
       setUpiText("");
-    } catch {
+    } catch (e: any) {
       Alert.alert("Could not parse", "Please type the expense manually.");
     } finally {
       setUpiLoading(false);
@@ -876,6 +1671,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   const onChangeName = (t: string) => {
     setName(t);
     if (upiFilled.name) setUpiFilled((f) => ({ ...f, name: false }));
+    // user is typing — clear manual category override so auto-tag kicks back in
     if (manualCat && !upiFilled.category) setManualCat(null);
   };
 
@@ -885,9 +1681,12 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   };
 
   const allSelected = splitAmong.length === trip.members.length;
-  const toggleAll   = () => { if (allSelected) setSplitAmong([]); else setSplitAmong(trip.members.map((m: any) => m.id)); };
+  const toggleAll = () => {
+    if (allSelected) setSplitAmong([]);
+    else setSplitAmong(trip.members.map((m: any) => m.id));
+  };
 
-  const indigo      = isDark ? c.indigo : "#0A0A0A";
+  const indigo = isDark ? c.indigo : "#0A0A0A";
   const aiHighlight = isDark ? "rgba(124,92,255,0.45)" : c.indigo;
 
   return (
@@ -907,16 +1706,22 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
 
           {/* Paste UPI button */}
           <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
-            <TouchableOpacity testID="add-exp-paste-upi" onPress={() => setShowUpi(true)} style={[styles.upiBtn, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <TouchableOpacity
+              testID="add-exp-paste-upi"
+              onPress={() => setShowUpi(true)}
+              style={[styles.upiBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+            >
               <Text style={{ fontSize: 16 }}>📋</Text>
-              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", marginLeft: 8 }}>Paste UPI Message</Text>
+              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", marginLeft: 8 }}>
+                Paste UPI Message
+              </Text>
               <View style={[styles.aiBadge, { backgroundColor: isDark ? "rgba(124,92,255,0.18)" : "#EEF2FF" }]}>
                 <Text style={{ color: indigo, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 }}>AI</Text>
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* Name */}
+          {/* Name field */}
           <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
             <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>NAME</Text>
             <TextInput
@@ -925,19 +1730,47 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               onChangeText={onChangeName}
               placeholder="What is this for?"
               placeholderTextColor={c.textMuted}
-              style={[styles.input, { backgroundColor: c.surface, borderColor: upiFilled.name ? aiHighlight : c.border, borderWidth: upiFilled.name ? 1.5 : 1, color: c.textPrimary }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: c.surface,
+                  borderColor: upiFilled.name ? aiHighlight : c.border,
+                  borderWidth: upiFilled.name ? 1.5 : 1,
+                  color: c.textPrimary,
+                },
+              ]}
             />
+            {/* Auto-tag chip */}
             {(name.length > 0 || manualCat) && (
               <View style={{ flexDirection: "row", marginTop: 8, alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-                <View testID="add-exp-cat-chip" style={[styles.catTag, { backgroundColor: meta.tint + "22", borderColor: upiFilled.category ? aiHighlight : meta.tint + "55", borderWidth: upiFilled.category ? 1.5 : 1 }]}>
+                <View
+                  testID="add-exp-cat-chip"
+                  style={[
+                    styles.catTag,
+                    {
+                      backgroundColor: meta.tint + "22",
+                      borderColor: upiFilled.category ? aiHighlight : meta.tint + "55",
+                      borderWidth: upiFilled.category ? 1.5 : 1,
+                    },
+                  ]}
+                >
                   <Text style={{ fontSize: 13 }}>{meta.emoji}</Text>
-                  <Text style={{ color: c.textPrimary, fontSize: 11, fontWeight: "700", marginLeft: 5 }}>{meta.label}</Text>
+                  <Text style={{ color: c.textPrimary, fontSize: 11, fontWeight: "700", marginLeft: 5 }}>
+                    {meta.label}
+                  </Text>
                 </View>
-                <Text style={{ color: c.textMuted, fontSize: 10 }}>{upiFilled.category ? "(AI)" : "(auto · tap to change)"}</Text>
+                <Text style={{ color: c.textMuted, fontSize: 10 }}>
+                  {upiFilled.category ? "(AI)" : "(auto · tap to change)"}
+                </Text>
               </View>
             )}
+            {/* Category override picker */}
             {(name.length > 0 || manualCat) && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 8 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, marginTop: 8 }}
+              >
                 {Object.entries(categoryMeta)
                   .filter(([k]) => k !== "settlement" && k !== "other")
                   .map(([k, m]) => {
@@ -946,11 +1779,22 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       <TouchableOpacity
                         key={k}
                         testID={`add-exp-cat-${k}`}
-                        onPress={() => { setManualCat(k); if (upiFilled.category) setUpiFilled((f) => ({ ...f, category: false })); }}
-                        style={[styles.catPick, { backgroundColor: active ? m.tint + "22" : c.surface, borderColor: active ? m.tint : c.border }]}
+                        onPress={() => {
+                          setManualCat(k);
+                          if (upiFilled.category) setUpiFilled((f) => ({ ...f, category: false }));
+                        }}
+                        style={[
+                          styles.catPick,
+                          {
+                            backgroundColor: active ? m.tint + "22" : c.surface,
+                            borderColor: active ? m.tint : c.border,
+                          },
+                        ]}
                       >
                         <Text style={{ fontSize: 12 }}>{m.emoji}</Text>
-                        <Text style={{ color: c.textPrimary, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>{m.label}</Text>
+                        <Text style={{ color: c.textPrimary, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>
+                          {m.label}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -958,7 +1802,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
             )}
           </View>
 
-          {/* Amount */}
+          {/* Amount field — full width with currency pill on the label row */}
           <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>AMOUNT</Text>
@@ -970,16 +1814,35 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       key={cur}
                       testID={`add-exp-cur-${cur}`}
                       onPress={() => setCurrency(cur)}
-                      style={[styles.curMini, { backgroundColor: active ? indigo : c.surface, borderColor: active ? "transparent" : c.border }]}
+                      style={[
+                        styles.curMini,
+                        {
+                          backgroundColor: active ? indigo : c.surface,
+                          borderColor: active ? "transparent" : c.border,
+                        },
+                      ]}
                     >
-                      <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 11, fontWeight: "700" }}>{cur}</Text>
+                      <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 11, fontWeight: "700" }}>
+                        {cur}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
             </View>
-            <View style={[styles.amountInputWrap, { backgroundColor: c.surface, borderColor: upiFilled.amount ? aiHighlight : c.border, borderWidth: upiFilled.amount ? 1.5 : 1 }]}>
-              <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "900", marginRight: 6 }}>{currencySymbol(currency)}</Text>
+            <View
+              style={[
+                styles.amountInputWrap,
+                {
+                  backgroundColor: c.surface,
+                  borderColor: upiFilled.amount ? aiHighlight : c.border,
+                  borderWidth: upiFilled.amount ? 1.5 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "900", marginRight: 6 }}>
+                {currencySymbol(currency)}
+              </Text>
               <TextInput
                 testID="add-exp-amount"
                 value={amount}
@@ -987,7 +1850,14 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                 placeholder="0.00"
                 placeholderTextColor={c.textMuted}
                 keyboardType="decimal-pad"
-                style={{ flex: 1, fontSize: 22, fontWeight: "800", color: c.textPrimary, padding: 0, minWidth: 60 }}
+                style={{
+                  flex: 1,
+                  fontSize: 22,
+                  fontWeight: "800",
+                  color: c.textPrimary,
+                  padding: 0,
+                  minWidth: 60,
+                }}
               />
             </View>
           </View>
@@ -999,7 +1869,12 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               {trip.members.map((m: any) => {
                 const active = paidBy === m.id;
                 return (
-                  <TouchableOpacity key={m.id} testID={`add-exp-payer-${m.id}`} onPress={() => setPaidBy(m.id)} style={[styles.payerChip, { backgroundColor: active ? indigo : c.surface, borderColor: c.border }]}>
+                  <TouchableOpacity
+                    key={m.id}
+                    testID={`add-exp-payer-${m.id}`}
+                    onPress={() => handleSetPaidBy(m.id)}
+                    style={[styles.payerChip, { backgroundColor: active ? indigo : c.surface, borderColor: c.border }]}
+                  >
                     <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 12, fontWeight: "700" }}>{m.name}</Text>
                   </TouchableOpacity>
                 );
@@ -1012,15 +1887,30 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>SPLIT AMONG</Text>
               <TouchableOpacity testID="add-exp-toggle-all" onPress={toggleAll}>
-                <Text style={{ color: indigo, fontSize: 12, fontWeight: "700" }}>{allSelected ? "Clear all" : "Select all"}</Text>
+                <Text style={{ color: indigo, fontSize: 12, fontWeight: "700" }}>
+                  {allSelected ? "Clear all" : "Select all"}
+                </Text>
               </TouchableOpacity>
             </View>
             <View style={{ marginTop: 8, gap: 8 }}>
               {trip.members.map((m: any) => {
                 const checked = splitAmong.includes(m.id);
                 return (
-                  <TouchableOpacity key={m.id} testID={`add-exp-split-${m.id}`} onPress={() => toggleMember(m.id)} style={[styles.splitRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-                    <View style={[styles.checkbox, { backgroundColor: checked ? indigo : "transparent", borderColor: checked ? "transparent" : c.border }]}>
+                  <TouchableOpacity
+                    key={m.id}
+                    testID={`add-exp-split-${m.id}`}
+                    onPress={() => toggleMember(m.id)}
+                    style={[styles.splitRow, { backgroundColor: c.surface, borderColor: c.border }]}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        {
+                          backgroundColor: checked ? indigo : "transparent",
+                          borderColor: checked ? "transparent" : c.border,
+                        },
+                      ]}
+                    >
                       {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
                     </View>
                     <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600", marginLeft: 12 }}>{m.name}</Text>
@@ -1028,7 +1918,13 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                 );
               })}
             </View>
-            <TouchableOpacity testID="add-exp-submit" disabled={submitting} onPress={onSubmit} style={[styles.primaryBtn, { backgroundColor: indigo, marginTop: 22, opacity: submitting ? 0.7 : 1 }]}>
+
+            <TouchableOpacity
+              testID="add-exp-submit"
+              disabled={submitting}
+              onPress={onSubmit}
+              style={[styles.primaryBtn, { backgroundColor: indigo, marginTop: 22, opacity: submitting ? 0.7 : 1 }]}
+            >
               {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Add expense</Text>}
             </TouchableOpacity>
           </View>
@@ -1039,8 +1935,12 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
       <Modal visible={showUpi} animationType="fade" transparent onRequestClose={() => setShowUpi(false)}>
         <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
           <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border }]}>
-            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>Paste your UPI message</Text>
-            <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>AI will fill the fields for you. You can edit before saving.</Text>
+            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>
+              Paste your UPI message
+            </Text>
+            <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
+              AI will fill the fields for you. You can edit before saving.
+            </Text>
             <TextInput
               testID="upi-text"
               value={upiText}
@@ -1049,14 +1949,30 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               autoFocus
               placeholder="e.g. Rs 350 debited to Swiggy on 02 May…"
               placeholderTextColor={c.textMuted}
-              style={[styles.upiInput, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+              style={[
+                styles.upiInput,
+                { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary },
+              ]}
             />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <TouchableOpacity testID="upi-cancel" onPress={() => setShowUpi(false)} style={[styles.upiBtnSecondary, { borderColor: c.border, backgroundColor: c.surface }]}>
+              <TouchableOpacity
+                testID="upi-cancel"
+                onPress={() => setShowUpi(false)}
+                style={[styles.upiBtnSecondary, { borderColor: c.border, backgroundColor: c.surface }]}
+              >
                 <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity testID="upi-parse" onPress={onParseUpi} disabled={upiLoading} style={[styles.upiBtnPrimary, { backgroundColor: indigo, opacity: upiLoading ? 0.6 : 1 }]}>
-                {upiLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Parse with AI</Text>}
+              <TouchableOpacity
+                testID="upi-parse"
+                onPress={onParseUpi}
+                disabled={upiLoading}
+                style={[styles.upiBtnPrimary, { backgroundColor: indigo, opacity: upiLoading ? 0.6 : 1 }]}
+              >
+                {upiLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Parse with AI</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1066,12 +1982,10 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADD MEMBER SHEET
-// ─────────────────────────────────────────────────────────────────────────────
+// --- Add Member sheet ---
 function AddMemberSheet({ trip, onClose, onAdded }: any) {
   const { c, isDark } = useTheme();
-  const [name, setName]           = useState("");
+  const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
@@ -1104,7 +2018,12 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
             placeholderTextColor={c.textMuted}
             style={[styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary, marginTop: 14 }]}
           />
-          <TouchableOpacity testID="add-member-submit" onPress={onSubmit} disabled={submitting} style={[styles.primaryBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", marginTop: 18 }]}>
+          <TouchableOpacity
+            testID="add-member-submit"
+            onPress={onSubmit}
+            disabled={submitting}
+            style={[styles.primaryBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", marginTop: 18 }]}
+          >
             {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Add</Text>}
           </TouchableOpacity>
 
@@ -1125,15 +2044,18 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SETTINGS SHEET
-// ─────────────────────────────────────────────────────────────────────────────
+// --- Settings sheet ---
 function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember, onDeleted, onCurrencyChanged }: any) {
   const { c } = useTheme();
   const [showCur, setShowCur] = useState(false);
 
   const onDelete = async () => {
-    const ok = await confirmAction("Are you sure?", "This cannot be undone.", "Delete", true);
+    const ok = await confirmAction(
+      "Are you sure?",
+      "This cannot be undone.",
+      "Delete",
+      true
+    );
     if (!ok) return;
     try {
       await api.delete(`/trips/${trip.id}`);
@@ -1166,30 +2088,36 @@ function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember,
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
             {trip.members.length} members · {(trip.expenses || []).filter((e: any) => !e.is_settlement).length} expenses · {trip.currency || "INR"}
           </Text>
+
           <View style={{ marginTop: 18, gap: 8 }}>
-            <SettingsRow label="Add member"                             icon="person-add-outline"     onPress={onAddMember}            testID="settings-add-member" />
-            <SettingsRow label="Invite via link"                        icon="link-outline"           onPress={onShare}                testID="settings-invite" />
-            <SettingsRow label={`Change currency · ${trip.currency || "INR"}`} icon="swap-horizontal-outline" onPress={() => setShowCur(true)} testID="settings-change-currency" />
-            <SettingsRow label="Delete split"                           icon="trash-outline"          onPress={onDelete}  danger       testID="settings-delete" />
+            <SettingsRow label="Add member" icon="person-add-outline" onPress={onAddMember} testID="settings-add-member" />
+            <SettingsRow label="Invite via link" icon="link-outline" onPress={onShare} testID="settings-invite" />
+            <SettingsRow
+              label={`Change currency · ${trip.currency || "INR"}`}
+              icon="swap-horizontal-outline"
+              onPress={() => setShowCur(true)}
+              testID="settings-change-currency"
+            />
+            <SettingsRow label="Delete split" icon="trash-outline" danger onPress={onDelete} testID="settings-delete" />
           </View>
         </View>
       </View>
 
       <Modal visible={showCur} animationType="fade" transparent onRequestClose={() => setShowCur(false)}>
-        <CurrencyPicker current={trip.currency || "INR"} onPick={changeCurrency} onClose={() => setShowCur(false)} />
+        <CurrencyPicker
+          current={trip.currency || "INR"}
+          onPick={changeCurrency}
+          onClose={() => setShowCur(false)}
+        />
       </Modal>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CURRENCY PICKER
-// ─────────────────────────────────────────────────────────────────────────────
 function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick: (c: string) => void; onClose: () => void }) {
   const { c, isDark } = useTheme();
   const [query, setQuery] = useState("");
   const list = currencyOptions.filter((cu) => cu.toLowerCase().includes(query.toLowerCase()));
-
   return (
     <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
       <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border, maxWidth: 420, padding: 18 }]}>
@@ -1210,7 +2138,13 @@ function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick:
                 key={cu}
                 testID={`cur-pick-${cu}`}
                 onPress={() => onPick(cu)}
-                style={[styles.curRow, { backgroundColor: active ? (isDark ? "rgba(124,92,255,0.18)" : "#F5F5F5") : "transparent", borderColor: c.border }]}
+                style={[
+                  styles.curRow,
+                  {
+                    backgroundColor: active ? (isDark ? "rgba(124,92,255,0.18)" : "#F5F5F5") : "transparent",
+                    borderColor: c.border,
+                  },
+                ]}
               >
                 <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700", flex: 1 }}>{cu}</Text>
                 <Text style={{ color: c.textSecondary, fontSize: 13 }}>{currencySymbol(cu)}</Text>
@@ -1227,14 +2161,15 @@ function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick:
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SETTINGS ROW
-// ─────────────────────────────────────────────────────────────────────────────
 function SettingsRow({ label, icon, onPress, danger, testID }: any) {
   const { c } = useTheme();
   const color = danger ? c.negative : c.textPrimary;
   return (
-    <TouchableOpacity testID={testID} onPress={onPress} style={[styles.settingsRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+    <TouchableOpacity
+      testID={testID}
+      onPress={onPress}
+      style={[styles.settingsRow, { backgroundColor: c.surface, borderColor: c.border }]}
+    >
       <Ionicons name={icon} size={18} color={color} />
       <Text style={{ color, fontSize: 14, fontWeight: "700", marginLeft: 10, flex: 1 }}>{label}</Text>
       {!danger && <Ionicons name="chevron-forward" size={18} color={c.textMuted} />}
@@ -1242,58 +2177,341 @@ function SettingsRow({ label, icon, onPress, danger, testID }: any) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STYLES (single definition)
-// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  searchBox:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
-  exportBtn:       { width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  hero:            { width: "100%", height: 220, position: "relative", justifyContent: "flex-end" },
-  heroTop:         { position: "absolute", top: 60, left: 16, right: 16, flexDirection: "row", justifyContent: "space-between" },
-  heroInfo:        { padding: 20 },
-  frostBtn:        { width: 38, height: 38, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
-  tabBar:          { flexDirection: "row", borderRadius: 999, borderWidth: 1, padding: 4, marginHorizontal: 24, marginTop: -22 },
-  tab:             { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: "center" },
-  fab:             { position: "absolute", right: 24, bottom: 28, width: 58, height: 58, borderRadius: 999, alignItems: "center", justifyContent: "center", elevation: 8 },
-  balRow:          { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1 },
-  expRow:          { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 14, borderWidth: 1 },
-  expEmoji:        { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", marginRight: 12 },
-  catEmojiSm:      { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  memberRow:       { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 14, borderWidth: 1 },
-  avatarSm:        { width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  badge:           { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  inviteBtn:       { marginTop: 18, paddingVertical: 14, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center" },
-  smallBtn:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
-  settleRow:       { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1 },
-  markPaidBtn:     { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
-  modalRoot:       { flex: 1, justifyContent: "flex-end" },
-  modalBackdrop:   { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  sheet:           { paddingTop: 0, paddingBottom: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, maxHeight: "90%" },
-  sheetHandle:     { alignItems: "center", paddingVertical: 12 },
-  handleBar:       { width: 36, height: 4, borderRadius: 999 },
-  input:           { paddingHorizontal: 14, paddingVertical: 14, borderRadius: 12, borderWidth: 1, fontSize: 15 },
-  curMini:         { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
-  catChip:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
-  payerChip:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1 },
-  splitRow:        { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, borderWidth: 1 },
-  checkbox:        { width: 22, height: 22, borderRadius: 7, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  primaryBtn:      { paddingVertical: 16, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  settingsRow:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
-  upiBtn:          { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
-  aiBadge:         { marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  catTag:          { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  catPick:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
-  amountInputWrap: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, width: "100%" },
-  upiModal:        { margin: 24, padding: 22, borderRadius: 20, borderWidth: 1, width: "85%", maxWidth: 420, alignSelf: "center", marginTop: "auto", marginBottom: "auto" },
-  upiInput:        { marginTop: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1, fontSize: 14, minHeight: 90, textAlignVertical: "top" },
-  upiBtnSecondary: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center" },
-  upiBtnPrimary:   { flex: 1.5, paddingVertical: 12, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  aiSection:       { marginTop: 22 },
-  aiSkel:          { height: 60, borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  forecastChip:    { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, alignSelf: "center", marginTop: 12, maxWidth: "100%" },
-  insightCard:     { padding: 14, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center" },
-  personalityCard: { padding: 18, borderRadius: 18 },
-  factCard:        { width: 220, padding: 14, borderRadius: 14, borderWidth: 1, minHeight: 110 },
-  curRow:          { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, marginBottom: 6 },
-  fieldLabel:      { fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  exportBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hero: { width: "100%", height: 220, position: "relative", justifyContent: "flex-end" },
+  heroTop: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  heroInfo: { padding: 20 },
+  frostBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  tabBar: {
+    flexDirection: "row",
+    borderRadius: 999,
+    borderWidth: 1,
+    padding: 4,
+    marginHorizontal: 24,
+    marginTop: -22,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: "center",
+  },
+  fab: {
+    position: "absolute",
+    right: 24,
+    bottom: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 8px 14px rgba(0,0,0,0.25)",
+    elevation: 8,
+  },
+  balRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  expRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  expEmoji: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  catEmojiSm: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  avatarSm: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  inviteBtn: {
+    marginTop: 18,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  smallBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  settleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  markPaidBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  sheet: {
+    paddingTop: 0,
+    paddingBottom: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxHeight: "90%",
+  },
+  sheetHandle: { alignItems: "center", paddingVertical: 12 },
+  handleBar: { width: 36, height: 4, borderRadius: 999 },
+  input: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 15,
+  },
+  curMini: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  catChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  payerChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  splitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryBtn: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  upiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  aiBadge: {
+    marginLeft: "auto",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  catTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  catPick: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  amountInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    width: "100%",
+  },
+  upiModal: {
+    margin: 24,
+    padding: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    width: "85%",
+    maxWidth: 420,
+    alignSelf: "center",
+    marginTop: "auto",
+    marginBottom: "auto",
+  },
+  upiInput: {
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 14,
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  upiBtnSecondary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  upiBtnPrimary: {
+    flex: 1.5,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // AI Overview section
+  aiSection: { marginTop: 22 },
+  aiSkel: {
+    height: 60,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  forecastChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignSelf: "center",
+    marginTop: 12,
+    maxWidth: "100%",
+  },
+  insightCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  personalityCard: {
+    padding: 18,
+    borderRadius: 18,
+  },
+  factCard: {
+    width: 220,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 110,
+  },
+  curRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
 });

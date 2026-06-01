@@ -1,131 +1,146 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Merizo Design Tokens — complete export matching all app imports
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Colour palette (used by theme.tsx via palette.dark / palette.light) ───────
 export const palette = {
-  // Warm ledger paper — a living financial notebook
-  light: {
-    bg:           "#F5F1E8",  // warm ledger paper
-    surface:      "#EDE7D8",  // aged receipt paper
-    surfaceAlt:   "#E4DBCA",  // deeper paper
-    border:       "#C4B89A",  // faded accounting lines
-    textPrimary:  "#1F1A17",  // dark ink
-    textSecondary:"#5C4F3A",  // faded ink
-    textMuted:    "#9A8970",  // very faded ink
-    accent:       "#1F1A17",  // ink black
-    accentSoft:   "rgba(31,26,23,0.07)",
-    positive:     "#3D6B3D",  // ledger green ink
-    negative:     "#9C3D32",  // accounting red ink
-    indigo:       "#5B4A8A",  // muted purple (for brand)
-  },
-  // Dark leather — aged accounting book at night
   dark: {
-    bg:           "#1C1712",  // dark leather
-    surface:      "#252018",  // dark paper
-    surfaceAlt:   "#2E2820",  // raised dark surface
-    border:       "rgba(196,184,154,0.12)",
-    textPrimary:  "#F0EAD6",  // aged paper white
-    textSecondary:"#A89878",  // faded page text
-    textMuted:    "#6B5D4A",  // very faded
-    accent:       "#7C5CFF",  // indigo (original brand color)
-    accentSoft:   "rgba(124,92,255,0.15)",
-    positive:     "#6BAE6B",  // green ink
-    negative:     "#C25B52",  // red ink
-    indigo:       "#7C5CFF",
+    bg:           "#14110F",
+    surface:      "#1B1612",
+    surfaceAlt:   "#231C17",
+    border:       "rgba(201,170,120,0.15)",
+    borderActive: "rgba(201,170,120,0.35)",
+    textPrimary:   "#F4E6D0",
+    textSecondary: "#B89D77",
+    textMuted:     "#7A6550",
+    positive: "#7ED38B",
+    negative: "#FF8B7B",
+    indigo:   "#9D7BFF",
+    gold:     "#E8B04E",
+    cardBg:   "#1B1612",
+    overlay:  "rgba(0,0,0,0.6)",
+  },
+  light: {
+    bg:           "#FAF7F2",
+    surface:      "#F3EEE6",
+    surfaceAlt:   "#EDE5D8",
+    border:       "rgba(90,60,30,0.12)",
+    borderActive: "rgba(90,60,30,0.28)",
+    textPrimary:   "#1C1208",
+    textSecondary: "#5C4030",
+    textMuted:     "#9A7B5E",
+    positive: "#1A7A40",
+    negative: "#C0392B",
+    indigo:   "#5B3FD4",
+    gold:     "#B8860B",
+    cardBg:   "#F3EEE6",
+    overlay:  "rgba(0,0,0,0.4)",
   },
 };
 
-export const radius = {
-  card: 16,
-  small: 12,
-  pill: 999,
-};
-
-export const space = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-};
-
-// Cover image map — keyword to remote url. Grayscale in light mode applied at render.
-export const coverImages: Record<string, string> = {
-  // destinations
-  goa: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=1200&q=80",
-  manali: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80",
-  paris: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1200&q=80",
-  tokyo: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1200&q=80",
-  "new york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=1200&q=80",
-  london: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80",
-  bali: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1200&q=80",
-  singapore: "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=1200&q=80",
-  kerala: "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?w=1200&q=80",
-  maldives: "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=1200&q=80",
-  dubai: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&q=80",
-  // category fallbacks
-  trip: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80",
-  food: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80",
-  home: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&q=80",
-  friends: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80",
-  shopping: "https://images.unsplash.com/photo-1481437156560-3205f6a55735?w=1200&q=80",
-  bills: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&q=80",
-  default: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80",
-};
-
-export function resolveCover(destinations: string[] | undefined, category: string, override?: string): string {
-  if (override && coverImages[override]) return coverImages[override];
-  if (destinations && destinations.length > 0) {
-    for (const d of destinations) {
-      const k = (d || "").toLowerCase().trim();
-      if (coverImages[k]) return coverImages[k];
-    }
-  }
-  return coverImages[category] || coverImages.default;
+// ── Currency ──────────────────────────────────────────────────────────────────
+export function currencySymbol(currency?: string): string {
+  const map: Record<string, string> = {
+    INR: "₹", USD: "$", EUR: "€", GBP: "£",
+    JPY: "¥", AED: "د.إ", SGD: "S$", AUD: "A$", CAD: "C$",
+  };
+  return map[(currency || "INR").toUpperCase()] ?? "₹";
 }
 
-export const categoryMeta: Record<string, { emoji: string; label: string; tint: string; description: string }> = {
-  trip: { emoji: "✈️", label: "Trip / Travel", tint: "#3B82F6", description: "Beach, mountains, road trips" },
-  food: { emoji: "🍽️", label: "Food & Dining", tint: "#EF4444", description: "Restaurants, drinks, takeout" },
-  home: { emoji: "🏠", label: "Home & Rent", tint: "#10B981", description: "Rent, bills, utilities" },
-  friends: { emoji: "🎉", label: "Friends & Events", tint: "#F59E0B", description: "Parties, meetups, gigs" },
-  shopping: { emoji: "🛍️", label: "Shopping", tint: "#8B5CF6", description: "Gifts, gear, groceries" },
-  bills: { emoji: "⚡", label: "Bills & Subscriptions", tint: "#14B8A6", description: "Recurring expenses" },
-  other: { emoji: "💸", label: "Other", tint: "#6B7280", description: "Anything else" },
-  settlement: { emoji: "✅", label: "Settlement", tint: "#10B981", description: "Paid up" },
-};
-
-export const coverOptions = [
-  { key: "goa", label: "Goa", url: coverImages.goa },
-  { key: "paris", label: "Paris", url: coverImages.paris },
-  { key: "tokyo", label: "Tokyo", url: coverImages.tokyo },
-  { key: "new york", label: "NYC", url: coverImages["new york"] },
-  { key: "manali", label: "Manali", url: coverImages.manali },
-  { key: "bali", label: "Bali", url: coverImages.bali },
-  { key: "dubai", label: "Dubai", url: coverImages.dubai },
-  { key: "maldives", label: "Maldives", url: coverImages.maldives },
+export const currencyOptions = [
+  { code: "INR", label: "Indian Rupee",     symbol: "₹" },
+  { code: "USD", label: "US Dollar",        symbol: "$" },
+  { code: "EUR", label: "Euro",             symbol: "€" },
+  { code: "GBP", label: "British Pound",    symbol: "£" },
+  { code: "JPY", label: "Japanese Yen",     symbol: "¥" },
+  { code: "AED", label: "UAE Dirham",       symbol: "د.إ" },
+  { code: "SGD", label: "Singapore Dollar", symbol: "S$" },
+  { code: "AUD", label: "Australian Dollar",symbol: "A$" },
 ];
 
-export function detectCategory(text: string): string {
-  const t = (text || "").toLowerCase();
-  if (/(flight|hotel|cab|uber|train|bus|trip|travel|airport)/.test(t)) return "trip";
-  if (/(pizza|food|dinner|lunch|breakfast|restaurant|cafe|coffee|drink|bar|beer)/.test(t)) return "food";
-  if (/(rent|home|apartment|electric|wifi|water|utility)/.test(t)) return "home";
-  if (/(party|movie|gig|concert|event|club)/.test(t)) return "friends";
-  if (/(shop|gift|amazon|grocery|market|mall)/.test(t)) return "shopping";
-  if (/(bill|subscription|netflix|spotify|prime)/.test(t)) return "bills";
+// ── Category metadata ─────────────────────────────────────────────────────────
+export const categoryMeta: Record<string, { label: string; emoji: string; tint: string }> = {
+  food:          { label: "Food",          emoji: "🍽️", tint: "#FF8B7B" },
+  travel:        { label: "Travel",        emoji: "✈️", tint: "#60A5FA" },
+  entertainment: { label: "Entertainment", emoji: "🎬", tint: "#A78BFA" },
+  utilities:     { label: "Utilities",     emoji: "⚡", tint: "#FBBF24" },
+  shopping:      { label: "Shopping",      emoji: "🛍️", tint: "#F472B6" },
+  health:        { label: "Health",        emoji: "💊", tint: "#34D399" },
+  accommodation: { label: "Stay",          emoji: "🏨", tint: "#E8B04E" },
+  trip:          { label: "Trip",          emoji: "🗺️", tint: "#9D7BFF" },
+  other:         { label: "Other",         emoji: "📦", tint: "#9CA3AF" },
+  settlement:    { label: "Settlement",    emoji: "✅", tint: "#7ED38B" },
+};
+
+export function detectCategory(name: string): string {
+  const n = name.toLowerCase();
+  if (/food|eat|lunch|dinner|breakfast|cafe|rest|pizza|coffee|swiggy|zomato|biryani/.test(n)) return "food";
+  if (/uber|ola|cab|taxi|train|flight|bus|travel|petrol|fuel|metro|auto/.test(n)) return "travel";
+  if (/movie|netflix|game|sport|fun|entertain|ticket|show|concert/.test(n)) return "entertainment";
+  if (/rent|electr|wifi|water|house|flat|maintenance|bill/.test(n)) return "utilities";
+  if (/shop|cloth|amazon|flipkart|mall|buy|purchase/.test(n)) return "shopping";
+  if (/doctor|medicine|hospital|pharmacy|health|medical/.test(n)) return "health";
+  if (/hotel|hostel|airbnb|stay|room|resort/.test(n)) return "accommodation";
   return "other";
 }
 
-export const currencyOptions = ["INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "AED", "SGD", "THB"];
+// ── Cover image resolver ──────────────────────────────────────────────────────
+// Curated Unsplash images per category — these are stable permanent URLs
+const COVER_MAP: Record<string, string[]> = {
+  food:          [
+    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80",
+    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80",
+    "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=800&q=80",
+  ],
+  travel:        [
+    "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=800&q=80",
+    "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80",
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+  ],
+  entertainment: [
+    "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+    "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80",
+  ],
+  accommodation: [
+    "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80",
+    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+  ],
+  utilities:     [
+    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
+  ],
+  shopping:      [
+    "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80",
+  ],
+  trip:          [
+    "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80",
+    "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80",
+    "https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=800&q=80",
+  ],
+  other:         [
+    "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80",
+    "https://images.unsplash.com/photo-1579621970795-87facc2f976d?w=800&q=80",
+  ],
+};
 
-export function currencySymbol(code: string): string {
-  const map: Record<string, string> = {
-    INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥", AUD: "A$", CAD: "C$", AED: "د.إ", SGD: "S$", THB: "฿",
-  };
-  return map[code] || code;
-}
+/**
+ * Resolve a cover image URL for a trip/group.
+ * @param destinations  optional array of destination strings (unused, kept for compat)
+ * @param category      split_category of the group (food | travel | trip | …)
+ * @param coverKey      optional explicit override URL
+ */
+export function resolveCover(
+  destinations?: string[] | null,
+  category?: string | null,
+  coverKey?: string | null,
+): string {
+  // Explicit override wins
+  if (coverKey && coverKey.startsWith("http")) return coverKey;
 
-export function formatAmount(amount: number, currency = "INR", showSign = false): string {
-  const sym = currencySymbol(currency);
-  const abs = Math.abs(amount);
-  const formatted = abs.toLocaleString("en-IN", { maximumFractionDigits: abs >= 1000 ? 0 : 2 });
-  const sign = showSign ? (amount > 0 ? "+" : amount < 0 ? "-" : "") : (amount < 0 ? "-" : "");
-  return `${sign}${sym}${formatted}`;
+  // Pick from category map
+  const cat = (category || "other").toLowerCase();
+  const pool = COVER_MAP[cat] || COVER_MAP.other;
+
+  // Deterministic pick based on first destination letter so it's stable
+  const seed  = (destinations?.[0] || "").charCodeAt(0) || 0;
+  return pool[seed % pool.length];
 }

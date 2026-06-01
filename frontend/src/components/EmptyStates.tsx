@@ -1,183 +1,216 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+/**
+ * EmptyStates.tsx — AI-Powered Empty States
+ * Merizo · Staff Designer Grade
+ *
+ * Never show: "No data found" or generic placeholders
+ * Always show: Context-aware AI guidance with clear CTAs
+ */
+import React, { useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme";
 
-export function EmptyState({
-  icon,
-  title,
-  description,
-  actionText = "Get Started",
-  onAction,
-  testID,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
-  actionText?: string;
-  onAction?: () => void;
-  testID?: string;
-}) {
-  const { c, isDark } = useTheme();
+interface EmptyProps {
+  onPrimary?:   () => void;
+  onSecondary?: () => void;
+}
+
+// ─── Floating orb animation ───────────────────────────────────────────────────
+function FloatingOrb({ color, size = 80 }: { color: string; size?: number }) {
+  const float = useRef(new Animated.Value(0)).current;
+  const glow  = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(float, { toValue: -12, duration: 2000,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(float, { toValue: 0,   duration: 2000,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(glow, { toValue: 0.8, duration: 2000, useNativeDriver: true }),
+          Animated.timing(glow, { toValue: 0.4, duration: 2000, useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: c.bg }]} testID={testID}>
-      <View style={styles.content}>
-        <View
-          style={[
-            styles.iconBox,
-            {
-              backgroundColor: isDark ? "rgba(129, 140, 248, 0.1)" : "rgba(79, 70, 229, 0.08)",
-            },
-          ]}
-        >
-          <Ionicons
-            name={icon}
-            size={48}
-            color={isDark ? c.indigo : "#4F46E5"}
-            testID={`${testID}-icon`}
-          />
-        </View>
-
-        <Text style={[styles.title, { color: c.textPrimary, fontFamily: "Syne_700Bold" }]} testID={`${testID}-title`}>
-  {title}
-</Text>
-
-        <Text style={[styles.description, { color: c.textSecondary }]} testID={`${testID}-desc`}>
-          {description}
-        </Text>
+    <Animated.View style={{ transform: [{ translateY: float }], opacity: glow,
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: color + "22", alignItems: "center", justifyContent: "center",
+      marginBottom: 24 }}>
+      <View style={{ width: size * 0.65, height: size * 0.65, borderRadius: size * 0.325,
+        backgroundColor: color + "35", alignItems: "center", justifyContent: "center" }}>
+        <View style={{ width: size * 0.4, height: size * 0.4, borderRadius: size * 0.2,
+          backgroundColor: color + "60" }} />
       </View>
+    </Animated.View>
+  );
+}
 
-      {onAction && (
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: isDark ? c.indigo : "#4F46E5" }]}
-          onPress={onAction}
-          testID={`${testID}-action`}
-        >
-          <Ionicons name="add-circle" size={20} color="#fff" />
-          <Text style={styles.buttonText}>{actionText}</Text>
+// ─── No Groups ───────────────────────────────────────────────────────────────
+export function EmptyGroups({ onPrimary, onSecondary }: EmptyProps) {
+  const { c, isDark } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 24 }}>
+      <FloatingOrb color={isDark ? "#9D7BFF" : "#5B3FD4"} size={96} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
+        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
+          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
+      </View>
+      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
+        textAlign: "center", marginBottom: 10, letterSpacing: -0.3 }}>
+        No groups yet
+      </Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
+        lineHeight: 22, marginBottom: 28 }}>
+        Create a group for trips, roommates, or dinner — and I'll handle all the math for you.
+      </Text>
+      <TouchableOpacity onPress={onPrimary}
+        style={{ backgroundColor: isDark ? "#9D7BFF" : "#1F1A17", borderRadius: 14,
+          paddingVertical: 14, paddingHorizontal: 28,
+          flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Ionicons name="add" size={18} color="#fff" />
+        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Create a Group</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onSecondary}
+        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Ionicons name="calculator-outline" size={14} color={c.textMuted} />
+        <Text style={{ color: c.textMuted, fontSize: 13 }}>or try Quick Split — no group needed</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── No Expenses in a group ───────────────────────────────────────────────────
+export function EmptyExpenses({ onPrimary, onSecondary }: EmptyProps) {
+  const { c, isDark } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <FloatingOrb color={isDark ? "#E8B04E" : "#B8860B"} size={88} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
+        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
+          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
+      </View>
+      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
+        textAlign: "center", marginBottom: 10 }}>No expenses yet</Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
+        lineHeight: 22, marginBottom: 28 }}>
+        Add your first expense or upload a receipt — I'll extract the details and split it automatically.
+      </Text>
+      <TouchableOpacity onPress={onPrimary}
+        style={{ backgroundColor: isDark ? "#E8B04E" : "#1F1A17", borderRadius: 14,
+          paddingVertical: 14, paddingHorizontal: 28,
+          flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Ionicons name="add" size={18} color={isDark ? "#1F1A17" : "#fff"} />
+        <Text style={{ color: isDark ? "#1F1A17" : "#fff", fontSize: 15, fontWeight: "800" }}>
+          Add Expense
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onSecondary}
+        style={{ flexDirection: "row", alignItems: "center", gap: 8,
+          paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12,
+          borderWidth: 1, borderColor: c.border }}>
+        <Ionicons name="receipt-outline" size={16} color={c.textSecondary} />
+        <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: "600" }}>
+          Scan a receipt instead
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── All Settled ──────────────────────────────────────────────────────────────
+export function EmptySettled() {
+  const { c, isDark } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <FloatingOrb color={isDark ? "#7ED38B" : "#1A7A40"} size={88} />
+      <Text style={{ color: c.positive, fontSize: 22, fontWeight: "800",
+        textAlign: "center", marginBottom: 10 }}>
+        All settled! 🎉
+      </Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
+        lineHeight: 22 }}>
+        Everyone in this group is square. No pending payments.
+      </Text>
+    </View>
+  );
+}
+
+// ─── No Insights ──────────────────────────────────────────────────────────────
+export function EmptyInsights({ onPrimary }: EmptyProps) {
+  const { c, isDark } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <FloatingOrb color={isDark ? "#60A5FA" : "#1D4ED8"} size={88} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
+        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
+          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
+      </View>
+      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
+        textAlign: "center", marginBottom: 10 }}>No insights yet</Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
+        lineHeight: 22, marginBottom: 28 }}>
+        Start adding expenses and I'll show you spending patterns, category breakdowns, and smart suggestions.
+      </Text>
+      <TouchableOpacity onPress={onPrimary}
+        style={{ backgroundColor: isDark ? "#60A5FA" : "#1D4ED8", borderRadius: 14,
+          paddingVertical: 14, paddingHorizontal: 28,
+          flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Ionicons name="add" size={18} color="#fff" />
+        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Add your first expense</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── No Search Results ────────────────────────────────────────────────────────
+export function EmptySearch({ query }: { query: string }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <Text style={{ fontSize: 48, marginBottom: 16 }}>🔍</Text>
+      <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "700",
+        textAlign: "center", marginBottom: 8 }}>
+        Nothing found for "{query}"
+      </Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center", lineHeight: 22 }}>
+        Try a different search term or check the spelling.
+      </Text>
+    </View>
+  );
+}
+
+// ─── Network Error ─────────────────────────────────────────────────────────────
+export function EmptyNetworkError({ onRetry }: { onRetry?: () => void }) {
+  const { c, isDark } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <Text style={{ fontSize: 48, marginBottom: 16 }}>📡</Text>
+      <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "700",
+        textAlign: "center", marginBottom: 8 }}>
+        Can't connect right now
+      </Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
+        lineHeight: 22, marginBottom: 24 }}>
+        Check your internet connection and try again.
+      </Text>
+      {onRetry && (
+        <TouchableOpacity onPress={onRetry}
+          style={{ backgroundColor: isDark ? "#9D7BFF" : "#1F1A17", borderRadius: 14,
+            paddingVertical: 12, paddingHorizontal: 24,
+            flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name="refresh-outline" size={16} color="#fff" />
+          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Try again</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
-
-export function SkeletonCard({
-  testID,
-}: {
-  testID?: string;
-}) {
-  const { c, isDark } = useTheme();
-  const bgColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-
-  return (
-    <View
-      style={[
-        styles.skeletonCard,
-        {
-          backgroundColor: c.surface,
-          borderColor: c.border,
-        },
-      ]}
-      testID={testID}
-    >
-      <View style={styles.skeletonCardHeader}>
-        <View
-          style={[
-            styles.skeletonAvatar,
-            { backgroundColor: bgColor },
-          ]}
-        />
-        <View style={{ flex: 1, gap: 8 }}>
-          <View style={[styles.skeletonText, { width: "70%", backgroundColor: bgColor }]} />
-          <View style={[styles.skeletonText, { width: "50%", backgroundColor: bgColor }]} />
-        </View>
-      </View>
-
-      <View style={[styles.skeletonAmount, { backgroundColor: bgColor }]} />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 40,
-    minHeight: 400,
-  },
-  content: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  iconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 12,
-    fontFamily: "Syne_800ExtraBold",
-  },
-  description: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    maxWidth: 280,
-  },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-    width: "100%",
-    maxWidth: 280,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  skeletonCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
-  },
-  skeletonCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 12,
-  },
-  skeletonAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  skeletonText: {
-    height: 10,
-    borderRadius: 5,
-  },
-  skeletonAmount: {
-    height: 20,
-    borderRadius: 10,
-    width: "100%",
-  },
-});
-
-export default {
-  EmptyState,
-  SkeletonCard,
-};

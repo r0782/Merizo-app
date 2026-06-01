@@ -80,3 +80,16 @@ export async function removeMemberFromGroup(
 ) {
   return api.delete(`/groups/${groupId}/members/${memberId}`);
 }
+// ── Keep Render warm — ping every 14 min to prevent cold start ───────────────
+let _pingTimer: any = null;
+export function startKeepAlive() {
+  if (_pingTimer) return;
+  const ping = () => {
+    api.get("/").catch(() => {}); // silent — just wake the server
+  };
+  ping(); // immediate ping on app start
+  _pingTimer = setInterval(ping, 14 * 60 * 1000); // every 14 minutes
+}
+export function stopKeepAlive() {
+  if (_pingTimer) { clearInterval(_pingTimer); _pingTimer = null; }
+}

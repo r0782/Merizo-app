@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
@@ -8,7 +8,6 @@ import { api } from "../../src/lib/api";
 import { SmartNum } from "../../src/components/DotNum";
 import { currencySymbol } from "../../src/lib/tokens";
 import { getOverbudgetAlerts, setOverbudgetAlerts } from "../../src/lib/settings";
-import { FinancialRealmsSettings } from "../../src/components/FinancialRealmsSettings";
 import { confirmAction } from "../../src/lib/confirm";
 import { NumberTicker } from "../../src/components/NumberTicker";
 
@@ -17,8 +16,13 @@ export default function ProfileScreen() {
   const { c, isDark, mode, setMode } = useTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState({ count: 0, settled: 0 });
+  const [stats,    setStats]    = useState({ count: 0, settled: 0 });
   const [alertsOn, setAlertsOnState] = useState(true);
+  const [upiId,    setUpiId]    = useState("");
+  const [upiSaved, setUpiSaved] = useState(false);
+  const [savingUpi,setSavingUpi]= useState(false);
+  const [editName, setEditName] = useState(false);
+  const [nameVal,  setNameVal]  = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -37,11 +41,25 @@ export default function ProfileScreen() {
   useEffect(() => {
     load();
     getOverbudgetAlerts().then(setAlertsOnState);
+    api.get("/auth/me").then(r => {
+      setUpiId(r.data.upi_id || "");
+      setNameVal(r.data.name || "");
+    }).catch(() => {});
   }, [load]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const initial = (user?.name || "M").trim().charAt(0).toUpperCase();
+
+  const saveUpiId = async () => {
+    if (!upiId.trim()) return;
+    setSavingUpi(true);
+    try {
+      await api.patch("/auth/profile", { upi_id: upiId.trim() });
+      setUpiSaved(true);
+      setTimeout(() => setUpiSaved(false), 2500);
+    } catch {} finally { setSavingUpi(false); }
+  };
 
   const onLogout = async () => {
     const ok = await confirmAction(
@@ -102,7 +120,46 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <FinancialRealmsSettings />
+
+        {/* UPI ID card */}
+        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 16 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: isDark ? "rgba(157,123,255,0.15)" : "#F0EDFF", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="phone-portrait-outline" size={16} color={isDark ? "#9D7BFF" : "#6D28D9"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>UPI Payment ID</Text>
+              <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 1 }}>Others pay you instantly with one tap</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <TextInput
+              value={upiId}
+              onChangeText={setUpiId}
+              placeholder="yourname@upi  or  phone@paytm"
+              placeholderTextColor={c.textMuted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={{ flex: 1, color: c.textPrimary, fontSize: 14, backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F5F5F5", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: c.border, outlineStyle: "none" } as any}
+            />
+            <TouchableOpacity
+              onPress={saveUpiId}
+              disabled={savingUpi || !upiId.trim()}
+              style={{ backgroundColor: upiSaved ? (isDark ? "#7ED38B" : "#16A34A") : (isDark ? "#9D7BFF" : "#1F1A17"), borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, opacity: (!upiId.trim() || savingUpi) ? 0.5 : 1, flexDirection: "row", alignItems: "center", gap: 5 }}
+            >
+              {savingUpi
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <><Ionicons name={upiSaved ? "checkmark" : "checkmark-circle-outline"} size={15} color="#fff" />
+                   <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>{upiSaved ? "Saved!" : "Save"}</Text></>
+              }
+            </TouchableOpacity>
+          </View>
+          {upiId.trim() && (
+            <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 8 }}>
+              People in your groups will see a "Pay via UPI" button when they owe you money.
+            </Text>
+          )}
+        </View>
 
         {/* Settings card */}
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 16 }]}>
