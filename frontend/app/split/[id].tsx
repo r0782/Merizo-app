@@ -141,6 +141,10 @@ export default function SplitDetailScreen() {
   const cover = resolveCover(trip.destinations, trip.split_category, trip.cover_key);
   const isOwner = trip.owner_id === user?.id;
 
+  const onDownloadPDF = async () => {
+    Alert.alert("Download Report", "PDF download is available on the mobile app.");
+  };
+
   const onShareInvite = async () => {
     try {
       const inv = await api.get(`/trips/${tripId}/invite`);
