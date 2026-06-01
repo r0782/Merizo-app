@@ -128,6 +128,10 @@ const COVER_MAP: Record<string, string[]> = {
  * @param category      split_category of the group (food | travel | trip | …)
  * @param coverKey      optional explicit override URL
  */
+export const coverOptions = Object.entries(COVER_MAP).flatMap(([cat, urls]) =>
+  urls.map((url, i) => ({ key: `${cat}-${i}`, url, category: cat }))
+);
+
 export function resolveCover(
   destinations?: string[] | null,
   category?: string | null,
