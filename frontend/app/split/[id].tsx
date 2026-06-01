@@ -1812,12 +1812,12 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>AMOUNT</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                 {currencyOptions.slice(0, 8).map((cur) => {
-                  const active = currency === cur;
+                  const active = currency === cur.code;
                   return (
                     <TouchableOpacity
-                      key={cur}
-                      testID={`add-exp-cur-${cur}`}
-                      onPress={() => setCurrency(cur)}
+                      key={cur.code}
+                      testID={`add-exp-cur-${cur.code}`}
+                      onPress={() => setCurrency(cur.code)}
                       style={[
                         styles.curMini,
                         {
@@ -2121,7 +2121,7 @@ function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember,
 function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick: (c: string) => void; onClose: () => void }) {
   const { c, isDark } = useTheme();
   const [query, setQuery] = useState("");
-  const list = currencyOptions.filter((cu) => cu.toLowerCase().includes(query.toLowerCase()));
+  const list = currencyOptions.filter((cu) => cu.code.toLowerCase().includes(query.toLowerCase()));
   return (
     <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
       <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border, maxWidth: 420, padding: 18 }]}>
