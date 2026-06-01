@@ -43,7 +43,7 @@ export default function LoginScreen() {
     if (!email.trim() || !password) { Alert.alert("Fill in all fields"); return; }
     setLoading(true);
     try {
-      const r = await api.post("/api/auth/login", {
+      const r = await api.post("/auth/login", {
         email: email.trim().toLowerCase(), password,
       });
       await login(r.data.token, r.data.user);
@@ -103,7 +103,7 @@ export default function LoginScreen() {
         if (error) throw error;
         session = data.session;
       }
-      const r = await api.post("/api/auth/social-login", {
+      const r = await api.post("/auth/social-login", {
         supabase_token: session?.access_token,
         email: session?.user?.email || email,
         phone: session?.user?.phone || phone,
