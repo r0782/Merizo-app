@@ -269,12 +269,12 @@ export default function CreateSplitScreen() {
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {currencyOptions.map((cur) => {
-                const active = currency === cur;
+                const active = currency === cur.code;
                 return (
                   <TouchableOpacity
-                    key={cur}
-                    testID={`cur-${cur}`}
-                    onPress={() => setCurrency(cur)}
+                    key={cur.code}
+                    testID={`cur-${cur.code}`}
+                    onPress={() => setCurrency(cur.code)}
                     style={[
                       styles.curPill,
                       {
@@ -283,7 +283,7 @@ export default function CreateSplitScreen() {
                       },
                     ]}
                   >
-                    <Text style={{ color: active ? "#fff" : c.textPrimary, fontWeight: "700", fontSize: 13 }}>{cur}</Text>
+                    <Text style={{ color: active ? "#fff" : c.textPrimary, fontWeight: "700", fontSize: 13 }}>{cur.code} {cur.symbol}</Text>
                   </TouchableOpacity>
                 );
               })}
