@@ -41,6 +41,17 @@ import * as Print from "expo-print";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 
+// Web fix: prevent scroll container from stealing focus from inputs
+if (typeof document !== "undefined") {
+  document.addEventListener("mousedown", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      e.stopPropagation();
+    }
+  }, true);
+}
+
+
 // Web-safe input that doesn't lose focus in ScrollView
 function WebInput({ value, onChange, placeholder, style, type = "text" }: any) {
   if (typeof window !== "undefined") {
