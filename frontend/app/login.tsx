@@ -311,14 +311,7 @@ export default function LoginScreen() {
             <Text style={{color:txt,fontSize:15,fontWeight:"700"}}>Continue with Google</Text>
           </TouchableOpacity>
 
-          {/* Email OTP */}
-          <TouchableOpacity onPress={()=>setScreen("email_otp")}
-            style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
-              backgroundColor:card,borderRadius:16,padding:16,borderWidth:1,borderColor:border,
-              shadowColor:"#000",shadowOpacity:0.04,shadowRadius:6,shadowOffset:{width:0,height:1},elevation:1,marginBottom:12}}>
-            <Ionicons name="mail-outline" size={20} color={sub}/>
-            <Text style={{color:txt,fontSize:15,fontWeight:"600"}}>Continue with Email OTP</Text>
-          </TouchableOpacity>
+
 
           {/* Phone OTP */}
           <TouchableOpacity onPress={()=>setScreen("phone_otp")}
