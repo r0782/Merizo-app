@@ -1530,12 +1530,14 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   const [currency, setCurrency] = useState(trip.currency || "INR");
   const [paidBy, setPaidBy] = useState(trip.members[0]?.id || "");
   const [splitAmong, setSplitAmong] = useState<string[]>(trip.members.map((m: any) => m.id));
+  const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
 
   // Reset to all members every time the sheet opens
   React.useEffect(() => {
     setSplitAmong(trip.members.map((m: any) => m.id));
     setPaidBy(trip.members[0]?.id || "");
-    setName(""); setAmount(""); setManualCat(null);
+    setName(""); setAmount(""); setManualCat(null); setSplitMode("equal"); setCustomAmounts({});
   }, []);
   const [submitting, setSubmitting] = useState(false);
   const [showUpi, setShowUpi] = useState(false);
@@ -1597,6 +1599,10 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         );
       }
 
+      const customSplits = splitMode === "custom"
+        ? splitAmong.map(id => ({ member_id: id, amount: parseFloat(customAmounts[id] || "0") }))
+        : null;
+
       const r = await api.post(`/trips/${trip.id}/expenses`, {
         name: name.trim(),
         amount: amt,
@@ -1605,6 +1611,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         emoji: meta.emoji,
         paid_by: paidBy,
         split_among: splitAmong,
+        ...(customSplits ? { split_type: "exact", custom_splits: customSplits } : {}),
       });
 
       // Recurring expense detector toast (Home category)
@@ -1688,6 +1695,8 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   };
 
   const allSelected = splitAmong.length === trip.members.length;
+  const equalEach = splitAmong.length > 0 ? (parseFloat(amount || "0") / splitAmong.length) : 0;
+  const customTotal = Object.values(customAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const toggleAll = () => {
     if (allSelected) setSplitAmong([]);
     else setSplitAmong(trip.members.map((m: any) => m.id));
@@ -1900,6 +1909,30 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               </TouchableOpacity>
             </View>
             <View style={{ marginTop: 8, gap: 8 }}>
+              {/* Equal / Custom toggle */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setSplitMode("equal")}
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: 10, borderRadius: 12, borderWidth: 1.5,
+                    backgroundColor: splitMode === "equal" ? indigo : c.surface,
+                    borderColor: splitMode === "equal" ? indigo : c.border }}
+                >
+                  <Ionicons name="git-branch-outline" size={14} color={splitMode === "equal" ? "#fff" : c.textSecondary} />
+                  <Text style={{ color: splitMode === "equal" ? "#fff" : c.textSecondary, fontSize: 13, fontWeight: "700" }}>Equal Split</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSplitMode("custom")}
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: 10, borderRadius: 12, borderWidth: 1.5,
+                    backgroundColor: splitMode === "custom" ? indigo : c.surface,
+                    borderColor: splitMode === "custom" ? indigo : c.border }}
+                >
+                  <Ionicons name="create-outline" size={14} color={splitMode === "custom" ? "#fff" : c.textSecondary} />
+                  <Text style={{ color: splitMode === "custom" ? "#fff" : c.textSecondary, fontSize: 13, fontWeight: "700" }}>Custom Split</Text>
+                </TouchableOpacity>
+              </View>
+
               {trip.members.map((m: any) => {
                 const checked = splitAmong.includes(m.id);
                 return (
@@ -1909,21 +1942,39 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                     onPress={() => toggleMember(m.id)}
                     style={[styles.splitRow, { backgroundColor: c.surface, borderColor: c.border }]}
                   >
-                    <View
-                      style={[
-                        styles.checkbox,
-                        {
-                          backgroundColor: checked ? indigo : "transparent",
-                          borderColor: checked ? "transparent" : c.border,
-                        },
-                      ]}
-                    >
+                    <View style={[styles.checkbox, { backgroundColor: checked ? indigo : "transparent", borderColor: checked ? "transparent" : c.border }]}>
                       {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
                     </View>
-                    <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600", marginLeft: 12 }}>{m.name}</Text>
+                    <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600", marginLeft: 12, flex: 1 }}>{m.name}</Text>
+                    {splitMode === "equal" && checked && (
+                      <Text style={{ color: c.textMuted, fontSize: 13, fontVariant: ["tabular-nums"] as any }}>
+                        {currencySymbol(currency)}{equalEach > 0 ? Math.round(equalEach).toLocaleString("en-IN") : "0"}
+                      </Text>
+                    )}
+                    {splitMode === "custom" && checked && (
+                      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: c.bg, borderRadius: 8, borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ color: c.textMuted, fontSize: 13 }}>{currencySymbol(currency)}</Text>
+                        <TextInput
+                          value={customAmounts[m.id] || ""}
+                          onChangeText={v => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={c.textMuted}
+                          style={{ color: c.textPrimary, fontSize: 13, minWidth: 50, fontVariant: ["tabular-nums"] as any }}
+                        />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
+              {splitMode === "custom" && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 }}>
+                  <Text style={{ color: c.textMuted, fontSize: 12 }}>Total entered</Text>
+                  <Text style={{ color: customTotal === parseFloat(amount || "0") ? c.positive : c.negative, fontSize: 12, fontWeight: "700" }}>
+                    {currencySymbol(currency)}{Math.round(customTotal).toLocaleString("en-IN")} / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString("en-IN")}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
