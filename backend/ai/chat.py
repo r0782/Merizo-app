@@ -1,5 +1,5 @@
 import os
-import google.genai as genai
+import google.generativeai as genai
 from .prompts import SYSTEM_PROMPT, LANGUAGE_INSTRUCTIONS
 
 def build_system_prompt(context: dict) -> str:

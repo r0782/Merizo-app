@@ -1,5 +1,5 @@
 import os, json, re, base64
-import google.genai as genai
+import google.generativeai as genai
 from .prompts import BILL_SCAN_PROMPT
 
 async def scan_bill(image_bytes: bytes, members: list, currency: str = "INR") -> dict:

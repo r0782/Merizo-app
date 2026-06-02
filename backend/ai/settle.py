@@ -1,5 +1,5 @@
 import os
-import google.genai as genai
+import google.generativeai as genai
 from .prompts import SETTLEMENT_EXPLAIN_PROMPT, EXPLAIN_BALANCE_PROMPT
 
 def minimize_transactions(balances: dict) -> list:

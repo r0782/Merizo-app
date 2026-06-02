@@ -1,5 +1,5 @@
 import os, json, re
-import google.genai as genai
+import google.generativeai as genai
 from .prompts import EXPENSE_PARSER_PROMPT
 
 async def parse_expense_from_text(text: str, members: list, currency: str = "INR") -> dict:

@@ -1,5 +1,5 @@
 import os
-import google.genai as genai
+import google.generativeai as genai
 from collections import Counter
 from .prompts import TRIP_REPORT_PROMPT
 
