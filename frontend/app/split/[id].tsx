@@ -1954,18 +1954,25 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                     {splitMode === "custom" && checked && (
                       <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderRadius: 10, borderWidth: 1.5, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 6, minWidth: 90 }}>
                         <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: "600" }}>{currencySymbol(currency)}</Text>
-                        <TextInput
-                          value={customAmounts[m.id] || ""}
-                          onChangeText={v => {
-                            const clean = v.replace(/[^0-9.]/g, "");
-                            setCustomAmounts(prev => ({ ...prev, [m.id]: clean }));
-                          }}
-                          keyboardType="decimal-pad"
-                          placeholder="0"
-                          placeholderTextColor={c.textMuted}
-                          selectTextOnFocus
-                          style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, paddingVertical: 0 }}
-                        />
+                        {Platform.OS === "web" ? (
+                          <input
+                            type="number"
+                            value={customAmounts[m.id] || ""}
+                            onChange={e => setCustomAmounts(prev => ({ ...prev, [m.id]: e.target.value }))}
+                            placeholder="0"
+                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, background: "transparent", border: "none", outline: "none" } as any}
+                          />
+                        ) : (
+                          <TextInput
+                            value={customAmounts[m.id] || ""}
+                            onChangeText={v => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
+                            keyboardType="decimal-pad"
+                            placeholder="0"
+                            placeholderTextColor={c.textMuted}
+                            selectTextOnFocus
+                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, paddingVertical: 0 }}
+                          />
+                        )}
                       </View>
                     )}
                   </TouchableOpacity>
