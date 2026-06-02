@@ -1952,15 +1952,19 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       </Text>
                     )}
                     {splitMode === "custom" && checked && (
-                      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: c.bg, borderRadius: 8, borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ color: c.textMuted, fontSize: 13 }}>{currencySymbol(currency)}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderRadius: 10, borderWidth: 1.5, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 6, minWidth: 90 }}>
+                        <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: "600" }}>{currencySymbol(currency)}</Text>
                         <TextInput
                           value={customAmounts[m.id] || ""}
-                          onChangeText={v => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
-                          keyboardType="numeric"
+                          onChangeText={v => {
+                            const clean = v.replace(/[^0-9.]/g, "");
+                            setCustomAmounts(prev => ({ ...prev, [m.id]: clean }));
+                          }}
+                          keyboardType="decimal-pad"
                           placeholder="0"
                           placeholderTextColor={c.textMuted}
-                          style={{ color: c.textPrimary, fontSize: 13, minWidth: 50, fontVariant: ["tabular-nums"] as any }}
+                          selectTextOnFocus
+                          style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, paddingVertical: 0 }}
                         />
                       </View>
                     )}
@@ -1968,11 +1972,30 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                 );
               })}
               {splitMode === "custom" && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 }}>
-                  <Text style={{ color: c.textMuted, fontSize: 12 }}>Total entered</Text>
-                  <Text style={{ color: customTotal === parseFloat(amount || "0") ? c.positive : c.negative, fontSize: 12, fontWeight: "700" }}>
-                    {currencySymbol(currency)}{Math.round(customTotal).toLocaleString("en-IN")} / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString("en-IN")}
-                  </Text>
+                <View style={{ marginTop: 8, gap: 8 }}>
+                  <View style={{ backgroundColor: isDark ? "rgba(157,123,255,0.08)" : "#F5F3FF", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: isDark ? "rgba(157,123,255,0.2)" : "#DDD6FE" }}>
+                    <Text style={{ color: isDark ? "#9D7BFF" : "#6D28D9", fontSize: 13, fontWeight: "700", marginBottom: 4 }}>✏️ How Custom Split works</Text>
+                    <Text style={{ color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 12, lineHeight: 18 }}>
+                      Type how much each person owes. Like sharing pizza — ramu ate more slices, so they pay more! The total should match the bill amount.
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 4 }}>
+                    <Text style={{ color: c.textMuted, fontSize: 13 }}>Total entered</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={{ color: customTotal === parseFloat(amount || "0") ? c.positive : c.negative, fontSize: 14, fontWeight: "800" }}>
+                        {currencySymbol(currency)}{Math.round(customTotal).toLocaleString("en-IN")}
+                      </Text>
+                      <Text style={{ color: c.textMuted, fontSize: 13 }}>
+                        / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString("en-IN")}
+                      </Text>
+                      {customTotal === parseFloat(amount || "0") && <Ionicons name="checkmark-circle" size={18} color={c.positive} />}
+                    </View>
+                  </View>
+                  {customTotal > 0 && customTotal !== parseFloat(amount || "0") && (
+                    <Text style={{ color: c.negative, fontSize: 12, textAlign: "center" }}>
+                      {customTotal > parseFloat(amount || "0") ? "⚠️ Over by" : "⚠️ Still need"} {currencySymbol(currency)}{Math.abs(Math.round(parseFloat(amount || "0") - customTotal)).toLocaleString("en-IN")}
+                    </Text>
+                  )}
                 </View>
               )}
             </View>
