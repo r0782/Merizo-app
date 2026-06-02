@@ -1827,7 +1827,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       ]}
                     >
                       <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 11, fontWeight: "700" }}>
-                        {cur}
+                        {cur.code} {cur.symbol}
                       </Text>
                     </TouchableOpacity>
                   );
