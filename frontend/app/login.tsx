@@ -132,7 +132,7 @@ export default function LoginScreen() {
   };
 
   // ── Shared input style ───────────────────────────────────────────────────
-  const InputRow = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
+  const InputRow = React.useCallback(({ icon, children }: { icon: string; children: React.ReactNode }) => (
     <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inp,
       borderRadius: 16, borderWidth: 1, borderColor: border,
       paddingHorizontal: 16, gap: 12, marginBottom: 12,
@@ -140,7 +140,7 @@ export default function LoginScreen() {
       <Ionicons name={icon as any} size={18} color={sub} style={{ flexShrink:0 }}/>
       {children}
     </View>
-  );
+  ), [inp, border, sub]);
 
   const PrimaryBtn = ({ onPress, label }: { onPress:()=>void; label:string }) => (
     <TouchableOpacity onPress={onPress} disabled={loading}
