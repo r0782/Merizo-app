@@ -1,9 +1,9 @@
 import os, json, re, base64
-import google.generativeai as genai
+import google.genai as genai
 from .prompts import BILL_SCAN_PROMPT
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
 async def scan_bill(image_bytes: bytes, members: list, currency: str = "INR") -> dict:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.Client(api_key=os.environ.get("GEMINI_API_KEY","")).models
     image_b64 = base64.b64encode(image_bytes).decode()
     prompt = BILL_SCAN_PROMPT.format(members=", ".join(members) if members else "everyone", currency=currency)
     try:

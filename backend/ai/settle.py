@@ -1,7 +1,7 @@
 import os
-import google.generativeai as genai
+import google.genai as genai
 from .prompts import SETTLEMENT_EXPLAIN_PROMPT, EXPLAIN_BALANCE_PROMPT
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
 def minimize_transactions(balances: dict) -> list:
     debtors = sorted([(amt, name) for name, amt in balances.items() if amt < -0.01])
     creditors = sorted([(amt, name) for name, amt in balances.items() if amt > 0.01], reverse=True)
@@ -18,11 +18,11 @@ def minimize_transactions(balances: dict) -> list:
         if abs(creditors[j][0]) < 0.01: j += 1
     return transactions
 async def explain_settlement(transactions: list, currency: str, language: str = "en") -> str:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.Client(api_key=os.environ.get("GEMINI_API_KEY","")).models
     tx_text = "\n".join([f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions])
     response = model.generate_content(SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language))
     return response.text
 async def explain_balances(balances: dict, currency: str, language: str = "en") -> str:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.Client(api_key=os.environ.get("GEMINI_API_KEY","")).models
     response = model.generate_content(EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language))
     return response.text

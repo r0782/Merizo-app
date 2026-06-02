@@ -1,7 +1,7 @@
 import os
-import google.generativeai as genai
+import google.genai as genai
 from .prompts import SYSTEM_PROMPT, LANGUAGE_INSTRUCTIONS
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
 def build_system_prompt(context: dict) -> str:
     language = context.get("language", "en")
     members = ", ".join([m.get("name", "") for m in context.get("members", [])])
@@ -10,7 +10,7 @@ def build_system_prompt(context: dict) -> str:
     lang_instr = LANGUAGE_INSTRUCTIONS.get(language, "Respond in English.")
     return f"{SYSTEM_PROMPT}\nContext:\n- Group: {group_name}\n- Members: {members}\n- Currency: {currency}\n- {lang_instr}"
 async def get_chat_response(message: str, history: list, context: dict) -> str:
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=build_system_prompt(context))
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash", system_instruction=build_system_prompt(context))
     gemini_history = []
     for msg in history[-10:]:
         role = "user" if msg.get("role") == "user" else "model"

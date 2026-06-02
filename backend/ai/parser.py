@@ -1,9 +1,9 @@
 import os, json, re
-import google.generativeai as genai
+import google.genai as genai
 from .prompts import EXPENSE_PARSER_PROMPT
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
 async def parse_expense_from_text(text: str, members: list, currency: str = "INR") -> dict:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.Client(api_key=os.environ.get("GEMINI_API_KEY","")).models
     prompt = EXPENSE_PARSER_PROMPT.format(text=text, members=", ".join(members) if members else "unknown", currency=currency)
     try:
         response = model.generate_content(prompt)
