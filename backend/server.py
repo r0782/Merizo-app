@@ -9,7 +9,8 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import bcrypt, jwt, httpx
 from fastapi.responses import JSONResponse
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status, UploadFile, File, Form
+from fastapi import FastAPI
+from ai.router import router as ai_router, APIRouter, HTTPException, Depends, Request, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -837,6 +838,7 @@ Format: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR",
 async def startup():
     logger.info("Merizo API starting (Supabase backend)...")
     app.include_router(api)
+    app.include_router(ai_router)
     try:
         user = await sb_one("users", email=DEMO_EMAIL)
         if not user:
