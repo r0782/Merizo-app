@@ -274,6 +274,7 @@ export default function LoginScreen() {
           <InputRow icon="mail-outline">
             <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com"
               placeholderTextColor={sub} keyboardType="email-address" autoCapitalize="none"
+              autoCorrect={false} autoComplete="email" blurOnSubmit={false}
               style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
           </InputRow>
 
@@ -281,6 +282,7 @@ export default function LoginScreen() {
           <InputRow icon="lock-closed-outline">
             <TextInput value={password} onChangeText={setPassword} placeholder="••••••••"
               placeholderTextColor={sub} secureTextEntry={!showPw}
+              autoComplete="password" blurOnSubmit={false}
               style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
             <TouchableOpacity onPress={()=>setShowPw(s=>!s)}>
               <Ionicons name={showPw?"eye-off-outline":"eye-outline"} size={18} color={sub}/>
