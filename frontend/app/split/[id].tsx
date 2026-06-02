@@ -41,6 +41,28 @@ import * as Print from "expo-print";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 
+// Web-safe input that doesn't lose focus in ScrollView
+function WebInput({ value, onChange, placeholder, style, type = "text" }: any) {
+  if (typeof window !== "undefined") {
+    return (
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          background: "transparent", border: "none", outline: "none",
+          color: style?.color || "#000", fontSize: style?.fontSize || 14,
+          fontWeight: style?.fontWeight || "normal", width: "100%",
+          minWidth: style?.minWidth || "auto",
+        }}
+      />
+    );
+  }
+  return null;
+}
+
+
 
 // ── UPI payment deep link ─────────────────────────────────────────────────────
 function openUPI(upiId: string, name: string, amount: number, note: string) {
@@ -1954,25 +1976,13 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                     {splitMode === "custom" && checked && (
                       <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderRadius: 10, borderWidth: 1.5, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 6, minWidth: 90 }}>
                         <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: "600" }}>{currencySymbol(currency)}</Text>
-                        {Platform.OS === "web" ? (
-                          <input
+<WebInput
+                            value={customAmounts[m.id] || ""}
+                            onChange={v => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
+                            placeholder="0"
                             type="number"
-                            value={customAmounts[m.id] || ""}
-                            onChange={e => setCustomAmounts(prev => ({ ...prev, [m.id]: e.target.value }))}
-                            placeholder="0"
-                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, background: "transparent", border: "none", outline: "none" } as any}
+                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60 }}
                           />
-                        ) : (
-                          <TextInput
-                            value={customAmounts[m.id] || ""}
-                            onChangeText={v => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
-                            keyboardType="decimal-pad"
-                            placeholder="0"
-                            placeholderTextColor={c.textMuted}
-                            selectTextOnFocus
-                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 60, paddingVertical: 0 }}
-                          />
-                        )}
                       </View>
                     )}
                   </TouchableOpacity>
