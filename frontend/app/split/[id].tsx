@@ -34,6 +34,7 @@ import {
   detectCategory,
 } from "../../src/lib/tokens";
 import { SmartNum } from "../../src/components/DotNum";
+import { BalanceExplainer } from "../../src/components/ai/BalanceExplainer";
 import { ExpandingFAB } from "../../src/components/ExpandingFAB";
 import { VoiceExpenseSheet } from "../../src/components/VoiceExpenseSheet";
 import * as Print from "expo-print";
@@ -219,6 +220,7 @@ export default function SplitDetailScreen() {
         { label: "Quick Add",       sublabel: "Type expense manually",    icon: "create-outline",           onPress: () => setShowAdd(true) },
         { label: "Speak Expense",   sublabel: "Say it, AI parses it",     icon: "mic-outline",              onPress: () => setShowVoice(true) },
         { label: "Scan Receipt",    sublabel: "Camera · auto-fill",       icon: "camera-outline",           onPress: () => setShowAdd(true) },
+        { label: "Custom Split",    sublabel: "Split by person or %",     icon: "git-branch-outline",       onPress: () => router.push({ pathname: "/simple-split", params: { tripId: trip.id, tripName: trip.name } }) },
         { label: "Download Report", sublabel: "AI insights PDF",          icon: "document-text-outline",    onPress: onDownloadPDF },
       ]} />
 
@@ -756,6 +758,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
         ))}
       </View>
 
+      <BalanceExplainer trip={trip} userId={userId} />
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 80, gap: 12 }}>
 
