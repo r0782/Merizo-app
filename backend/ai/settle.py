@@ -22,9 +22,9 @@ def minimize_transactions(balances: dict) -> list:
 
 async def explain_settlement(transactions: list, currency: str, language: str = "en") -> str:
     tx_text = "\n".join([f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions])
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language))
+    response = client.models.generate_content(model="gemini-1.5-flash-latest", contents=SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language))
     return response.text
 
 async def explain_balances(balances: dict, currency: str, language: str = "en") -> str:
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language))
+    response = client.models.generate_content(model="gemini-1.5-flash-latest", contents=EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language))
     return response.text

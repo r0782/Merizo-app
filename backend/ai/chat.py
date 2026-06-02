@@ -20,7 +20,7 @@ async def get_chat_response(message: str, history: list, context: dict) -> str:
         contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))]))
     contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-1.5-flash-latest",
         contents=contents,
         config=types.GenerateContentConfig(system_instruction=build_system_prompt(context))
     )

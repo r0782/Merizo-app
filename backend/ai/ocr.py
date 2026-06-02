@@ -9,7 +9,7 @@ async def scan_bill(image_bytes: bytes, members: list, currency: str = "INR") ->
     prompt = BILL_SCAN_PROMPT.format(members=", ".join(members) if members else "everyone", currency=currency)
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash-latest",
             contents=[types.Part(inline_data=types.Blob(mime_type="image/jpeg", data=image_bytes)), prompt]
         )
         raw = re.sub(r"```json|```", "", response.text).strip()
