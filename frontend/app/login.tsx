@@ -164,7 +164,7 @@ export default function LoginScreen() {
       <View style={{ flex:1, backgroundColor:bg }}>
         <Blob1 color={blob1}/><Blob2 color={blob2}/>
         <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
             <TouchableOpacity onPress={()=>{setScreen(isEmail?"email_otp":"phone_otp");setOtp("");}}
               style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
               <Ionicons name="arrow-back" size={20} color={sub}/>
@@ -204,7 +204,7 @@ export default function LoginScreen() {
       <View style={{flex:1,backgroundColor:bg}}>
         <Blob1 color={blob1}/><Blob2 color={blob2}/>
         <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
             <TouchableOpacity onPress={()=>setScreen("main")} style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
               <Ionicons name="arrow-back" size={20} color={sub}/>
               <Text style={{color:sub,fontSize:14}}>Back</Text>
@@ -230,7 +230,7 @@ export default function LoginScreen() {
       <View style={{flex:1,backgroundColor:bg}}>
         <Blob1 color={blob1}/><Blob2 color={blob2}/>
         <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
             <TouchableOpacity onPress={()=>setScreen("main")} style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
               <Ionicons name="arrow-back" size={20} color={sub}/>
               <Text style={{color:sub,fontSize:14}}>Back</Text>
@@ -263,7 +263,7 @@ export default function LoginScreen() {
       <Blob1 color={blob1}/><Blob2 color={blob2}/>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
         <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}}
-          keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          keyboardShouldPersistTaps="always" showsVerticalScrollIndicator={false}>
 
           <Logo card={card} txt={txt}/>
 
