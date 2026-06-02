@@ -1,71 +1,20 @@
-# backend/ai/chat.py
+import os
 import google.generativeai as genai
-import os, json
-from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
-TOOLS = [
-    {
-        "name": "create_expense",
-        "description": "Create an expense in a group",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {"type": "string"},
-                "amount": {"type": "number"},
-                "paid_by": {"type": "string"},
-                "participants": {"type": "array", "items": {"type": "string"}},
-                "split_type": {"type": "string", "enum": ["equal", "exact", "percent"]},
-                "category": {"type": "string"}
-            },
-            "required": ["title", "amount", "paid_by", "participants"]
-        }
-    },
-    {
-        "name": "get_balances",
-        "description": "Get current balances for the group",
-        "parameters": {"type": "object", "properties": {}}
-    },
-    {
-        "name": "explain_balance",
-        "description": "Explain balances in simple plain language",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "user_name": {"type": "string"}
-            }
-        }
-    }
-]
-
-async def chat_stream(user_message: str, history: list, context: dict):
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=build_system_prompt(context),
-    )
-    
-    chat = model.start_chat(history=history)
-    
-    async def generate():
-        response = chat.send_message(user_message, stream=True)
-        for chunk in response:
-            if chunk.text:
-                yield f"data: {json.dumps({'text': chunk.text})}\n\n"
-        yield "data: [DONE]\n\n"
-    
-    return StreamingResponse(generate(), media_type="text/event-stream")
-
+from .prompts import SYSTEM_PROMPT, LANGUAGE_INSTRUCTIONS
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
 def build_system_prompt(context: dict) -> str:
-    members = ", ".join([m["name"] for m in context.get("members", [])])
-    currency = context.get("currency", "INR")
     language = context.get("language", "en")
-    
-    return f"""You are Merizo AI assistant.
-Group: {context.get('group_name', 'General')}
-Members: {members}
-Currency: {currency}
-Respond in language code: {language}
-
-{MERIZO_SYSTEM_PROMPT}"""
+    members = ", ".join([m.get("name", "") for m in context.get("members", [])])
+    group_name = context.get("group_name", "your group")
+    currency = context.get("currency", "INR")
+    lang_instr = LANGUAGE_INSTRUCTIONS.get(language, "Respond in English.")
+    return f"{SYSTEM_PROMPT}\nContext:\n- Group: {group_name}\n- Members: {members}\n- Currency: {currency}\n- {lang_instr}"
+async def get_chat_response(message: str, history: list, context: dict) -> str:
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=build_system_prompt(context))
+    gemini_history = []
+    for msg in history[-10:]:
+        role = "user" if msg.get("role") == "user" else "model"
+        gemini_history.append({"role": role, "parts": [msg.get("content", "")]})
+    chat = model.start_chat(history=gemini_history)
+    response = chat.send_message(message)
+    return response.text

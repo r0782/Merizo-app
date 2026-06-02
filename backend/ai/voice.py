@@ -1,36 +1,15 @@
-# backend/ai/voice.py
-import openai, os, tempfile
-from fastapi import UploadFile
-
-client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-SUPPORTED_LANGUAGES = {
-    "en": "english", "hi": "hindi", "te": "telugu",
-    "ta": "tamil", "kn": "kannada", "ml": "malayalam",
-    "bn": "bengali", "mr": "marathi", "es": "spanish",
-    "fr": "french", "ar": "arabic"
-}
-
-async def transcribe_and_parse(audio_file: UploadFile, language: str, members: list) -> dict:
-    # 1. Transcribe with Whisper
+import os, tempfile
+from openai import AsyncOpenAI
+from .parser import parse_expense_from_text
+client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+async def transcribe_audio(audio_bytes: bytes, language: str = "en") -> str:
     with tempfile.NamedTemporaryFile(suffix=".m4a", delete=False) as f:
-        f.write(await audio_file.read())
+        f.write(audio_bytes)
         tmp_path = f.name
-    
     with open(tmp_path, "rb") as f:
-        transcript = await client.audio.transcriptions.create(
-            model="whisper-1",
-            file=f,
-            language=language,
-            response_format="text"
-        )
-    
-    # 2. Parse transcript into expense
-    from .parser import parse_expense_from_text
-    parsed = await parse_expense_from_text(transcript, members)
-    
-    return {
-        "transcript": transcript,
-        "parsed": parsed,
-        "confidence": parsed.get("confidence", 0.8)
-    }
+        transcript = await client.audio.transcriptions.create(model="whisper-1", file=f, language=language)
+    return transcript.text
+async def transcribe_and_parse(audio_bytes: bytes, members: list, currency: str, language: str = "en") -> dict:
+    transcript = await transcribe_audio(audio_bytes, language)
+    parsed = await parse_expense_from_text(transcript, members, currency)
+    return {"transcript": transcript, "parsed": parsed}

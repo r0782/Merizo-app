@@ -1,8 +1,5 @@
-cat > backend/ai/router.py << 'EOF'
-import os
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import Optional, List
 from .chat import get_chat_response
 from .parser import parse_expense_from_text
 from .settle import minimize_transactions, explain_settlement, explain_balances
@@ -10,9 +7,7 @@ from .ocr import scan_bill
 from .voice import transcribe_and_parse
 from .report import generate_trip_report
 
-router = APIRouter(prefix="/ai", tags=["ai"])
-
-# ── Request models ─────────────────────────────────────────────────────────────
+router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 class ChatRequest(BaseModel):
     message: str
@@ -25,7 +20,7 @@ class ParseRequest(BaseModel):
     currency: str = "INR"
 
 class SettleRequest(BaseModel):
-    balances: dict        # {"Alice": -200, "Bob": 100, "Charlie": 100}
+    balances: dict
     currency: str = "INR"
     language: str = "en"
 
@@ -40,8 +35,6 @@ class ReportRequest(BaseModel):
     members: list
     language: str = "en"
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
-
 @router.post("/chat")
 async def chat(req: ChatRequest):
     try:
@@ -53,8 +46,7 @@ async def chat(req: ChatRequest):
 @router.post("/expense/parse")
 async def parse_expense(req: ParseRequest):
     try:
-        result = await parse_expense_from_text(req.text, req.members, req.currency)
-        return result
+        return await parse_expense_from_text(req.text, req.members, req.currency)
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -62,7 +54,7 @@ async def parse_expense(req: ParseRequest):
 async def optimize_settlement(req: SettleRequest):
     try:
         transactions = minimize_transactions(req.balances)
-        explanation  = await explain_settlement(transactions, req.currency, req.language)
+        explanation = await explain_settlement(transactions, req.currency, req.language)
         return {"transactions": transactions, "explanation": explanation}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -70,45 +62,27 @@ async def optimize_settlement(req: SettleRequest):
 @router.post("/explain/balances")
 async def explain(req: ExplainRequest):
     try:
-        explanation = await explain_balances(req.balances, req.currency, req.language)
-        return {"explanation": explanation}
+        return {"explanation": await explain_balances(req.balances, req.currency, req.language)}
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @router.post("/bill/scan")
-async def bill_scan(
-    image: UploadFile = File(...),
-    members: str = Form(""),
-    currency: str = Form("INR")
-):
+async def bill_scan(image: UploadFile = File(...), members: str = Form(""), currency: str = Form("INR")):
     try:
-        image_bytes  = await image.read()
-        members_list = [m.strip() for m in members.split(",") if m.strip()]
-        result = await scan_bill(image_bytes, members_list, currency)
-        return result
+        return await scan_bill(await image.read(), [m.strip() for m in members.split(",") if m.strip()], currency)
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @router.post("/voice/transcribe")
-async def voice_transcribe(
-    audio: UploadFile = File(...),
-    members: str = Form(""),
-    currency: str = Form("INR"),
-    language: str = Form("en")
-):
+async def voice_transcribe(audio: UploadFile = File(...), members: str = Form(""), currency: str = Form("INR"), language: str = Form("en")):
     try:
-        audio_bytes  = await audio.read()
-        members_list = [m.strip() for m in members.split(",") if m.strip()]
-        result = await transcribe_and_parse(audio_bytes, members_list, currency, language)
-        return result
+        return await transcribe_and_parse(await audio.read(), [m.strip() for m in members.split(",") if m.strip()], currency, language)
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @router.post("/trip/report")
 async def trip_report(req: ReportRequest):
     try:
-        report = await generate_trip_report(req.trip, req.expenses, req.members, req.language)
-        return {"report": report}
+        return {"report": await generate_trip_report(req.trip, req.expenses, req.members, req.language)}
     except Exception as e:
         raise HTTPException(500, str(e))
-EOF
