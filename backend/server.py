@@ -10,10 +10,10 @@ from typing import List, Optional
 import bcrypt, jwt, httpx
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI
-from ai.router import router as ai_router, APIRouter, HTTPException, Depends, Request, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
+from ai.router import router as ai_router
 from pydantic import BaseModel
 from supabase import create_client, Client
 
