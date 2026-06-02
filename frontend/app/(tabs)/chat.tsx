@@ -4,10 +4,10 @@ import {
   FlatList, KeyboardAvoidingView, Platform, ActivityIndicator
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../src/lib/theme";
-import { ChatBubble } from "../src/components/ai/ChatBubble";
-import { ExpenseConfirmCard } from "../src/components/ai/ExpenseConfirm";
-import { sendChat } from "../src/lib/ai";
+import { useTheme } from "../../src/lib/theme";
+import { ChatBubble } from "../../src/components/ai/ChatBubble";
+import { ExpenseConfirmCard } from "../../src/components/ai/ExpenseConfirm";
+import { sendChat } from "../../src/lib/ai";
 
 type Message = { id: string; role: string; content: string };
 

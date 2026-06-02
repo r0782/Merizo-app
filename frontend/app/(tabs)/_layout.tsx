@@ -13,9 +13,6 @@ function InsightsIcon({ color, focused }: any) {
 function ChatIcon({ color, focused }: any) {
   return <Ionicons name={focused ? "sparkles" : "sparkles-outline"} color={color} size={22} />;
 }
-function ChatIcon({ color, focused }: any) {
-  return <Ionicons name={focused ? "sparkles" : "sparkles-outline"} color={color} size={22} />;
-}
 function ProfileIcon({ color, focused }: any) {
   return <Ionicons name={focused ? "person" : "person-outline"} color={color} size={22} />;
 }
