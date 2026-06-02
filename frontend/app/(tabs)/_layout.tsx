@@ -10,6 +10,12 @@ function GroupsIcon({ color, focused }: any) {
 function InsightsIcon({ color, focused }: any) {
   return <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} color={color} size={22} />;
 }
+function ChatIcon({ color, focused }: any) {
+  return <Ionicons name={focused ? "sparkles" : "sparkles-outline"} color={color} size={22} />;
+}
+function ChatIcon({ color, focused }: any) {
+  return <Ionicons name={focused ? "sparkles" : "sparkles-outline"} color={color} size={22} />;
+}
 function ProfileIcon({ color, focused }: any) {
   return <Ionicons name={focused ? "person" : "person-outline"} color={color} size={22} />;
 }
@@ -41,6 +47,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: "Groups", tabBarIcon: GroupsIcon }} />
+      <Tabs.Screen name="chat" options={{ title: "AI", tabBarIcon: ChatIcon }} />
+      <Tabs.Screen name="chat" options={{ title: "AI Chat", tabBarIcon: ChatIcon }} />
       <Tabs.Screen name="insights" options={{ title: "Insights", tabBarIcon: InsightsIcon }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ProfileIcon }} />
     </Tabs>
