@@ -1,8 +1,8 @@
 import os
-from google import genai
+from groq import Groq
 from .prompts import SETTLEMENT_EXPLAIN_PROMPT, EXPLAIN_BALANCE_PROMPT
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 def minimize_transactions(balances: dict) -> list:
     debtors   = sorted([(amt, name) for name, amt in balances.items() if amt < -0.01])
@@ -22,9 +22,17 @@ def minimize_transactions(balances: dict) -> list:
 
 async def explain_settlement(transactions: list, currency: str, language: str = "en") -> str:
     tx_text = "\n".join([f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions])
-    response = client.models.generate_content(model="gemini-1.5-flash-latest", contents=SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language))
-    return response.text
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language)}],
+        max_tokens=256,
+    )
+    return response.choices[0].message.content
 
 async def explain_balances(balances: dict, currency: str, language: str = "en") -> str:
-    response = client.models.generate_content(model="gemini-1.5-flash-latest", contents=EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language))
-    return response.text
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language)}],
+        max_tokens=256,
+    )
+    return response.choices[0].message.content

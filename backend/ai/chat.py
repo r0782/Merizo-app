@@ -1,9 +1,8 @@
 import os
-from google import genai
-from google.genai import types
+from groq import Groq
 from .prompts import SYSTEM_PROMPT, LANGUAGE_INSTRUCTIONS
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 def build_system_prompt(context: dict) -> str:
     language   = context.get("language", "en")
@@ -14,14 +13,15 @@ def build_system_prompt(context: dict) -> str:
     return f"{SYSTEM_PROMPT}\nContext:\n- Group: {group_name}\n- Members: {members}\n- Currency: {currency}\n- {lang_instr}"
 
 async def get_chat_response(message: str, history: list, context: dict) -> str:
-    contents = []
+    messages = [{"role": "system", "content": build_system_prompt(context)}]
     for msg in history[-10:]:
-        role = "user" if msg.get("role") == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))]))
-    contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
-    response = client.models.generate_content(
-        model="gemini-1.5-flash-latest",
-        contents=contents,
-        config=types.GenerateContentConfig(system_instruction=build_system_prompt(context))
+        messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+    messages.append({"role": "user", "content": message})
+    
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages,
+        max_tokens=1024,
+        temperature=0.7,
     )
-    return response.text
+    return response.choices[0].message.content

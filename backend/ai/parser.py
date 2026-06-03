@@ -1,14 +1,23 @@
 import os, json, re
-from google import genai
+from groq import Groq
 from .prompts import EXPENSE_PARSER_PROMPT
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 async def parse_expense_from_text(text: str, members: list, currency: str = "INR") -> dict:
-    prompt = EXPENSE_PARSER_PROMPT.format(text=text, members=", ".join(members) if members else "unknown", currency=currency)
+    prompt = EXPENSE_PARSER_PROMPT.format(
+        text=text,
+        members=", ".join(members) if members else "unknown",
+        currency=currency
+    )
     try:
-        response = client.models.generate_content(model="gemini-1.5-flash-latest", contents=prompt)
-        raw = re.sub(r"```json|```", "", response.text).strip()
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=512,
+            temperature=0.1,
+        )
+        raw = re.sub(r"```json|```", "", response.choices[0].message.content).strip()
         return json.loads(raw)
     except Exception as e:
         return {"error": str(e), "raw_text": text}
