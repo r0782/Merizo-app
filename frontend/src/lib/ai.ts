@@ -1,8 +1,16 @@
 import { api } from "./api";
 
 export async function sendChat(message: string, history: any[], context: any = {}) {
-  const r = await api.post("/ai/chat", { message, history, context });
+  const token = await getStoredToken();
+  const r = await api.post("/ai/chat", { message, history, context, token });
   return r.data.reply as string;
+}
+
+async function getStoredToken(): Promise<string> {
+  try {
+    const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+    return (await AsyncStorage.getItem("token")) || "";
+  } catch { return ""; }
 }
 
 export async function parseExpenseText(text: string, members: string[], currency: string = "INR") {

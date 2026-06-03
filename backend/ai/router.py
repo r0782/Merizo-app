@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list = []
     context: dict = {}
+    token: str = ""
 
 class ParseRequest(BaseModel):
     text: str
@@ -38,7 +39,7 @@ class ReportRequest(BaseModel):
 @router.post("/chat")
 async def chat(req: ChatRequest):
     try:
-        reply = await get_chat_response(req.message, req.history, req.context)
+        reply = await get_chat_response(req.message, req.history, req.context, req.token)
         return {"reply": reply}
     except Exception as e:
         raise HTTPException(500, str(e))
