@@ -109,6 +109,8 @@ async def execute_tool(tool_name: str, args: dict, token: str) -> str:
     return json.dumps({"error": "unknown tool"})
 
 async def get_chat_response(message: str, history: list, context: dict, token: str = "") -> str:
+    import logging
+    logger = logging.getLogger("merizo.ai")
     messages = [{"role": "system", "content": build_system_prompt(context)}]
     for msg in history[-10:]:
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
@@ -125,6 +127,7 @@ async def get_chat_response(message: str, history: list, context: dict, token: s
     )
     
     msg = response.choices[0].message
+    logger.info(f"AI response: tool_calls={bool(msg.tool_calls)}, content={msg.content[:50] if msg.content else None}")
     
     # If AI wants to call a tool
     if msg.tool_calls:
