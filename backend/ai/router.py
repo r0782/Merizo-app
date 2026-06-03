@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     history: list = []
     context: dict = {}
     token: str = ""
+    token: str = ""
 
 class ParseRequest(BaseModel):
     text: str
