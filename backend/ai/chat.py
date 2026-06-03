@@ -67,7 +67,9 @@ def build_system_prompt(context: dict) -> str:
     return SYSTEM_PROMPT + ctx
 
 async def execute_tool(tool_name: str, args: dict, token: str) -> str:
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     async with httpx.AsyncClient() as http:
         if tool_name == "create_group":
             r = await http.post(f"{BACKEND_URL}/api/trips", 
