@@ -96,7 +96,7 @@ export default function HomeScreen() {
 
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity onPress={() => router.push("/create-split")} style={{ flex: 1, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 14, padding: 14, alignItems: "center", gap: 6 }}>
+            <TouchableOpacity onPress={() => router.push("/simple-split")} style={{ flex: 1, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 14, padding: 14, alignItems: "center", gap: 6 }}>
               <Ionicons name="add-circle" size={20} color="#fff" />
               <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>Add expense</Text>
             </TouchableOpacity>
