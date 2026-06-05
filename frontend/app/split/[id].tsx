@@ -1745,7 +1745,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         <View style={styles.sheetHandle}>
           <View style={[styles.handleBar, { backgroundColor: c.textMuted }]} />
         </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 30 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ paddingBottom: 30 }} keyboardShouldPersistTaps="always" style={Platform.OS === "web" ? { overflow: "auto" } as any : undefined}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }}>
             <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>Add expense</Text>
             <TouchableOpacity onPress={onClose} testID="add-exp-close">

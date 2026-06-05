@@ -45,7 +45,6 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: "Groups", tabBarIcon: GroupsIcon }} />
       <Tabs.Screen name="chat" options={{ title: "AI", tabBarIcon: ChatIcon }} />
-      <Tabs.Screen name="chat" options={{ title: "AI Chat", tabBarIcon: ChatIcon }} />
       <Tabs.Screen name="insights" options={{ title: "Insights", tabBarIcon: InsightsIcon }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ProfileIcon }} />
     </Tabs>
