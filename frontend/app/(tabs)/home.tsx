@@ -329,7 +329,7 @@ function FAB({ router, isDark, c }: any) {
       {/* Item 2 — Create group */}
       <Animated.View style={[{ position: "absolute", bottom: 0, right: 0, zIndex: 2 }, item2Style]}>
         <TouchableOpacity
-          onPress={() => closeMenu(() => router.push("/create-split"))}
+          onPress={() => closeMenu(() => router.push("/category"))}
           style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
         >
           <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
