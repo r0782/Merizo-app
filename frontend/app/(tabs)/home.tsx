@@ -274,53 +274,76 @@ function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netB
 function FAB({ router, isDark, c }: any) {
   const [open, setOpen] = useState(false);
   const rot = useSharedValue(0);
-  const s1 = useSharedValue(0);
-  const s2 = useSharedValue(0);
+  const y1  = useSharedValue(0);
+  const y2  = useSharedValue(0);
+  const op  = useSharedValue(0);
 
-  const toggle = () => {
-    if (open) {
-      rot.value = withTiming(0, { duration: 200 });
-      s1.value = withTiming(0, { duration: 150 });
-      s2.value = withTiming(0, { duration: 120 });
-      setTimeout(() => setOpen(false), 200);
-    } else {
-      setOpen(true);
-      rot.value = withTiming(1, { duration: 200 });
-      s1.value = withDelay(40, withSpring(1, { damping: 14 }));
-      s2.value = withDelay(80, withSpring(1, { damping: 14 }));
-    }
+  const openMenu = () => {
+    setOpen(true);
+    rot.value = withTiming(1, { duration: 250 });
+    op.value  = withTiming(1, { duration: 200 });
+    y1.value  = withSpring(-56,  { damping: 18, stiffness: 260 });
+    y2.value  = withSpring(-112, { damping: 18, stiffness: 240 });
   };
 
-  const rotStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${interpolate(rot.value, [0,1], [0,45])}deg` }] }));
-  const a1 = useAnimatedStyle(() => ({ opacity: s1.value, transform: [{ translateY: interpolate(s1.value, [0,1], [20,0]) }, { scale: s1.value }] }));
-  const a2 = useAnimatedStyle(() => ({ opacity: s2.value, transform: [{ translateY: interpolate(s2.value, [0,1], [40,0]) }, { scale: s2.value }] }));
+  const closeMenu = (cb?: () => void) => {
+    rot.value = withTiming(0, { duration: 200 });
+    op.value  = withTiming(0, { duration: 150 });
+    y1.value  = withTiming(0, { duration: 180 });
+    y2.value  = withTiming(0, { duration: 180 });
+    setTimeout(() => { setOpen(false); cb && cb(); }, 200);
+  };
+
+  const rotStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${interpolate(rot.value, [0,1], [0,45])}deg` }]
+  }));
+  const item1Style = useAnimatedStyle(() => ({
+    opacity: op.value,
+    transform: [{ translateY: y1.value }],
+    pointerEvents: open ? "auto" : "none",
+  }));
+  const item2Style = useAnimatedStyle(() => ({
+    opacity: op.value,
+    transform: [{ translateY: y2.value }],
+    pointerEvents: open ? "auto" : "none",
+  }));
 
   return (
-    <View style={{ position: "absolute", bottom: 24, right: 20, alignItems: "flex-end", gap: 10 }}>
-      {open && (
-        <>
-          <Animated.View style={[a1]}>
-            <TouchableOpacity onPress={() => { toggle(); setTimeout(() => router.push("/simple-split"), 200); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="flash" size={16} color={isDark ? "#7B6FFF" : "#6D5DFC"} />
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Quick split</Text>
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View style={[a2]}>
-            <TouchableOpacity onPress={() => { toggle(); setTimeout(() => router.push("/create-split"), 200); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="people" size={16} color={isDark ? "#7B6FFF" : "#6D5DFC"} />
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Create group</Text>
-            </TouchableOpacity>
-          </Animated.View>
-          <Pressable onPress={toggle} style={{ position: "absolute", top: -1000, left: -1000, right: -100, bottom: -100 }} />
-        </>
-      )}
-      <TouchableOpacity onPress={toggle} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", alignItems: "center", justifyContent: "center", shadowColor: "#6D5DFC", shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+    <View style={{ position: "absolute", bottom: 28, right: 20, alignItems: "flex-end" }}>
+      {/* Backdrop */}
+      {open && <Pressable onPress={() => closeMenu()} style={{ position: "absolute", top: -2000, left: -2000, right: -20, bottom: -28, zIndex: 0 }} />}
+
+      {/* Item 1 — Quick split */}
+      <Animated.View style={[{ position: "absolute", bottom: 0, right: 0, zIndex: 2 }, item1Style]}>
+        <TouchableOpacity
+          onPress={() => closeMenu(() => router.push("/simple-split"))}
+          style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+        >
+          <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="flash" size={15} color="#6D5DFC" />
+          </View>
+          <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Quick split</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Item 2 — Create group */}
+      <Animated.View style={[{ position: "absolute", bottom: 0, right: 0, zIndex: 2 }, item2Style]}>
+        <TouchableOpacity
+          onPress={() => closeMenu(() => router.push("/create-split"))}
+          style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+        >
+          <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="people" size={15} color="#6D5DFC" />
+          </View>
+          <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Create group</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Main FAB button */}
+      <TouchableOpacity
+        onPress={() => open ? closeMenu() : openMenu()}
+        style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", alignItems: "center", justifyContent: "center", shadowColor: "#6D5DFC", shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 3 }}
+      >
         <Animated.View style={rotStyle}>
           <Ionicons name="add" size={24} color="#fff" />
         </Animated.View>
