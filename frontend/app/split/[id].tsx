@@ -992,125 +992,143 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
 
 function InsightsTab({ trip }: { trip: any }) {
   const { c, isDark } = useTheme();
-  const currency = trip.currency || "INR";
-  const sym      = currencySymbol(currency);
+  const sym      = currencySymbol(trip.currency || "INR");
   const total    = trip.total_spent || 0;
   const balances = trip.balances || [];
   const txns     = trip.settlement_transactions || [];
 
-  const [insights, setInsights] = useState<any>(null);
-  const [loading, setLoading]   = useState(true);
+  const [insights, setInsights]   = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(true);
 
   useEffect(() => {
     api.get("/trips/" + trip.id + "/ai-report")
       .then(r => setInsights(r.data))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => setAiLoading(false));
   }, [trip.id]);
 
-  // Compute local stats
-  const topPayer    = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
-  const categories  = trip.by_category || {};
-  const topCatKey   = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
-  const topCatPct   = topCatKey && total > 0 ? Math.round(categories[topCatKey] / total * 100) : 0;
-  const catLabel    = { food: "Food & Dining", trip: "Travel", home: "Home", friends: "Events", shopping: "Shopping", bills: "Bills", other: "Other" };
-
-  // Group health
-  const maxPaid  = Math.max(...balances.map((b: any) => b.paid || 0), 0);
-  const avgPaid  = total / Math.max(balances.length, 1);
-  const isUneven = maxPaid > avgPaid * 2;
-  const health   = txns.length === 0
-    ? { emoji: "🟢", label: "Fully settled", detail: "Everyone is square. Great job!", color: c.positive }
+  const topPayer   = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
+  const categories = trip.by_category || {};
+  const topCatKey  = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
+  const topCatPct  = topCatKey && total > 0 ? Math.round(categories[topCatKey] / total * 100) : 0;
+  const catLabel: any = { food: "Food & Dining", trip: "Travel", home: "Home", friends: "Events", shopping: "Shopping", bills: "Bills", other: "Other" };
+  const maxPaid    = Math.max(...balances.map((b: any) => b.paid || 0), 0);
+  const avgPaid    = total / Math.max(balances.length, 1);
+  const isUneven   = maxPaid > avgPaid * 2;
+  const health     = txns.length === 0
+    ? { label: "Fully settled", detail: "Everyone is square.", color: "#00C48C", bg: "rgba(0,196,140,0.08)", border: "rgba(0,196,140,0.2)" }
     : isUneven
-    ? { emoji: "🔴", label: "Payment burden uneven", detail: `${topPayer?.name} has covered disproportionately more than others.`, color: c.negative }
-    : { emoji: "🟡", label: "Pending settlements", detail: `${txns.length} payment${txns.length !== 1 ? "s" : ""} needed to fully balance the group.`, color: "#F59E0B" };
+    ? { label: "Uneven load", detail: `${topPayer?.name} covered most.`, color: "#FF453A", bg: "rgba(255,67,58,0.08)", border: "rgba(255,67,58,0.2)" }
+    : { label: "Pending", detail: `${txns.length} payment${txns.length !== 1 ? "s" : ""} needed.`, color: "#FF9F0A", bg: "rgba(255,159,10,0.08)", border: "rgba(255,159,10,0.2)" };
 
   const staticInsights = [
-    topPayer && `${topPayer.name} covered the most — ${sym}${Math.round(topPayer.paid || 0).toLocaleString("en-IN")} paid.`,
-    topCatKey && `${catLabel[topCatKey as keyof typeof catLabel] || topCatKey} is ${topCatPct}% of total spending.`,
-    txns.length === 0 ? "The group is fully balanced — no payments needed." : `${txns.length} settlement${txns.length !== 1 ? "s" : ""} will clear all balances.`,
-    `Average spend per person: ${sym}${Math.round(total / Math.max(balances.length, 1)).toLocaleString("en-IN")}.`,
+    topPayer && `${topPayer.name} covered the most — ${sym}${Math.round(topPayer.paid || 0).toLocaleString("en-IN")}.`,
+    topCatKey && `${catLabel[topCatKey] || topCatKey} is ${topCatPct}% of total spending.`,
+    txns.length === 0 ? "The group is fully balanced." : `${txns.length} payment${txns.length !== 1 ? "s" : ""} will clear all balances.`,
+    `Average spend: ${sym}${Math.round(total / Math.max(balances.length, 1)).toLocaleString("en-IN")} per person.`,
   ].filter(Boolean) as string[];
 
+  const scoreRaw = txns.length === 0 ? 100 : isUneven ? 42 : Math.max(50, 100 - txns.length * 12);
+  const score    = Math.min(100, Math.max(0, scoreRaw));
+  const scoreColor = score >= 80 ? "#00C48C" : score >= 50 ? "#FF9F0A" : "#FF453A";
+
   return (
-    <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 16 }}>
-
-      {/* AI Summary */}
-      <View style={{ backgroundColor: isDark ? "rgba(124,92,255,0.1)" : "#F5F3FF", borderRadius: 14, padding: 16, borderWidth: 1, borderColor: isDark ? "rgba(124,92,255,0.25)" : "#E0D9FF" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <Ionicons name="sparkles" size={16} color={isDark ? c.indigo : "#6D28D9"} />
-          <Text style={{ color: isDark ? c.indigo : "#6D28D9", fontSize: 11, fontWeight: "700", letterSpacing: 1.5 }}>AI FINANCIAL SUMMARY</Text>
-        </View>
-        {loading ? (
-          <View style={{ height: 40, borderRadius: 8, backgroundColor: c.border, opacity: 0.4 }} />
-        ) : (
-          <Text style={{ color: c.textPrimary, fontSize: 14, lineHeight: 22 }}>
-            {insights?.summary || staticInsights[0] || "Loading financial analysis..."}
-          </Text>
-        )}
-      </View>
-
-      {/* Group Health */}
-      <View style={{ backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border }}>
-        <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2, marginBottom: 12 }}>GROUP HEALTH</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Text style={{ fontSize: 24 }}>{health.emoji}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: health.color, fontSize: 14, fontWeight: "800" }}>{health.label}</Text>
-            <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 3, lineHeight: 18 }}>{health.detail}</Text>
+    <ScrollView
+      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100, gap: 14 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Hero AI card ── */}
+      <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+        <View style={{ backgroundColor: isDark ? "rgba(109,93,252,0.15)" : "#F5F3FF", padding: 16, borderBottomWidth: 0.5, borderBottomColor: isDark ? "rgba(109,93,252,0.2)" : "#E0D9FF" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: isDark ? "rgba(109,93,252,0.3)" : "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="sparkles" size={14} color={isDark ? "#A78BFA" : "#6D5DFC"} />
+            </View>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: isDark ? "#A78BFA" : "#6D5DFC", letterSpacing: 0.3 }}>Merizo AI</Text>
           </View>
         </View>
+        <View style={{ padding: 16 }}>
+          {aiLoading ? (
+            <View style={{ gap: 8 }}>
+              <View style={{ height: 14, borderRadius: 7, backgroundColor: c.border, width: "90%" }} />
+              <View style={{ height: 14, borderRadius: 7, backgroundColor: c.border, width: "70%" }} />
+            </View>
+          ) : (
+            <Text style={{ fontSize: 15, color: c.textPrimary, lineHeight: 24, fontWeight: "400" }}>
+              {insights?.summary || `Total ${sym}${Math.round(total).toLocaleString("en-IN")} across ${trip.expense_count || 0} expenses, ${balances.length} members.`}
+            </Text>
+          )}
+        </View>
       </View>
 
-      {/* Key insights */}
-      <View style={{ gap: 8 }}>
-        <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2 }}>KEY INSIGHTS</Text>
-        {(insights?.recommendations || staticInsights).slice(0, 5).map((ins: string, i: number) => (
-          <View key={i} style={{ flexDirection: "row", gap: 10, backgroundColor: c.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
-            <Text style={{ color: isDark ? c.indigo : "#6D28D9", fontSize: 14 }}>✦</Text>
-            <Text style={{ color: c.textPrimary, fontSize: 13, lineHeight: 20, flex: 1 }}>{ins}</Text>
+      {/* ── Stats row ── */}
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+          <Text style={{ fontSize: 10, color: c.textSecondary, letterSpacing: 0.5, marginBottom: 6 }}>Total spent</Text>
+          <Text style={{ fontSize: 20, fontWeight: "500", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total).toLocaleString("en-IN")}</Text>
+          <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>{trip.expense_count || 0} expenses</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+          <Text style={{ fontSize: 10, color: c.textSecondary, letterSpacing: 0.5, marginBottom: 6 }}>Per person</Text>
+          <Text style={{ fontSize: 20, fontWeight: "500", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total / Math.max(balances.length, 1)).toLocaleString("en-IN")}</Text>
+          <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>{balances.length} members</Text>
+        </View>
+      </View>
+
+      {/* ── Financial score ── */}
+      <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, padding: 20, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", alignItems: "center" }}>
+        <Text style={{ fontSize: 10, color: c.textSecondary, letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Financial score</Text>
+        <Text style={{ fontSize: 64, fontWeight: "500", color: scoreColor, letterSpacing: -3, lineHeight: 72 }}>{score}</Text>
+        <View style={{ width: "100%", height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", borderRadius: 2, marginTop: 12, overflow: "hidden" }}>
+          <View style={{ width: `${score}%`, height: 4, backgroundColor: scoreColor, borderRadius: 2 }} />
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, backgroundColor: health.bg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 0.5, borderColor: health.border }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: health.color }} />
+          <Text style={{ fontSize: 12, fontWeight: "500", color: health.color }}>{health.label}</Text>
+          <Text style={{ fontSize: 12, color: c.textSecondary }}>· {health.detail}</Text>
+        </View>
+      </View>
+
+      {/* ── Key insights ── */}
+      <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+        <View style={{ padding: 16, borderBottomWidth: 0.5, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}>
+          <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>Key insights</Text>
+        </View>
+        {(insights?.recommendations || staticInsights).slice(0, 4).map((ins: string, i: number, arr: string[]) => (
+          <View key={i} style={{ flexDirection: "row", gap: 12, padding: 14, borderBottomWidth: i < arr.length - 1 ? 0.5 : 0, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)", alignItems: "flex-start" }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isDark ? "#A78BFA" : "#6D5DFC", marginTop: 6, flexShrink: 0 }} />
+            <Text style={{ fontSize: 14, color: c.textPrimary, lineHeight: 22, flex: 1 }}>{ins}</Text>
           </View>
         ))}
       </View>
 
-      {/* Smart settlement */}
+      {/* ── Smart settlement ── */}
       {txns.length > 0 && (
-        <View style={{ backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border }}>
-          <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2, marginBottom: 12 }}>SMART SETTLEMENT</Text>
-          <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: 12 }}>
-            To settle the group in the fewest transactions ({txns.length}):
-          </Text>
+        <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+          <View style={{ padding: 16, borderBottomWidth: 0.5, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}>
+            <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>Settle in {txns.length} payment{txns.length !== 1 ? "s" : ""}</Text>
+            <Text style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>Fewest transactions to balance everyone</Text>
+          </View>
           {txns.map((t: any, i: number) => (
-            <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: i < txns.length - 1 ? 1 : 0, borderBottomColor: c.border }}>
-              <Text style={{ color: c.textPrimary, fontSize: 13 }}>
-                <Text style={{ fontWeight: "700" }}>{t.from_name}</Text>
-                <Text style={{ color: c.textMuted }}> → </Text>
-                <Text style={{ fontWeight: "700" }}>{t.to_name}</Text>
-              </Text>
-              <Text style={{ fontFamily: "RobotoMono_700Bold", fontSize: 13, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
-                {sym}{Math.round(t.amount).toLocaleString("en-IN")}
-              </Text>
+            <View key={i} style={{ flexDirection: "row", alignItems: "center", padding: 14, borderBottomWidth: i < txns.length - 1 ? 0.5 : 0, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)", gap: 10 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(255,67,58,0.1)", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="arrow-forward" size={14} color="#FF453A" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: c.textPrimary }}>
+                  <Text style={{ fontWeight: "500" }}>{t.from_name}</Text>
+                  <Text style={{ color: c.textSecondary }}> pays </Text>
+                  <Text style={{ fontWeight: "500" }}>{t.to_name}</Text>
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#FF453A" }}>{sym}{Math.round(t.amount).toLocaleString("en-IN")}</Text>
             </View>
           ))}
         </View>
       )}
-
-      {/* Savings score */}
-      {insights?.savings_score != null && (
-        <View style={{ backgroundColor: c.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border, alignItems: "center" }}>
-          <Text style={{ color: c.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 2 }}>FINANCIAL SCORE</Text>
-          <Text style={{ fontFamily: "RobotoMono_700Bold", fontSize: 48, fontWeight: "900", color: insights.savings_score >= 70 ? c.positive : insights.savings_score >= 40 ? "#F59E0B" : c.negative, marginTop: 4 }}>
-            {insights.savings_score}
-          </Text>
-          <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>{insights.savings_label}</Text>
-        </View>
-      )}
-
-      <View style={{ height: 40 }} />
-    </View>
+    </ScrollView>
   );
 }
-
 
 function OverviewTab({ trip }: { trip: any }) {
   const { c, isDark } = useTheme();

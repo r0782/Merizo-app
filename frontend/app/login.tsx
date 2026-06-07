@@ -17,7 +17,7 @@ type Screen = "main" | "email_otp" | "phone_otp" | "verify_email" | "verify_phon
 
 export default function LoginScreen() {
   const { c, isDark } = useTheme();
-  const { login }     = useAuth();
+  const { login, loginWithToken } = useAuth();
   const router        = useRouter();
 
   const [screen,   setScreen]   = useState<Screen>("main");
@@ -39,6 +39,17 @@ export default function LoginScreen() {
   const accent  = isDark ? "#F4E6D0" : "#1A1208";
 
   // ── Password login ───────────────────────────────────────────────────────
+  const demoLogin = async () => {
+    setLoading(true);
+    try {
+      const r = await api.post("/auth/demo-login", {});
+      await loginWithToken(r.data.access_token, r.data.user);
+      router.replace("/(tabs)/home");
+    } catch (e: any) {
+      Alert.alert("Demo login failed", e?.message || "Try again");
+    } finally { setLoading(false); }
+  };
+
   const doLogin = async () => {
     if (!email.trim() || !password) { Alert.alert("Fill in all fields"); return; }
     setLoading(true);
@@ -46,7 +57,7 @@ export default function LoginScreen() {
       const r = await api.post("/auth/login", {
         email: email.trim().toLowerCase(), password,
       });
-      await login(r.data.access_token, r.data.user);
+      await loginWithToken(r.data.access_token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
       Alert.alert("Login failed", e?.response?.data?.detail || "Check your credentials");
@@ -111,7 +122,7 @@ export default function LoginScreen() {
              || session?.user?.email?.split("@")[0]
              || "User",
       });
-      await login(r.data.access_token, r.data.user);
+      await loginWithToken(r.data.access_token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
       Alert.alert("Invalid code", e?.message || "Try again");
@@ -315,6 +326,13 @@ export default function LoginScreen() {
 
 
 
+          {/* Demo login */}
+          <TouchableOpacity onPress={demoLogin}
+            style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
+              backgroundColor:"rgba(109,93,252,0.08)",borderRadius:16,padding:16,borderWidth:1,borderColor:"rgba(109,93,252,0.2)",marginBottom:12}}>
+            <Ionicons name="sparkles" size={20} color="#6D5DFC"/>
+            <Text style={{color:"#6D5DFC",fontSize:15,fontWeight:"600"}}>Try Demo Account</Text>
+          </TouchableOpacity>
           {/* Phone OTP */}
           <TouchableOpacity onPress={()=>setScreen("phone_otp")}
             style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
