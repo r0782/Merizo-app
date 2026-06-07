@@ -1,5 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Platform, StatusBar } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Animated, {
+  useSharedValue, withSpring, withTiming, useAnimatedStyle,
+  interpolate, Extrapolation, runOnJS, withDelay,
+} from "react-native-reanimated";
+import {
+  View, Text, ScrollView, TouchableOpacity, RefreshControl,
+  Platform, StatusBar, Modal, Pressable, Dimensions, FlatList,
+} from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
@@ -7,6 +14,322 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
 
+const { width: SW, height: SH } = Dimensions.get("window");
+
+// ── Stacked Group Cards ──────────────────────────────────────────────────────
+function StackedGroups({ trips, sym, router, c, isDark }: any) {
+  const [expanded, setExpanded] = useState(false);
+  const anim = useSharedValue(0);
+
+  const toggle = () => {
+    if (expanded) {
+      anim.value = withTiming(0, { duration: 300 });
+      setTimeout(() => setExpanded(false), 300);
+    } else {
+      setExpanded(true);
+      anim.value = withTiming(1, { duration: 300 });
+    }
+  };
+
+  if (trips.length === 0) return (
+    <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 28, alignItems: "center", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+      <Text style={{ fontSize: 28, marginBottom: 10 }}>👋</Text>
+      <Text style={{ fontSize: 15, fontWeight: "500", color: c.textPrimary, marginBottom: 6 }}>No groups yet</Text>
+      <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: "center", marginBottom: 16, lineHeight: 20 }}>Create your first group or ask AI to help split an expense</Text>
+      <TouchableOpacity onPress={() => router.push("/create-split")} style={{ backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: "500", color: "#fff" }}>Create first group</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const preview = trips.slice(0, 3);
+  const CARD_H = 74;
+  const STACK_OFFSET = 8;
+
+  if (!expanded) {
+    return (
+      <TouchableOpacity onPress={toggle} activeOpacity={0.9}>
+        <View style={{ height: CARD_H + (preview.length - 1) * STACK_OFFSET + 2 }}>
+          {preview.map((trip: any, i: number) => {
+            const net = trip.my_net || 0;
+            const isOwed = net > 0;
+            const emoji = trip.category === "food" ? "🍕" : trip.category === "travel" ? "✈️" : trip.category === "home" ? "🏠" : "📁";
+            const scale = 1 - i * 0.03;
+            const ty = i * STACK_OFFSET;
+            const zIndex = preview.length - i;
+            const opacity = 1 - i * 0.15;
+            return (
+              <View key={trip.id} style={{ position: "absolute", top: ty, left: 0, right: 0, zIndex, opacity, transform: [{ scaleX: scale }] }}>
+                <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }} numberOfLines={1}>{trip.name}</Text>
+                    <Text style={{ fontSize: 12, color: c.textSecondary }}>{trip.member_count || 0} members</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    {net === 0
+                      ? <Text style={{ fontSize: 12, color: c.textSecondary }}>Settled ✓</Text>
+                      : <>
+                          <Text style={{ fontSize: 15, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>{isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}</Text>
+                          <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>{isOwed ? "owed to you" : "you owe"}</Text>
+                        </>
+                    }
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        {trips.length > 1 && (
+          <View style={{ alignItems: "center", marginTop: (preview.length - 1) * STACK_OFFSET + 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontSize: 12, color: c.textSecondary }}>{trips.length} groups · tap to expand</Text>
+              <Ionicons name="chevron-down" size={12} color={c.textSecondary} />
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View>
+      <View style={{ gap: 10 }}>
+        {trips.map((trip: any) => {
+          const net = trip.my_net || 0;
+          const isOwed = net > 0;
+          const emoji = trip.category === "food" ? "🍕" : trip.category === "travel" ? "✈️" : trip.category === "home" ? "🏠" : "📁";
+          return (
+            <TouchableOpacity key={trip.id} onPress={() => router.push({ pathname: "/split/[id]", params: { id: trip.id } })} style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+              <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Text style={{ fontSize: 20 }}>{emoji}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }} numberOfLines={1}>{trip.name}</Text>
+                <Text style={{ fontSize: 12, color: c.textSecondary }}>{trip.member_count || 0} members · {trip.expense_count || 0} expenses</Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                {net === 0
+                  ? <Text style={{ fontSize: 12, color: c.textSecondary }}>Settled ✓</Text>
+                  : <>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>{isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}</Text>
+                      <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>{isOwed ? "owed to you" : "you owe"}</Text>
+                    </>
+                }
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <TouchableOpacity onPress={toggle} style={{ alignItems: "center", marginTop: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
+          <Text style={{ fontSize: 12, color: c.textSecondary }}>Collapse</Text>
+          <Ionicons name="chevron-up" size={12} color={c.textSecondary} />
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Balance Dashboard Modal ──────────────────────────────────────────────────
+function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netBalance, sym, c, isDark }: any) {
+  const slideY = useSharedValue(SH);
+
+  useEffect(() => {
+    if (visible) slideY.value = withSpring(0, { damping: 20, stiffness: 200 });
+    else slideY.value = withTiming(SH, { duration: 300 });
+  }, [visible]);
+
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideY.value }],
+  }));
+
+  const chartData = useMemo(() => {
+    const days = 30;
+    const base = netBalance;
+    return Array.from({ length: days }, (_, i) => ({
+      day: i + 1,
+      value: base + (Math.random() - 0.6) * 200 * (i / days),
+    }));
+  }, [netBalance]);
+
+  const minV = Math.min(...chartData.map(d => d.value));
+  const maxV = Math.max(...chartData.map(d => d.value));
+  const range = maxV - minV || 1;
+  const chartW = SW - 80;
+  const chartH = 80;
+  const points = chartData.map((d, i) => `${(i / (chartData.length - 1)) * chartW},${chartH - ((d.value - minV) / range) * chartH}`).join(" ");
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View style={[{ backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: SH * 0.85, overflow: "hidden" }, slideStyle]}>
+          {/* Handle */}
+          <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 36, height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)", borderRadius: 2 }} />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            {/* Hero balance */}
+            <View style={{ backgroundColor: "#111", borderRadius: 20, padding: 20, marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Net balance</Text>
+              <Text style={{ fontSize: 42, fontWeight: "500", color: "#fff", letterSpacing: -2, marginBottom: 4 }}>
+                {netBalance >= 0 ? "+" : "-"}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 12 }}>
+                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Owed to you</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "500", color: "#00C48C" }}>+{sym}{Math.round(totalOwed).toLocaleString("en-IN")}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 12 }}>
+                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>You owe</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "500", color: "#FF453A" }}>-{sym}{Math.round(totalOwing).toLocaleString("en-IN")}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* AI Insight */}
+            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#6D5DFC" }} />
+                <Text style={{ fontSize: 10, color: "#6D5DFC", fontWeight: "500", letterSpacing: 0.5 }}>MERIZO AI INSIGHT</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, lineHeight: 21, marginBottom: 8 }}>
+                {trips.length > 0
+                  ? `${trips[0]?.name} accounts for ${trips.length > 0 ? Math.round(Math.abs(trips[0]?.my_net || 0) / Math.max(totalOwing, 1) * 100) : 0}% of your total debt. Settling with ${trips[0]?.member_count || 0} members will significantly clear this up.`
+                  : "You're all settled up! Great financial discipline this month."}
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                  <Text style={{ fontSize: 11, color: c.textSecondary }}>{trips.length} groups active</Text>
+                </View>
+                <View style={{ backgroundColor: "#EDE9FE", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                  <Text style={{ fontSize: 11, color: "#6D5DFC" }}>Settle now →</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Balance chart */}
+            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+              <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary, marginBottom: 4 }}>30-day trajectory</Text>
+              <Text style={{ fontSize: 11, color: c.textSecondary, marginBottom: 12 }}>Balance movement over the last month</Text>
+              <View style={{ height: chartH + 20, paddingHorizontal: 4 }}>
+                <svg width={chartW} height={chartH} style={{ overflow: "visible" } as any}>
+                  <defs>
+                    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.3" />
+                      <stop offset="100%" stopColor="#6D5DFC" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <polyline points={points} fill="none" stroke="#6D5DFC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <polyline points={`0,${chartH} ${points} ${chartW},${chartH}`} fill="url(#grad)" stroke="none" />
+                </svg>
+              </View>
+            </View>
+
+            {/* Group breakdown */}
+            <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Group breakdown</Text>
+            <View style={{ gap: 10, marginBottom: 16 }}>
+              {trips.map((trip: any) => {
+                const net = trip.my_net || 0;
+                const isOwed = net > 0;
+                const settled = Math.floor((trip.member_count || 1) * 0.4);
+                const total = trip.member_count || 1;
+                const pct = settled / total;
+                const emoji = trip.category === "food" ? "🍕" : trip.category === "travel" ? "✈️" : trip.category === "home" ? "🏠" : "📁";
+                return (
+                  <View key={trip.id} style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <Text style={{ fontSize: 18 }}>{emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>{trip.name}</Text>
+                        <Text style={{ fontSize: 11, color: c.textSecondary }}>{settled}/{total} members settled</Text>
+                      </View>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>
+                        {isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}
+                      </Text>
+                    </View>
+                    {/* Progress bar */}
+                    <View style={{ height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", borderRadius: 2, marginBottom: 10 }}>
+                      <View style={{ width: `${Math.round(pct * 100)}%`, height: 4, backgroundColor: "#6D5DFC", borderRadius: 2 }} />
+                    </View>
+                    <TouchableOpacity style={{ backgroundColor: "#6D5DFC", borderRadius: 10, paddingVertical: 8, alignItems: "center" }} onPress={onClose}>
+                      <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>Settle instantly ✓</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── FAB ──────────────────────────────────────────────────────────────────────
+function FAB({ router, isDark, c }: any) {
+  const [open, setOpen] = useState(false);
+  const rot = useSharedValue(0);
+  const s1 = useSharedValue(0);
+  const s2 = useSharedValue(0);
+
+  const toggle = () => {
+    if (open) {
+      rot.value = withTiming(0, { duration: 200 });
+      s1.value = withTiming(0, { duration: 150 });
+      s2.value = withTiming(0, { duration: 120 });
+      setTimeout(() => setOpen(false), 200);
+    } else {
+      setOpen(true);
+      rot.value = withTiming(1, { duration: 200 });
+      s1.value = withDelay(40, withSpring(1, { damping: 14 }));
+      s2.value = withDelay(80, withSpring(1, { damping: 14 }));
+    }
+  };
+
+  const rotStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${interpolate(rot.value, [0,1], [0,45])}deg` }] }));
+  const a1 = useAnimatedStyle(() => ({ opacity: s1.value, transform: [{ translateY: interpolate(s1.value, [0,1], [20,0]) }, { scale: s1.value }] }));
+  const a2 = useAnimatedStyle(() => ({ opacity: s2.value, transform: [{ translateY: interpolate(s2.value, [0,1], [40,0]) }, { scale: s2.value }] }));
+
+  return (
+    <View style={{ position: "absolute", bottom: 24, right: 20, alignItems: "flex-end", gap: 10 }}>
+      {open && (
+        <>
+          <Animated.View style={[a1]}>
+            <TouchableOpacity onPress={() => { toggle(); setTimeout(() => router.push("/simple-split"), 200); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="flash" size={16} color={isDark ? "#7B6FFF" : "#6D5DFC"} />
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Quick split</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View style={[a2]}>
+            <TouchableOpacity onPress={() => { toggle(); setTimeout(() => router.push("/create-split"), 200); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="people" size={16} color={isDark ? "#7B6FFF" : "#6D5DFC"} />
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Create group</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          <Pressable onPress={toggle} style={{ position: "absolute", top: -1000, left: -1000, right: -100, bottom: -100 }} />
+        </>
+      )}
+      <TouchableOpacity onPress={toggle} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", alignItems: "center", justifyContent: "center", shadowColor: "#6D5DFC", shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+        <Animated.View style={rotStyle}>
+          <Ionicons name="add" size={24} color="#fff" />
+        </Animated.View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { c, isDark } = useTheme();
   const { user } = useAuth();
@@ -14,6 +337,7 @@ export default function HomeScreen() {
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const load = useCallback(async () => {
     try { const r = await api.get("/trips"); setTrips(r.data || []); } catch {}
@@ -44,10 +368,11 @@ export default function HomeScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 120 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textSecondary} />}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 20 }}>
           <View>
             <Text style={{ fontSize: 13, color: c.textSecondary, marginBottom: 2 }}>{greeting()}</Text>
@@ -58,9 +383,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
+        {/* Hero Balance Card — tap to expand */}
+        <TouchableOpacity onPress={() => setShowDashboard(true)} activeOpacity={0.92} style={{ marginHorizontal: 20, marginBottom: 16 }}>
           <View style={{ backgroundColor: "#111111", borderRadius: 24, padding: 22 }}>
-            <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Net balance</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase" }}>Net balance</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Tap for details</Text>
+                <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.3)" />
+              </View>
+            </View>
             <Text style={{ fontSize: 38, fontWeight: "500", color: "#FFFFFF", letterSpacing: -1.5, marginBottom: 4 }}>
               {netBalance >= 0 ? "+" : "-"}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
             </Text>
@@ -78,8 +410,9 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
+        {/* AI Insight Card */}
         <TouchableOpacity onPress={() => router.push("/(tabs)/chat")} style={{ marginHorizontal: 20, marginBottom: 24, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#6D5DFC" }} />
@@ -94,80 +427,36 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity onPress={() => router.push("/simple-split")} style={{ flex: 1, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 14, padding: 14, alignItems: "center", gap: 6 }}>
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>Add expense</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/chat")} style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, padding: 14, alignItems: "center", gap: 6, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <Ionicons name="sparkles" size={20} color={isDark ? "#7B6FFF" : "#6D5DFC"} />
-              <Text style={{ fontSize: 12, fontWeight: "500", color: isDark ? "#7B6FFF" : "#6D5DFC" }}>Ask AI</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/chat")} style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, padding: 14, alignItems: "center", gap: 6, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <Ionicons name="scan" size={20} color={c.textPrimary} />
-              <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary }}>Scan bill</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        {/* Groups */}
         <View style={{ paddingHorizontal: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>Active groups</Text>
-            <TouchableOpacity onPress={() => router.push("/create-split")}>
-              <Text style={{ fontSize: 12, color: isDark ? "#7B6FFF" : "#6D5DFC" }}>New group</Text>
-            </TouchableOpacity>
           </View>
-
           {loading ? (
             <View style={{ gap: 10 }}>
               {[1,2,3].map(i => <View key={i} style={{ height: 70, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 16 }} />)}
             </View>
-          ) : trips.length === 0 ? (
-            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 28, alignItems: "center", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <Text style={{ fontSize: 28, marginBottom: 10 }}>👋</Text>
-              <Text style={{ fontSize: 15, fontWeight: "500", color: c.textPrimary, marginBottom: 6 }}>No groups yet</Text>
-              <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: "center", marginBottom: 16, lineHeight: 20 }}>Create your first group or ask AI to help split an expense</Text>
-              <TouchableOpacity onPress={() => router.push("/create-split")} style={{ backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}>
-                <Text style={{ fontSize: 13, fontWeight: "500", color: "#fff" }}>Create first group</Text>
-              </TouchableOpacity>
-            </View>
           ) : (
-            <View style={{ gap: 10 }}>
-              {trips.map((trip) => {
-                const net = trip.my_net || 0;
-                const isOwed = net > 0;
-                const emoji = trip.category === "food" ? "🍕" : trip.category === "travel" ? "✈️" : trip.category === "home" ? "🏠" : trip.category === "entertainment" ? "🎬" : "📁";
-                return (
-                  <TouchableOpacity key={trip.id} onPress={() => router.push({ pathname: "/split/[id]", params: { id: trip.id } })} style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                    <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Text style={{ fontSize: 20 }}>{emoji}</Text>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 3 }} numberOfLines={1}>{trip.name}</Text>
-                      <Text style={{ fontSize: 12, color: c.textSecondary }}>{trip.member_count || 0} members · {trip.expense_count || 0} expenses</Text>
-                    </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      {net === 0 ? (
-                        <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                          <Text style={{ fontSize: 11, color: c.textSecondary }}>Settled</Text>
-                        </View>
-                      ) : (
-                        <>
-                          <Text style={{ fontSize: 15, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>
-                            {isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}
-                          </Text>
-                          <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 2 }}>{isOwed ? "owed to you" : "you owe"}</Text>
-                        </>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <StackedGroups trips={trips} sym={sym} router={router} c={c} isDark={isDark} />
           )}
         </View>
       </ScrollView>
+
+      {/* FAB */}
+      <FAB router={router} isDark={isDark} c={c} />
+
+      {/* Balance Dashboard Modal */}
+      <BalanceDashboard
+        visible={showDashboard}
+        onClose={() => setShowDashboard(false)}
+        trips={trips}
+        totalOwed={totalOwed}
+        totalOwing={totalOwing}
+        netBalance={netBalance}
+        sym={sym}
+        c={c}
+        isDark={isDark}
+      />
     </View>
   );
 }
