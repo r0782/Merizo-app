@@ -1,16 +1,15 @@
 import { api } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+async function getStoredToken(): Promise<string> {
+  try { return (await AsyncStorage.getItem("merizo_token")) || ""; }
+  catch { return ""; }
+}
 
 export async function sendChat(message: string, history: any[], context: any = {}) {
   const token = await getStoredToken();
   const r = await api.post("/ai/chat", { message, history, context, token });
   return r.data.reply as string;
-}
-
-async function getStoredToken(): Promise<string> {
-  try {
-    const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
-    return (await AsyncStorage.getItem("token")) || "";
-  } catch { return ""; }
 }
 
 export async function parseExpenseText(text: string, members: string[], currency: string = "INR") {
