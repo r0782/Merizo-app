@@ -189,57 +189,87 @@ export default function SplitDetailScreen() {
     }
   };
 
+  const net = trip.my_net || 0;
+  const isOwed = net > 0;
+  const sym = currencySymbol(trip.currency || "INR");
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Image source={{ uri: cover }} style={[StyleSheet.absoluteFill as any, { width: "100%", height: 220 }]} />
-          <View style={[StyleSheet.absoluteFill as any, { backgroundColor: "rgba(0,0,0,0.35)", height: 220 }]} />
-          <View style={styles.heroTop}>
-            <TouchableOpacity testID="split-back" onPress={() => router.back()} style={styles.frostBtn}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+
+        {/* ── Premium Hero ── */}
+        <View style={{ height: 260, position: "relative" }}>
+          <Image source={{ uri: cover }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 260 }} resizeMode="cover" />
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: 260, backgroundColor: "rgba(0,0,0,0.38)" }} />
+
+          {/* Top controls */}
+          <View style={{ position: "absolute", top: Platform.OS === "ios" ? 52 : 36, left: 20, right: 20, flexDirection: "row", justifyContent: "space-between" }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="arrow-back" size={18} color="#fff" />
             </TouchableOpacity>
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity testID="split-share" onPress={onShareInvite} style={styles.frostBtn}>
-                <Ionicons name="share-outline" size={20} color="#fff" />
+              <TouchableOpacity onPress={onShareInvite} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="share-outline" size={18} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity testID="split-settings" onPress={() => setShowSettings(true)} style={styles.frostBtn}>
-                <Ionicons name="settings-outline" size={20} color="#fff" />
+              <TouchableOpacity onPress={() => setShowSettings(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="settings-outline" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.heroInfo}>
-            <Text style={{ color: "#fff", fontSize: 28, fontFamily: "Syne_700Bold", letterSpacing: -0.5 }}>{trip.name}</Text>
-            <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 4 }}>
+
+          {/* Group info */}
+          <View style={{ position: "absolute", bottom: 20, left: 20, right: 20 }}>
+            <Text style={{ color: "#fff", fontSize: 30, fontWeight: "500", letterSpacing: -1, marginBottom: 4 }}>{trip.name}</Text>
+            <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
               {trip.members.length} members{trip.start_date ? ` · ${trip.start_date}` : ""}{trip.end_date ? ` → ${trip.end_date}` : ""}
             </Text>
           </View>
         </View>
 
-        {/* Cinematic tab bar */}
-        <View style={{ flexDirection: "row", backgroundColor: isDark ? "#14110F" : c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
-          {([
-            { id: "journal",  label: "JOURNAL",  icon: "book-outline"       },
-            { id: "settle",   label: "SETTLE",   icon: "swap-horizontal-outline" },
-            { id: "insights", label: "AI",       icon: "sparkles-outline"   },
-            { id: "members",  label: "MEMBERS",  icon: "people-outline"     },
-          ] as { id: Tab; label: string; icon: any }[]).map(({ id: t, label, icon }) => {
-            const active = tab === t;
-            return (
-              <TouchableOpacity
-                key={t}
-                testID={`tab-${t}`}
-                onPress={() => setTab(t)}
-                style={{ flex: 1, paddingVertical: 11, alignItems: "center", borderBottomWidth: active ? 2 : 0, borderBottomColor: isDark ? c.accent : "#1F1A17", gap: 3 }}
-              >
-                <Ionicons name={icon} size={14} color={active ? (isDark ? c.accent : "#1F1A17") : c.textMuted} />
-                <Text style={{ color: active ? (isDark ? c.accent : "#1F1A17") : c.textMuted, fontSize: 7, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular" }}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* ── Balance pill ── */}
+        <View style={{ marginHorizontal: 20, marginTop: -18, marginBottom: 16, zIndex: 10 }}>
+          <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+            <View>
+              <Text style={{ fontSize: 11, color: c.textSecondary, marginBottom: 3, letterSpacing: 0.3 }}>Your balance</Text>
+              <Text style={{ fontSize: 24, fontWeight: "500", color: net === 0 ? c.textSecondary : isOwed ? "#00C48C" : "#FF453A", letterSpacing: -0.5 }}>
+                {net === 0 ? "Settled ✓" : `${isOwed ? "+" : "-"}${sym}${Math.abs(Math.round(net)).toLocaleString("en-IN")}`}
+              </Text>
+              {net !== 0 && <Text style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{isOwed ? "Others owe you" : "You owe"}</Text>}
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 4 }}>
+              <View style={{ backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Text style={{ fontSize: 12, color: c.textSecondary }}>{sym}{Math.round(trip.total_spent || 0).toLocaleString("en-IN")} total</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: c.textSecondary }}>{trip.expense_count || 0} expenses</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Pill tab bar ── */}
+        <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 14, padding: 3, gap: 2 }}>
+            {([
+              { id: "journal",  label: "Journal",  icon: "book-outline" },
+              { id: "settle",   label: "Settle",   icon: "swap-horizontal-outline" },
+              { id: "insights", label: "AI",       icon: "sparkles-outline" },
+              { id: "members",  label: "Members",  icon: "people-outline" },
+            ] as { id: Tab; label: string; icon: any }[]).map(({ id: t, label, icon }) => {
+              const active = tab === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  testID={`tab-${t}`}
+                  onPress={() => setTab(t)}
+                  style={{ flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 11, backgroundColor: active ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent", gap: 3, shadowColor: active ? "#000" : "transparent", shadowOpacity: 0.06, shadowRadius: 4, elevation: active ? 2 : 0 }}
+                >
+                  <Ionicons name={icon} size={13} color={active ? (isDark ? "#7B6FFF" : "#6D5DFC") : c.textSecondary} />
+                  <Text style={{ fontSize: 10, fontWeight: active ? "500" : "400", color: active ? (isDark ? "#7B6FFF" : "#6D5DFC") : c.textSecondary }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {tab === "journal"  && <LedgerTab   trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
