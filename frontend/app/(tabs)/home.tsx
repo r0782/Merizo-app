@@ -13,9 +13,131 @@ import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
-import { StackedCarousel } from "../../src/components/StackedCarousel";
 
 const { width: SW, height: SH } = Dimensions.get("window");
+
+// ── Debt Gravity Stack ──────────────────────────────────────────────────────
+function DebtGravityStack({ trips, router, c, isDark, sym }: any) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const CARD_H = 72;
+  const PEEK = 10;
+
+  // Sort by absolute amount descending — largest debt on top
+  const sorted = [...trips].sort((a, b) => Math.abs(b.my_net || 0) - Math.abs(a.my_net || 0));
+  const total = sorted.length;
+  const containerH = CARD_H + (Math.min(total - 1, 3) * PEEK) + 24;
+
+  const emoji = (cat: string) =>
+    cat === "food" ? "🍕" : cat === "travel" ? "✈️" : cat === "home" ? "🏠" : cat === "entertainment" ? "🎬" : cat === "friends" ? "🎉" : cat === "shopping" ? "🛍️" : "📁";
+
+  return (
+    <View>
+      <View style={{ height: containerH, position: "relative" }}>
+        {sorted.map((trip: any, i: number) => {
+          const net = trip.my_net || 0;
+          const isOwed = net > 0;
+          const isActive = i === activeIndex;
+          const isVisible = i >= activeIndex && i < activeIndex + 4;
+          if (!isVisible) return null;
+
+          const layerPos = i - activeIndex;
+          const top = layerPos * PEEK;
+          const scale = 1 - layerPos * 0.03;
+          const opacity = 1 - layerPos * 0.18;
+          const zIndex = total - i;
+
+          return (
+            <TouchableOpacity
+              key={trip.id}
+              onPress={() => {
+                if (layerPos > 0) {
+                  setActiveIndex(i);
+                } else {
+                  router.push({ pathname: "/split/[id]", params: { id: trip.id } });
+                }
+              }}
+              activeOpacity={layerPos === 0 ? 0.9 : 0.7}
+              style={{
+                position: "absolute", left: 0, right: 0, top,
+                zIndex, opacity,
+                transform: [{ scaleX: scale }],
+              }}
+            >
+              <View style={{
+                backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
+                borderRadius: 18, height: CARD_H,
+                flexDirection: "row", alignItems: "center",
+                paddingHorizontal: 16, gap: 12,
+                borderWidth: 0.5,
+                borderColor: isActive && layerPos === 0
+                  ? isDark ? "rgba(109,93,252,0.4)" : "rgba(109,93,252,0.25)"
+                  : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                shadowColor: "#000",
+                shadowOpacity: layerPos === 0 ? 0.08 : 0,
+                shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+                elevation: layerPos === 0 ? 4 : 0,
+              }}>
+                <View style={{
+                  width: 42, height: 42, borderRadius: 13,
+                  backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0
+                }}>
+                  <Text style={{ fontSize: 19 }}>{emoji(trip.category || "other")}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }} numberOfLines={1}>
+                    {trip.name}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: c.textSecondary }}>
+                    {trip.member_count || 0} members · {trip.expense_count || 0} expenses
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  {net === 0 ? (
+                    <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 11, color: c.textSecondary }}>Settled ✓</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>
+                        {isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>
+                        {isOwed ? "owed to you" : "you owe"}
+                      </Text>
+                    </>
+                  )}
+                </View>
+                {layerPos > 0 && (
+                  <View style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}>
+                    <Ionicons name="chevron-down" size={14} color={c.textMuted} />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Pagination dots */}
+      {total > 1 && (
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 4, marginTop: 14 }}>
+          {sorted.map((_: any, i: number) => (
+            <TouchableOpacity key={i} onPress={() => setActiveIndex(i)}>
+              <View style={{
+                width: i === activeIndex ? 18 : 5,
+                height: 5, borderRadius: 3,
+                backgroundColor: i === activeIndex
+                  ? isDark ? "#7B6FFF" : "#6D5DFC"
+                  : isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
+              }} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 // ── Balance Dashboard Modal ──────────────────────────────────────────────────
 function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netBalance, sym, c, isDark }: any) {
@@ -341,7 +463,7 @@ export default function HomeScreen() {
           </View>
           {loading ? (
             <View style={{ gap: 10 }}>
-              {[1,2,3].map(i => <View key={i} style={{ height: 70, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 16 }} />)}
+              {[1,2,3].map(i => <View key={i} style={{ height: 72, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 18 }} />)}
             </View>
           ) : trips.length === 0 ? (
             <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 28, alignItems: "center", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
@@ -353,10 +475,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <StackedCarousel
-              trips={trips}
-              onPressCard={(trip) => router.push({ pathname: "/split/[id]", params: { id: trip.id } })}
-            />
+            <DebtGravityStack trips={trips} router={router} c={c} isDark={isDark} sym={sym} />
           )}
         </View>
       </ScrollView>
