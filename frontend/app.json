@@ -16,7 +16,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Scan bills to log expenses fast",
         "NSPhotoLibraryUsageDescription": "Pick a bill photo to log an expense"
-      }
+      },
+      "bundleIdentifier": "com.raghu30.merizo"
     },
     "android": {
       "package": "com.raghu30.merizo",

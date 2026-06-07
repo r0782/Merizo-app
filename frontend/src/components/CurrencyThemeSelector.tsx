@@ -123,13 +123,13 @@ export function CurrencyThemeSelector({
             styles.noneCard,
             {
               backgroundColor: c.surface,
-              borderColor: selectedId === "none" ? c.accent : c.border,
+              borderColor: selectedId === "none" ? c.indigo : c.border,
               borderWidth: 2,
             },
           ]}
         >
           {selectedId === "none" && (
-            <View style={[styles.selectedBadge, { backgroundColor: c.accent }]}>
+            <View style={[styles.selectedBadge, { backgroundColor: c.indigo }]}>
               <Ionicons name="checkmark" size={10} color="#fff" />
             </View>
           )}
@@ -173,7 +173,7 @@ export function CurrencyThemeList({
   const { c } = useTheme();
 
   const options: { id: CurrencyThemeId | "none"; label: string; sub: string; emoji: string; accent: string }[] = [
-    { id: "none",          label: "Standard",        sub: "Light / Dark mode",       emoji: "🌓", accent: c.accent },
+    { id: "none",          label: "Standard",        sub: "Light / Dark mode",       emoji: "🌓", accent: c.indigo },
     { id: "westernLedger", label: "Western Ledger",  sub: "USD — Frontier Finance",  emoji: "🤠", accent: "#8C6A3B" },
     { id: "festivalLedger",label: "Festival Ledger", sub: "INR — Festive Elegance",  emoji: "🪔", accent: "#F4B400" },
     { id: "zenInk",        label: "Zen Ink",         sub: "JPY — Minimal Clarity",   emoji: "🏯", accent: "#C53030" },

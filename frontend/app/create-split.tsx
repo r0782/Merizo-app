@@ -309,7 +309,7 @@ export default function CreateSplitScreen() {
                     style={[styles.coverThumbWrap, { borderColor: active ? c.indigo : c.border, borderWidth: active ? 2 : 1 }]}
                   >
                     <Image source={{ uri: opt.url }} style={{ width: 80, height: 60 }} />
-                    <Text style={{ position: "absolute", bottom: 4, left: 6, color: "#fff", fontSize: 10, fontWeight: "700" }}>{opt.label}</Text>
+                    <Text style={{ position: "absolute", bottom: 4, left: 6, color: "#fff", fontSize: 10, fontWeight: "700" }}>{opt.category}</Text>
                   </TouchableOpacity>
                 );
               })}

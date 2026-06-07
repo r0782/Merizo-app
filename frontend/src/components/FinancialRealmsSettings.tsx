@@ -49,9 +49,9 @@ function CurrencyRow({
               styles.currencyPill,
               {
                 backgroundColor:
-                  currency === code ? c.accent : c.surface,
+                  currency === code ? c.indigo : c.surface,
                 borderColor:
-                  currency === code ? c.accent : c.border,
+                  currency === code ? c.indigo : c.border,
               },
             ]}
           >
@@ -94,7 +94,7 @@ export function FinancialRealmsSettings() {
     <View style={[styles.container, { backgroundColor: c.surface, borderColor: c.border }]}>
       {/* Section header */}
       <View style={styles.sectionHeader}>
-        <View style={[styles.iconWrap, { backgroundColor: c.accentSoft }]}>
+        <View style={[styles.iconWrap, { backgroundColor: c.indigoSoft }]}>
           <Text style={{ fontSize: 18 }}>🌐</Text>
         </View>
         <View style={{ flex: 1 }}>
@@ -134,7 +134,7 @@ export function FinancialRealmsSettings() {
         <Switch
           value={immersiveEnabled}
           onValueChange={setImmersiveEnabled}
-          trackColor={{ false: c.border, true: c.accent }}
+          trackColor={{ false: c.border, true: c.indigo }}
           thumbColor={immersiveEnabled ? "#fff" : c.textMuted}
         />
       </View>
@@ -151,10 +151,10 @@ export function FinancialRealmsSettings() {
           {manualThemeOverride && (
             <TouchableOpacity
               onPress={clearManualOverride}
-              style={[styles.overrideNotice, { borderColor: c.accent, backgroundColor: c.accentSoft }]}
+              style={[styles.overrideNotice, { borderColor: c.indigo, backgroundColor: c.indigoSoft }]}
             >
-              <Ionicons name="refresh-outline" size={14} color={c.accent} />
-              <Text style={[styles.overrideText, { color: c.accent }]}>
+              <Ionicons name="refresh-outline" size={14} color={c.indigo} />
+              <Text style={[styles.overrideText, { color: c.indigo }]}>
                 Manual override active — tap to sync with {defaultCurrency}
               </Text>
             </TouchableOpacity>
