@@ -1148,6 +1148,15 @@ function InsightsTab({ trip }: { trip: any }) {
       </View>
     );
   }
+  if (total === 0 && (trip.expense_count || 0) === 0) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
+        <Text style={{ fontSize: 32 }}>📊</Text>
+        <Text style={{ fontSize: 17, fontWeight: "500", color: c.textPrimary, textAlign: "center" }}>No spending data yet</Text>
+        <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>Add expenses to see AI insights, financial score, and settlement recommendations.</Text>
+      </View>
+    );
+  }
   const topPayer   = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
   const categories = trip.by_category || {};
   const topCatKey  = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
