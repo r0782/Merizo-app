@@ -120,6 +120,46 @@ export default function InsightsScreen() {
           )}
         </View>
 
+        {/* Set Monthly Budget */}
+        <View style={{ marginHorizontal:20, marginBottom:20 }}>
+          <Text style={{ fontSize:11, fontWeight:"500", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>Monthly budget</Text>
+          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:18, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
+            <View style={{ padding:16, flexDirection:"row", alignItems:"center", gap:12 }}>
+              <View style={{ width:40, height:40, borderRadius:12, backgroundColor:"rgba(109,93,252,0.1)", alignItems:"center", justifyContent:"center" }}>
+                <Ionicons name="flag" size={18} color="#6D5DFC" />
+              </View>
+              <View style={{ flex:1 }}>
+                <Text style={{ fontSize:14, fontWeight:"500", color:c.textPrimary }}>Set Monthly Budget</Text>
+                <Text style={{ fontSize:12, color:c.textSecondary }}>Track spending limits by category</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+            </View>
+            <View style={{ height:0.5, backgroundColor:c.border, marginHorizontal:16 }} />
+            {[
+              { label:"Food & Dining", emoji:"🍕", budget:5000, spent:total, color:"#FF9F0A" },
+              { label:"Travel", emoji:"✈️", budget:10000, spent:0, color:"#6D5DFC" },
+              { label:"Entertainment", emoji:"🎬", budget:2000, spent:0, color:"#FF453A" },
+            ].map((b,i) => {
+              const pct = Math.min(100, (b.spent/b.budget)*100);
+              const over = b.spent > b.budget;
+              return (
+                <View key={i} style={{ padding:14, borderBottomWidth:i<2?0.5:0, borderBottomColor:c.border }}>
+                  <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
+                      <Text style={{ fontSize:16 }}>{b.emoji}</Text>
+                      <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary }}>{b.label}</Text>
+                    </View>
+                    <Text style={{ fontSize:12, color:over?"#FF453A":c.textSecondary }}>₹{Math.round(b.spent).toLocaleString("en-IN")} / ₹{b.budget.toLocaleString("en-IN")}</Text>
+                  </View>
+                  <View style={{ height:4, backgroundColor:isDark?"rgba(255,255,255,0.08)":"#F0EDE8", borderRadius:2, overflow:"hidden" }}>
+                    <View style={{ width:`${pct}%` as any, height:4, backgroundColor:over?"#FF453A":b.color, borderRadius:2 }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
         {/* AI Insights — PRO locked */}
         <View style={{ marginHorizontal: 20, marginBottom: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>

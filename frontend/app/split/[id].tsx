@@ -1048,8 +1048,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                   const msg = `${trip.name} - Split Summary
 Total: ${sym}${Math.round(total).toLocaleString("en-IN")}
 
-${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("
-")}
+${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("\n")}
 
 Tracked with Merizo - merizo.app`;
                   const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;

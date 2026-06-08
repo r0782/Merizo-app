@@ -7,6 +7,7 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
 import { ProGate } from "../../src/components/ProGate";
+import { useRouter } from "expo-router";
 
 function SettingRow({ icon, label, sublabel, onPress, right, danger = false, c, isDark }: any) {
   return (
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState({ count:0, settled:0 });
   const [overbudget, setOverbudget] = useState(true);
   const [showPro, setShowPro] = useState(false);
+  const router = useRouter();
   const [upi, setUpi] = useState("");
   const [editUpi, setEditUpi] = useState(false);
 
@@ -195,7 +197,7 @@ export default function ProfileScreen() {
         <Section title="Features" c={c}>
           <SettingRow icon="bar-chart" label="Spending Analytics" sublabel="View charts and graphs" onPress={()=>setShowPro(true)} c={c} isDark={isDark} />
           <Divider c={c} />
-          <SettingRow icon="repeat" label="Recurring Expenses" sublabel="Set up automatic expense tracking" c={c} isDark={isDark} />
+          <SettingRow icon="repeat" label="Recurring Expenses" sublabel="Set up automatic expense tracking" onPress={()=>router.push("/recurring")} c={c} isDark={isDark} />
         </Section>
 
         {/* Support */}

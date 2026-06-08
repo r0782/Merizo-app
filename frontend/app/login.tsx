@@ -11,6 +11,19 @@ import { useAuth }  from "../src/lib/auth";
 import { api }      from "../src/lib/api";
 import { supabase } from "../src/lib/supabase";
 
+// STABLE InputRow — defined outside component to prevent re-render focus loss
+function StableInputRow({ icon, children, inp, border, sub }: any) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inp,
+      borderRadius: 16, borderWidth: 1, borderColor: border,
+      paddingHorizontal: 16, gap: 12, marginBottom: 12,
+      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width:0,height:2 }, elevation:2 }}>
+      <Ionicons name={icon as any} size={18} color={sub} style={{ flexShrink:0 }}/>
+      {children}
+    </View>
+  );
+}
+
 const { width, height } = Dimensions.get("window");
 
 type Screen = "main" | "email_otp" | "phone_otp" | "verify_email" | "verify_phone";
@@ -223,11 +236,11 @@ export default function LoginScreen() {
             <Logo card={card} txt={txt}/>
             <Text style={{color:txt,fontSize:28,fontWeight:"800",marginTop:24,marginBottom:8}}>Sign in with Email</Text>
             <Text style={{color:sub,fontSize:14,marginBottom:32}}>We'll send a 6-digit code — no password needed</Text>
-            <InputRow icon="mail-outline">
+            <StableInputRow icon="mail-outline" inp={inp} border={border} sub={sub}>
               <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com"
                 placeholderTextColor={sub} keyboardType="email-address" autoCapitalize="none"
                 style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
-            </InputRow>
+            </StableInputRow>
             <PrimaryBtn onPress={sendEmailOtp} label="Send Code"/>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -282,15 +295,15 @@ export default function LoginScreen() {
           <Text style={{color:sub,fontSize:15,marginTop:6,marginBottom:36}}>Split smarter. Settle faster.</Text>
 
           {/* Email */}
-          <InputRow icon="mail-outline">
+          <StableInputRow icon="mail-outline" inp={inp} border={border} sub={sub}>
             <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com"
               placeholderTextColor={sub} keyboardType="email-address" autoCapitalize="none"
               autoCorrect={false} autoComplete="email" blurOnSubmit={false}
               style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
-          </InputRow>
+          </StableInputRow>
 
           {/* Password */}
-          <InputRow icon="lock-closed-outline">
+          <StableInputRow icon="lock-closed-outline" inp={inp} border={border} sub={sub}>
             <TextInput value={password} onChangeText={setPassword} placeholder="••••••••"
               placeholderTextColor={sub} secureTextEntry={!showPw}
               autoComplete="password" blurOnSubmit={false}
@@ -298,7 +311,7 @@ export default function LoginScreen() {
             <TouchableOpacity onPress={()=>setShowPw(s=>!s)}>
               <Ionicons name={showPw?"eye-off-outline":"eye-outline"} size={18} color={sub}/>
             </TouchableOpacity>
-          </InputRow>
+          </StableInputRow>
 
           {/* Forgot */}
           <TouchableOpacity style={{alignSelf:"flex-end",marginBottom:4}}>
