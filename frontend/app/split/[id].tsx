@@ -814,91 +814,171 @@ function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void
 // ═══════════════════════════════════════════════════════════════════════════════
 function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => void; userId: string }) {
   const { c, isDark } = useTheme();
-  const sym       = currencySymbol(trip.currency || "INR");
-  const txns: any[]= trip.settlement_transactions || [];
-  const bals: any[]= trip.balances || [];
-  const total     = trip.total_spent || 0;
-  const me        = bals.find((b: any) => b.id === userId || b.member_id === userId);
-  const myNet     = me?.net || 0;
-  const [view,    setView]    = React.useState<"mine"|"all"|"board">("mine");
+  const sym        = currencySymbol(trip.currency || "INR");
+  const txns: any[] = trip.settlement_transactions || [];
+  const bals: any[] = trip.balances || [];
+  const total      = trip.total_spent || 0;
+  const members    = trip.members || [];
+  const perPerson  = total / Math.max(members.length, 1);
+  const me         = bals.find((b: any) => b.id === userId || b.member_id === userId);
+  const myNet      = me?.net || 0;
+  const [view, setView] = React.useState<"mine"|"all"|"board">("mine");
   const [marking, setMarking] = React.useState<string | null>(null);
   const [localPaid, setLocalPaid] = React.useState<Record<string, boolean>>({});
+  const [expandedTxn, setExpandedTxn] = React.useState<string | null>(null);
 
-  const myPay  = txns.filter((t: any) => t.from_id === userId);
-  const myRec  = txns.filter((t: any) => t.to_id   === userId);
-  const totalExpenses = (trip.expenses || []).filter((e: any) => !e.is_settlement).length;
-
-  // Sorted for leaderboard
-  const owes    = [...bals].filter((b: any) => (b.net||0) < -0.5).sort((a: any,b: any) => a.net - b.net);
-  const gets    = [...bals].filter((b: any) => (b.net||0) >  0.5).sort((a: any,b: any) => b.net - a.net);
-  const maxAbs  = Math.max(...bals.map((b: any) => Math.abs(b.net||0)), 1);
+  const myPay = txns.filter((t: any) => t.from_id === userId);
+  const myRec = txns.filter((t: any) => t.to_id === userId);
 
   const mark = async (t: any) => {
     const key = t.from_id + t.to_id;
     setMarking(key);
-    // Optimistic update — mark instantly, sync in background
     setLocalPaid(prev => ({ ...prev, [key]: true }));
     try {
       await api.post("/trips/" + trip.id + "/settle", {
         from_member: t.from_id, to_member: t.to_id, amount: t.amount,
       });
-      onChange(); // silent refresh, no await
+      onChange();
     } catch (e: any) {
-      setLocalPaid(prev => ({ ...prev, [key]: false })); // revert
+      setLocalPaid(prev => ({ ...prev, [key]: false }));
       Alert.alert("Error", e?.response?.data?.detail || "Could not record");
     } finally { setMarking(null); }
   };
 
-  // ── Sub tab bar ────────────────────────────────────────────────────────────
-  const subTabs = [
-    { id: "mine" as const, label: "My Tab"      },
-    { id: "all"  as const, label: "All"         },
-    { id: "board"as const, label: "Leaderboard" },
-  ];
-
-  const TransactionCard = ({ t, showMark }: { t: any; showMark: boolean }) => {
-    const key   = t.from_id + t.to_id;
-    const yPay  = t.from_id === userId;
-    const yRec  = t.to_id   === userId;
-    const done  = localPaid[key];
-    const busy  = marking === key;
-    const color = yPay ? c.negative : yRec ? c.positive : c.textSecondary;
-    const payee = (trip.members || []).find((m: any) => m.id === t.to_id);
+  // ── Premium Settlement Card ───────────────────────────────────────────────
+  const PremiumSettlementCard = ({ t, showMark }: { t: any; showMark: boolean }) => {
+    const key    = t.from_id + t.to_id;
+    const yPay   = t.from_id === userId;
+    const yRec   = t.to_id === userId;
+    const done   = localPaid[key];
+    const busy   = marking === key;
+    const isExpanded = expandedTxn === key;
+    const payee  = members.find((m: any) => m.id === t.to_id);
+    const payer  = members.find((m: any) => m.id === t.from_id);
+    const fromBal = bals.find((b: any) => b.id === t.from_id || b.member_id === t.from_id);
+    const toBal   = bals.find((b: any) => b.id === t.to_id || b.member_id === t.to_id);
 
     return (
-      <View style={{ backgroundColor: done ? (isDark ? "rgba(255,255,255,0.02)" : "#F9F9F9") : (isDark ? "#1B1612" : c.surface), borderRadius: 14, borderWidth: 1.5, borderColor: done ? c.border : (yPay ? c.negative + "50" : yRec ? c.positive + "50" : c.border), marginBottom: 10, overflow: "hidden", opacity: done ? 0.45 : 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12 }}>
-          {/* Avatar */}
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: yPay ? (isDark ? "rgba(255,139,123,0.2)" : "#FFE8E8") : yRec ? (isDark ? "rgba(126,211,139,0.15)" : "#E8F5E9") : (isDark ? "rgba(255,255,255,0.07)" : "#F0F0F0"), alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color, fontSize: 16, fontWeight: "800" }}>{(yPay ? t.to_name : t.from_name).charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{yPay ? t.to_name : t.from_name}</Text>
-              <Text style={{ color: c.textMuted, fontSize: 11 }}>{yPay ? "receives" : yRec ? "sends you" : (t.from_name + " → " + t.to_name)}</Text>
-            </View>
-            <Text style={{ color: done ? c.positive : color, fontSize: 18, fontFamily: "RobotoMono_700Bold" as any, marginTop: 2, fontVariant: ["tabular-nums"] as any }}>
-              {done ? "✓ Settled" : (yPay ? "−" : yRec ? "+" : "") + sym + Math.round(t.amount).toLocaleString("en-IN")}
-            </Text>
-          </View>
-          {showMark && !done && (
-            <TouchableOpacity onPress={() => mark(t)} disabled={!!busy}
-              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: yPay ? (isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8") : (isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9"), alignItems: "center", justifyContent: "center" }}>
-              {busy ? <ActivityIndicator size="small" color={color} /> : <Ionicons name="checkmark-circle-outline" size={20} color={color} />}
-            </TouchableOpacity>
-          )}
-          {done && <Ionicons name="checkmark-circle" size={22} color={c.positive} />}
+      <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: done ? "rgba(0,196,140,0.3)" : yPay ? "rgba(255,67,58,0.2)" : yRec ? "rgba(0,196,140,0.2)" : (isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), marginBottom: 10, opacity: done ? 0.6 : 1 }}>
+
+        {/* Top label */}
+        <View style={{ backgroundColor: done ? "rgba(0,196,140,0.08)" : yPay ? "rgba(255,67,58,0.06)" : yRec ? "rgba(0,196,140,0.06)" : (isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"), paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}>
+          <Text style={{ fontSize: 11, fontWeight: "500", color: done ? "#00C48C" : yPay ? "#FF453A" : yRec ? "#00C48C" : c.textSecondary, letterSpacing: 0.3 }}>
+            {done ? "✓ Settled" : yPay ? "You need to pay" : yRec ? "You will receive" : "Payment required"}
+          </Text>
         </View>
 
-        {/* UPI button if you pay */}
-        {showMark && !done && yPay && payee?.upi_id && (
+        {/* Main content */}
+        <View style={{ padding: 16 }}>
+          {/* Who pays who */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            {/* Payer */}
+            <View style={{ alignItems: "center", gap: 4 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: yPay ? "rgba(255,67,58,0.1)" : (isDark ? "#2C2C2E" : "#F0EDE8"), alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 17, fontWeight: "500", color: yPay ? "#FF453A" : c.textPrimary }}>{t.from_name?.charAt(0).toUpperCase()}</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: c.textSecondary, fontWeight: "500" }}>{yPay ? "You" : t.from_name}</Text>
+            </View>
+
+            {/* Arrow with amount */}
+            <View style={{ flex: 1, alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 22, fontWeight: "500", color: done ? "#00C48C" : yPay ? "#FF453A" : yRec ? "#00C48C" : c.textPrimary, letterSpacing: -0.5 }}>
+                {sym}{Math.round(t.amount).toLocaleString("en-IN")}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <View style={{ height: 1, flex: 1, backgroundColor: done ? "#00C48C" : isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" }} />
+                <Ionicons name="arrow-forward" size={14} color={done ? "#00C48C" : c.textMuted} />
+                <View style={{ height: 1, flex: 1, backgroundColor: done ? "#00C48C" : isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" }} />
+              </View>
+              <Text style={{ fontSize: 11, color: c.textMuted }}>to settle</Text>
+            </View>
+
+            {/* Receiver */}
+            <View style={{ alignItems: "center", gap: 4 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: yRec ? "rgba(0,196,140,0.1)" : (isDark ? "#2C2C2E" : "#F0EDE8"), alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 17, fontWeight: "500", color: yRec ? "#00C48C" : c.textPrimary }}>{t.to_name?.charAt(0).toUpperCase()}</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: c.textSecondary, fontWeight: "500" }}>{yRec ? "You" : t.to_name}</Text>
+            </View>
+          </View>
+
+          {/* Breakdown rows */}
+          <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F7F5F2", borderRadius: 12, padding: 12, gap: 6, marginBottom: 12 }}>
+            {[
+              { label: "Paid", value: sym + Math.round(fromBal?.paid || 0).toLocaleString("en-IN"), sub: t.from_name },
+              { label: "Fair share", value: sym + Math.round(perPerson).toLocaleString("en-IN"), sub: "per person" },
+              { label: "Difference", value: "-" + sym + Math.round(t.amount).toLocaleString("en-IN"), color: "#FF453A" },
+            ].map((row, i) => (
+              <View key={i} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 13, color: c.textSecondary }}>{row.label}</Text>
+                <Text style={{ fontSize: 13, fontWeight: "500", color: row.color || c.textPrimary }}>{row.value}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Why this payment expandable */}
           <TouchableOpacity
-            onPress={() => openUPI(payee.upi_id, t.to_name, t.amount, trip.name + " via Merizo")}
-            style={{ borderTopWidth: 1, borderTopColor: c.border, paddingVertical: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: isDark ? "rgba(157,123,255,0.06)" : "#F5F3FF" }}
+            onPress={() => setExpandedTxn(isExpanded ? null : key)}
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
           >
-            <Ionicons name="phone-portrait-outline" size={14} color={isDark ? "#9D7BFF" : "#6D28D9"} />
-            <Text style={{ color: isDark ? "#9D7BFF" : "#6D28D9", fontSize: 12, fontWeight: "700" }}>Pay via UPI</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons name="sparkles" size={13} color="#6D5DFC" />
+              <Text style={{ fontSize: 13, color: "#6D5DFC", fontWeight: "500" }}>Why this payment?</Text>
+            </View>
+            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={14} color={c.textMuted} />
           </TouchableOpacity>
+
+          {isExpanded && (
+            <View style={{ backgroundColor: isDark ? "rgba(109,93,252,0.08)" : "#F5F3FF", borderRadius: 12, padding: 14, marginTop: 8, borderWidth: 0.5, borderColor: isDark ? "rgba(109,93,252,0.2)" : "#DDD6FE", gap: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: isDark ? "#A78BFA" : "#6D5DFC", marginBottom: 4 }}>Settlement Breakdown</Text>
+
+              {/* From person */}
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary }}>{t.from_name} {yPay ? "(You)" : ""}</Text>
+                <Text style={{ fontSize: 12, color: c.textSecondary }}>Paid: {sym}{Math.round(fromBal?.paid || 0).toLocaleString("en-IN")} · Fair share: {sym}{Math.round(perPerson).toLocaleString("en-IN")} · Shortfall: {sym}{Math.round(t.amount).toLocaleString("en-IN")}</Text>
+              </View>
+
+              <View style={{ height: 0.5, backgroundColor: isDark ? "rgba(109,93,252,0.2)" : "#DDD6FE" }} />
+
+              {/* To person */}
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary }}>{t.to_name} {yRec ? "(You)" : ""}</Text>
+                <Text style={{ fontSize: 12, color: c.textSecondary }}>Paid: {sym}{Math.round(toBal?.paid || 0).toLocaleString("en-IN")} · Fair share: {sym}{Math.round(perPerson).toLocaleString("en-IN")} · Extra contribution: {sym}{Math.round((toBal?.paid || 0) - perPerson).toLocaleString("en-IN")}</Text>
+              </View>
+
+              <View style={{ height: 0.5, backgroundColor: isDark ? "rgba(109,93,252,0.2)" : "#DDD6FE" }} />
+
+              <Text style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#6D5DFC", lineHeight: 18 }}>
+                Therefore {t.from_name} should pay {t.to_name} {sym}{Math.round(t.amount).toLocaleString("en-IN")}. After this payment, both will have contributed their fair share of {sym}{Math.round(perPerson).toLocaleString("en-IN")}.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action buttons */}
+        {showMark && !done && (
+          <View style={{ padding: 14, paddingTop: 0, gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => mark(t)}
+              disabled={!!busy}
+              style={{ backgroundColor: yPay ? "#FF453A" : "#00C48C", borderRadius: 12, padding: 14, alignItems: "center" }}
+            >
+              {busy ? <ActivityIndicator color="#fff" size="small" /> :
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "500" }}>
+                  {yPay ? `Mark as paid · ${sym}${Math.round(t.amount).toLocaleString("en-IN")}` : "Mark as received"}
+                </Text>
+              }
+            </TouchableOpacity>
+            {yPay && payee?.upi_id && (
+              <TouchableOpacity
+                onPress={() => openUPI(payee.upi_id, t.to_name, t.amount, trip.name + " via Merizo")}
+                style={{ backgroundColor: isDark ? "rgba(109,93,252,0.15)" : "#EDE9FE", borderRadius: 12, padding: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+              >
+                <Ionicons name="phone-portrait-outline" size={15} color="#6D5DFC" />
+                <Text style={{ color: "#6D5DFC", fontSize: 13, fontWeight: "500" }}>Pay via UPI</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </View>
     );
@@ -908,212 +988,178 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
     <View style={{ flex: 1 }}>
       {/* Sub-tab bar */}
       <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingTop: 14, gap: 6, paddingBottom: 4 }}>
-        {subTabs.map(tab => (
+        {[{ id: "mine" as const, label: "My Tab" }, { id: "all" as const, label: "All" }, { id: "board" as const, label: "Leaderboard" }].map(tab => (
           <TouchableOpacity key={tab.id} onPress={() => setView(tab.id)}
-            style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: view === tab.id ? (isDark ? "#9D7BFF" : "#1F1A17") : (isDark ? "#1B1612" : c.surface), alignItems: "center", borderWidth: 1, borderColor: view === tab.id ? "transparent" : c.border }}>
-            <Text style={{ color: view === tab.id ? "#fff" : c.textSecondary, fontSize: 12, fontWeight: "700" }}>{tab.label}</Text>
+            style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: view === tab.id ? (isDark ? "#7B6FFF" : "#111") : (isDark ? "#1C1C1E" : "#F0EDE8"), alignItems: "center", borderWidth: 0.5, borderColor: view === tab.id ? "transparent" : c.border }}>
+            <Text style={{ color: view === tab.id ? "#fff" : c.textSecondary, fontSize: 12, fontWeight: "500" }}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <BalanceExplainer trip={trip} userId={userId} />
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 80, gap: 12 }}>
 
-        {/* ══ MY TAB ══ */}
-        {view === "mine" && (
-          <>
-            {/* My net card */}
-            <View style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <View>
-                <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 4 }}>NET BALANCE</Text>
-                <Text style={{ color: myNet > 0.5 ? c.positive : myNet < -0.5 ? c.negative : c.textMuted, fontSize: 28, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
-                  {myNet >= 0 ? "+" : ""}{sym}{Math.round(Math.abs(myNet)).toLocaleString("en-IN")}
-                </Text>
-                <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
-                  {myNet > 0.5 ? "Others owe you" : myNet < -0.5 ? "You owe others" : "All balanced ✓"}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 4 }}>
-                <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 1, fontFamily: "RobotoMono_400Regular" as any }}>GROUP TOTAL</Text>
-                <Text style={{ color: c.textPrimary, fontSize: 16, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>{sym}{Math.round(total).toLocaleString("en-IN")}</Text>
-              </View>
-            </View>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 80, gap: 12 }}>
 
-            {/* Share buttons */}
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity onPress={() => shareGroupSummary(trip.id, trip.name, "whatsapp")}
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
-                <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
-                <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700" }}>WhatsApp</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => shareGroupSummary(trip.id, trip.name, "share")}
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
-                <Ionicons name="copy-outline" size={15} color={c.textSecondary} />
-                <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700" }}>Copy</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* AI note */}
-            {txns.length > 0 && totalExpenses > txns.length && (
-              <View style={{ flexDirection: "row", gap: 8, padding: 12, borderRadius: 10, backgroundColor: isDark ? "rgba(157,123,255,0.08)" : "#F5F3FF", borderWidth: 1, borderColor: isDark ? "rgba(157,123,255,0.2)" : "#E0D9FF" }}>
-                <Ionicons name="sparkles" size={13} color={isDark ? "#9D7BFF" : "#6D28D9"} />
-                <Text style={{ color: isDark ? "#C4A8FF" : "#6D28D9", fontSize: 12, flex: 1, lineHeight: 18 }}>
-                  AI simplified {totalExpenses} expenses into {txns.length} payment{txns.length !== 1 ? "s" : ""}.
-                </Text>
-              </View>
-            )}
-
-            {/* What I receive */}
-            {myRec.length > 0 && (
-              <>
-                <Text style={{ color: c.positive, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any }}>YOU RECEIVE ({myRec.length})</Text>
-                {myRec.map((t: any, i: number) => <TransactionCard key={i} t={t} showMark={true} />)}
-              </>
-            )}
-
-            {/* What I pay */}
-            {myPay.length > 0 && (
-              <>
-                <Text style={{ color: c.negative, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any, marginTop: 4 }}>YOU PAY ({myPay.length})</Text>
-                {myPay.map((t: any, i: number) => <TransactionCard key={i} t={t} showMark={true} />)}
-              </>
-            )}
-
-            {myPay.length === 0 && myRec.length === 0 && (
-              <View style={{ alignItems: "center", paddingVertical: 40, gap: 10 }}>
-                <Text style={{ fontSize: 40 }}>🎉</Text>
-                <Text style={{ color: c.positive, fontSize: 16, fontFamily: "Syne_700Bold" as any }}>You're all clear!</Text>
-                <Text style={{ color: c.textSecondary, fontSize: 13, textAlign: "center" }}>Nothing to pay or receive in this group.</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* ══ ALL TRANSACTIONS ══ */}
-        {view === "all" && (
-          <>
-            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any }}>
-              {txns.length} PAYMENT{txns.length !== 1 ? "S" : ""} NEEDED
-            </Text>
-            {txns.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 40, gap: 10 }}>
-                <Ionicons name="checkmark-circle" size={48} color={c.positive} />
-                <Text style={{ color: c.positive, fontSize: 16, fontFamily: "Syne_700Bold" as any }}>All Settled!</Text>
-              </View>
-            ) : txns.map((t: any, i: number) => (
-              <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: c.negative }}>{t.from_name.charAt(0)}</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={14} color={c.textMuted} />
-                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: c.positive }}>{t.to_name.charAt(0)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.textPrimary, fontSize: 12 }}>
-                    <Text style={{ fontWeight: "700" }}>{t.from_id === userId ? "You" : t.from_name}</Text>
-                    <Text style={{ color: c.textMuted }}> pays </Text>
-                    <Text style={{ fontWeight: "700" }}>{t.to_id === userId ? "You" : t.to_name}</Text>
-                  </Text>
-                </View>
-                <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
-                  {sym}{Math.round(t.amount).toLocaleString("en-IN")}
-                </Text>
-              </View>
-            ))}
-
-            {/* Balance table */}
-            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginTop: 8 }}>EVERYONE'S BALANCE</Text>
-            <View style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, overflow: "hidden" }}>
-              <View style={{ flexDirection: "row", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: isDark ? "rgba(255,255,255,0.03)" : c.surfaceAlt }}>
-                {["MEMBER","PAID","SHARE","NET"].map((h, i) => (
-                  <Text key={h} style={{ flex: i === 0 ? 2.5 : 1.5, color: c.textMuted, fontSize: 7.5, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular" as any, textAlign: i === 0 ? "left" : "right" }}>{h}</Text>
+          {/* Group Summary Card */}
+          {total > 0 && (
+            <View style={{ backgroundColor: "#111", borderRadius: 20, padding: 18, gap: 0 }}>
+              <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Group Summary</Text>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                {[
+                  { label: "Total spent", value: sym + Math.round(total).toLocaleString("en-IN"), color: "#fff" },
+                  { label: "Per person", value: sym + Math.round(perPerson).toLocaleString("en-IN"), color: "#fff" },
+                  { label: "Members", value: String(members.length), color: "#fff" },
+                ].map((s, i) => (
+                  <View key={i} style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 10 }}>
+                    <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4, letterSpacing: 0.5 }}>{s.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "500", color: s.color }}>{s.value}</Text>
+                  </View>
                 ))}
               </View>
-              {bals.map((b: any, i: number) => {
+            </View>
+          )}
+
+          {/* ══ MY TAB ══ */}
+          {view === "mine" && (
+            <>
+              {/* My net */}
+              <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 0.5, borderColor: myNet > 0.5 ? "rgba(0,196,140,0.2)" : myNet < -0.5 ? "rgba(255,67,58,0.2)" : c.border }}>
+                <View>
+                  <Text style={{ fontSize: 11, color: c.textSecondary, marginBottom: 4 }}>Your balance</Text>
+                  <Text style={{ fontSize: 28, fontWeight: "500", color: myNet > 0.5 ? "#00C48C" : myNet < -0.5 ? "#FF453A" : c.textSecondary, letterSpacing: -0.5 }}>
+                    {myNet === 0 ? "Settled ✓" : (myNet > 0 ? "+" : "") + sym + Math.round(Math.abs(myNet)).toLocaleString("en-IN")}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                    {myNet > 0.5 ? "Others owe you" : myNet < -0.5 ? "You owe others" : "All balanced"}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <View style={{ backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                    <Text style={{ fontSize: 12, color: c.textSecondary }}>{sym}{Math.round(total).toLocaleString("en-IN")} total</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: c.textMuted }}>{trip.expense_count || 0} expenses</Text>
+                </View>
+              </View>
+
+              {/* WhatsApp + Copy share */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => {
+                  const msg = `${trip.name} — Split Summary
+Total: ${sym}${Math.round(total).toLocaleString("en-IN")}
+
+${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("
+")}
+
+Tracked with Merizo — merizo.app`;
+                  const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+                  Linking.openURL(url);
+                }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                  <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>WhatsApp</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => Alert.alert("Copied", "Summary copied to clipboard")} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
+                  <Ionicons name="copy-outline" size={18} color={c.textPrimary} />
+                  <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* My payments */}
+              {myPay.length === 0 && myRec.length === 0 ? (
+                <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 18, padding: 28, alignItems: "center", borderWidth: 0.5, borderColor: c.border }}>
+                  <Text style={{ fontSize: 28, marginBottom: 10 }}>🎉</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "500", color: "#00C48C", marginBottom: 6 }}>You're all clear!</Text>
+                  <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: "center" }}>Nothing to pay or receive in this group.</Text>
+                </View>
+              ) : (
+                <>
+                  {myPay.length > 0 && (
+                    <>
+                      <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>YOU PAY ({myPay.length})</Text>
+                      {myPay.map((t: any, i: number) => <PremiumSettlementCard key={i} t={t} showMark={true} />)}
+                    </>
+                  )}
+                  {myRec.length > 0 && (
+                    <>
+                      <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>YOU RECEIVE ({myRec.length})</Text>
+                      {myRec.map((t: any, i: number) => <PremiumSettlementCard key={i} t={t} showMark={false} />)}
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ══ ALL TAB ══ */}
+          {view === "all" && (
+            <>
+              {/* Balance status cards */}
+              <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>Member balances</Text>
+              <View style={{ gap: 8 }}>
+                {bals.map((b: any, i: number) => {
+                  const net = b.net || 0;
+                  const isMe = b.id === userId || b.member_id === userId;
+                  const status = net > 0.5 ? "Gets Back" : net < -0.5 ? "Owes" : "Settled";
+                  const statusColor = net > 0.5 ? "#00C48C" : net < -0.5 ? "#FF453A" : c.textSecondary;
+                  return (
+                    <View key={i} style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+                      <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: net > 0.5 ? "rgba(0,196,140,0.1)" : net < -0.5 ? "rgba(255,67,58,0.1)" : (isDark ? "#2C2C2E" : "#F0EDE8"), alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ fontSize: 16, fontWeight: "500", color: statusColor }}>{(b.name || "?").charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>{b.name || "Member"} {isMe ? "(You)" : ""}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          <View style={{ backgroundColor: net > 0.5 ? "rgba(0,196,140,0.1)" : net < -0.5 ? "rgba(255,67,58,0.1)" : (isDark ? "#2C2C2E" : "#F0EDE8"), borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 11, color: statusColor, fontWeight: "500" }}>{status}</Text>
+                          </View>
+                          <Text style={{ fontSize: 12, color: c.textSecondary }}>Paid {sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 18, fontWeight: "500", color: statusColor, letterSpacing: -0.5 }}>
+                        {net === 0 ? "✓" : (net > 0 ? "+" : "") + sym + Math.round(Math.abs(net)).toLocaleString("en-IN")}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {txns.length > 0 && (
+                <>
+                  <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>Settlement plan</Text>
+                  {txns.map((t: any, i: number) => <PremiumSettlementCard key={i} t={t} showMark={false} />)}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ══ LEADERBOARD ══ */}
+          {view === "board" && (
+            <>
+              <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>Who paid the most</Text>
+              {[...bals].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0)).map((b: any, i: number) => {
+                const maxPaid = Math.max(...bals.map((x: any) => x.paid || 0), 1);
+                const pct = ((b.paid || 0) / maxPaid) * 100;
                 const isMe = b.id === userId || b.member_id === userId;
-                const n = b.net || 0;
                 return (
-                  <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: i < bals.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: isMe ? (isDark ? "rgba(157,123,255,0.05)" : "#FAF8FF") : "transparent" }}>
-                    <Text style={{ flex: 2.5, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 12, fontFamily: isMe ? "RobotoMono_700Bold" : "RobotoMono_400Regular" as any }}>{isMe ? "You" : b.name}</Text>
-                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular" as any, textAlign: "right" }}>{sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
-                    <Text style={{ flex: 1.5, color: c.textSecondary, fontSize: 11, fontFamily: "RobotoMono_400Regular" as any, textAlign: "right" }}>{sym}{Math.round(b.share || 0).toLocaleString("en-IN")}</Text>
-                    <Text style={{ flex: 1.5, color: n > 0.5 ? c.positive : n < -0.5 ? c.negative : c.textMuted, fontSize: 12, fontFamily: "RobotoMono_700Bold" as any, textAlign: "right", fontVariant: ["tabular-nums"] as any }}>
-                      {n >= 0 ? "+" : ""}{sym}{Math.round(Math.abs(n)).toLocaleString("en-IN")}
-                    </Text>
+                  <View key={i} style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: i === 0 ? "rgba(255,159,10,0.3)" : c.border }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <Text style={{ fontSize: 18 }}>{i === 0 ? "🏆" : i === 1 ? "🥈" : i === 2 ? "🥉" : "  "}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, flex: 1 }}>{b.name} {isMe ? "(You)" : ""}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: c.textPrimary }}>{sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
+                    </View>
+                    <View style={{ height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", borderRadius: 2, overflow: "hidden" }}>
+                      <View style={{ width: `${pct}%` as any, height: 4, backgroundColor: i === 0 ? "#FF9F0A" : "#6D5DFC", borderRadius: 2 }} />
+                    </View>
                   </View>
                 );
               })}
-            </View>
-          </>
-        )}
-
-        {/* ══ LEADERBOARD ══ */}
-        {view === "board" && (
-          <>
-            {owes.length > 0 && (
-              <>
-                <Text style={{ color: c.negative, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any }}>PAYING UP</Text>
-                {owes.map((b: any, i: number) => {
-                  const isMe = b.id === userId || b.member_id === userId;
-                  const pct  = Math.abs(b.net || 0) / maxAbs * 100;
-                  return (
-                    <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: isMe ? c.negative + "50" : c.border, padding: 14, marginBottom: 8 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                        <Text style={{ color: c.textMuted, fontSize: 13, fontFamily: "RobotoMono_400Regular" as any, width: 18 }}>{i + 1}</Text>
-                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? "rgba(255,139,123,0.15)" : "#FFE8E8", alignItems: "center", justifyContent: "center" }}>
-                          <Text style={{ color: c.negative, fontSize: 14, fontWeight: "800" }}>{(isMe ? "Y" : b.name.charAt(0)).toUpperCase()}</Text>
-                        </View>
-                        <Text style={{ flex: 1, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 13, fontWeight: isMe ? "800" : "600" }}>{isMe ? "You" : b.name}</Text>
-                        <Text style={{ color: c.negative, fontSize: 15, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
-                          −{sym}{Math.round(Math.abs(b.net || 0)).toLocaleString("en-IN")}
-                        </Text>
-                      </View>
-                      <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0F0F0", borderRadius: 4, height: 4, marginLeft: 42 }}>
-                        <View style={{ height: 4, borderRadius: 4, backgroundColor: c.negative, width: `${pct}%` as any }} />
-                      </View>
-                    </View>
-                  );
-                })}
-              </>
-            )}
-
-            {gets.length > 0 && (
-              <>
-                <Text style={{ color: c.positive, fontSize: 9, letterSpacing: 2.5, fontFamily: "RobotoMono_400Regular" as any, marginTop: 8 }}>GETTING BACK</Text>
-                {gets.map((b: any, i: number) => {
-                  const isMe = b.id === userId || b.member_id === userId;
-                  const pct  = (b.net || 0) / maxAbs * 100;
-                  return (
-                    <View key={i} style={{ backgroundColor: isDark ? "#1B1612" : c.surface, borderRadius: 12, borderWidth: 1, borderColor: isMe ? c.positive + "50" : c.border, padding: 14, marginBottom: 8 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                        <Text style={{ color: c.textMuted, fontSize: 13, fontFamily: "RobotoMono_400Regular" as any, width: 18 }}>{i + 1}</Text>
-                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? "rgba(126,211,139,0.12)" : "#E8F5E9", alignItems: "center", justifyContent: "center" }}>
-                          <Text style={{ color: c.positive, fontSize: 14, fontWeight: "800" }}>{(isMe ? "Y" : b.name.charAt(0)).toUpperCase()}</Text>
-                        </View>
-                        <Text style={{ flex: 1, color: isMe ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 13, fontWeight: isMe ? "800" : "600" }}>{isMe ? "You" : b.name}</Text>
-                        <Text style={{ color: c.positive, fontSize: 15, fontFamily: "RobotoMono_700Bold" as any, fontVariant: ["tabular-nums"] as any }}>
-                          +{sym}{Math.round(b.net || 0).toLocaleString("en-IN")}
-                        </Text>
-                      </View>
-                      <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0F0F0", borderRadius: 4, height: 4, marginLeft: 42 }}>
-                        <View style={{ height: 4, borderRadius: 4, backgroundColor: c.positive, width: `${pct}%` as any }} />
-                      </View>
-                    </View>
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
-
-      </View>
+            </>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
-
 
 function InsightsTab({ trip }: { trip: any }) {
   const { c, isDark } = useTheme();
