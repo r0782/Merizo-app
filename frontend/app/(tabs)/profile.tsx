@@ -235,7 +235,7 @@ function StatCard({ label, value, testID }: { label: string; value: string; test
           <NumberTicker 
             value={numericValue} 
             currency="₹"
-            decimals={2}
+            decimals={0}
             duration={2000} // 2 seconds - slower
           />
         ) : (
