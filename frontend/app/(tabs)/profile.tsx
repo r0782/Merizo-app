@@ -10,6 +10,7 @@ import { currencySymbol } from "../../src/lib/tokens";
 import { getOverbudgetAlerts, setOverbudgetAlerts } from "../../src/lib/settings";
 import { confirmAction } from "../../src/lib/confirm";
 import { NumberTicker } from "../../src/components/NumberTicker";
+import { ProGate, ProBadge } from "../../src/components/ProGate";
 
 
 export default function ProfileScreen() {
@@ -22,6 +23,7 @@ export default function ProfileScreen() {
   const [upiSaved, setUpiSaved] = useState(false);
   const [savingUpi,setSavingUpi]= useState(false);
   const [editName, setEditName] = useState(false);
+  const [showPro, setShowPro] = useState(false);
   const [nameVal,  setNameVal]  = useState("");
 
   const load = useCallback(async () => {

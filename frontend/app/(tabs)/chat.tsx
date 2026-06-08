@@ -5,6 +5,11 @@ import { useTheme } from "../../src/lib/theme";
 import { ChatBubble } from "../../src/components/ai/ChatBubble";
 import { ExpenseConfirmCard } from "../../src/components/ai/ExpenseConfirm";
 import { sendChat } from "../../src/lib/ai";
+import { ProGate } from "../../src/components/ProGate";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const FREE_LIMIT = 3;
+const AI_COUNT_KEY = "merizo_ai_count";
 
 type Message = { id: string; role: string; content: string };
 
@@ -16,10 +21,20 @@ export default function AIChatScreen() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingExpense, setPendingExpense] = useState<any>(null);
+  const [showPro, setShowPro] = useState(false);
+  const [aiCount, setAiCount] = useState(0);
   const listRef = useRef<FlatList>(null);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
+    // Check free limit
+    try {
+      const stored = await AsyncStorage.getItem(AI_COUNT_KEY);
+      const count = parseInt(stored || "0", 10);
+      if (count >= FREE_LIMIT) { setShowPro(true); return; }
+      await AsyncStorage.setItem(AI_COUNT_KEY, String(count + 1));
+      setAiCount(count + 1);
+    } catch {}
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: text };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
@@ -121,6 +136,7 @@ export default function AIChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <ProGate visible={showPro} onClose={() => setShowPro(false)} feature="Unlimited AI chat" />
     </KeyboardAvoidingView>
   );
 }
