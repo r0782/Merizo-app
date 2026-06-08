@@ -1731,7 +1731,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   React.useEffect(() => {
     setSplitAmong(trip.members.map((m: any) => m.id));
     setPaidBy(trip.members[0]?.id || "");
-    setName(""); setAmount(""); setManualCat(null); setSplitMode("equal"); setCustomAmounts({});
+    setName(""); setAmount(""); setManualCat(null); setSplitMode("equal"); setCustomAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod("equal"); setAiQuick("");
   }, []);
   const [submitting, setSubmitting] = useState(false);
   const [showUpi, setShowUpi] = useState(false);
@@ -1743,6 +1743,11 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
     category: false,
   });
   const [manualCat, setManualCat] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [recurring, setRecurring] = useState<"none"|"weekly"|"biweekly"|"monthly">("none");
+  const [splitMethod, setSplitMethod] = useState<"equal"|"percent"|"shares"|"exact">("equal");
+  const [aiQuick, setAiQuick] = useState("");
+  const [scanCount] = useState(3);
 
   // Auto-tag — runs as user types unless they manually picked
   const autoCat = manualCat || detectCategory(name);
@@ -2103,6 +2108,30 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
               </TouchableOpacity>
             </View>
             <View style={{ marginTop: 8, gap: 8 }}>
+              {/* Split Method */}
+              <View style={{ marginBottom:12 }}>
+                <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.2, textTransform:"uppercase", marginBottom:8 }}>Split Method</Text>
+                <View style={{ flexDirection:"row", backgroundColor:isDark?"#1C1C1E":"#F0EDE8", borderRadius:12, padding:3, gap:2 }}>
+                  {(["Equal","%","Shares","Exact"] as const).map((m,i)=>{
+                    const key = ["equal","percent","shares","exact"][i] as any;
+                    const active = splitMethod===key;
+                    return (
+                      <TouchableOpacity key={m} onPress={()=>{setSplitMethod(key); if(key==="equal")setSplitMode("equal"); else setSplitMode("custom");}} style={{ flex:1, paddingVertical:8, alignItems:"center", borderRadius:9, backgroundColor:active?(isDark?"#2C2C2E":"#fff"):"transparent" }}>
+                        <Text style={{ fontSize:12, fontWeight:active?"600":"400", color:active?(isDark?"#7B6FFF":"#6D5DFC"):c.textSecondary }}>{m}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {splitMethod==="equal" && splitAmong.length>0 && parseFloat(amount||"0")>0 && (
+                  <View style={{ backgroundColor:isDark?"#1C1C1E":"#F5F3FF", borderRadius:12, padding:12, marginTop:8, alignItems:"center", borderWidth:0.5, borderColor:isDark?"rgba(109,93,252,0.2)":"#DDD6FE" }}>
+                    <Text style={{ fontSize:12, color:c.textSecondary }}>Each person pays</Text>
+                    <Text style={{ fontSize:20, fontWeight:"500", color:"#6D5DFC", letterSpacing:-0.5 }}>
+                      {currencySymbol(currency)}{(parseFloat(amount||"0")/splitAmong.length).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               {/* Equal / Custom toggle */}
               <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
                 <TouchableOpacity
