@@ -97,7 +97,7 @@ function fallbackParse(text: string): { done: boolean; reply: string; result?: S
         total: amount, currency: "INR", people, each,
         description: "Expense split",
         rows: Array.from({ length: people }, (_, i) => ({ name: `Person ${i + 1}`, amount: each })),
-        tip: null,
+        tip: undefined,
       },
     };
   }

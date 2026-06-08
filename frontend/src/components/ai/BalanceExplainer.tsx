@@ -68,8 +68,32 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ backgroundColor: c.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border }}>
-                  <Text style={{ color: c.textPrimary, fontSize: 15, lineHeight: 24 }}>{explanation}</Text>
+                {/* Visual breakdown bars */}
+                {(trip.balances || []).slice(0, 5).map((b: any, i: number) => {
+                  const maxAbs = Math.max(...(trip.balances||[]).map((x: any) => Math.abs(x.net||0)), 1);
+                  const pct = Math.abs(b.net||0) / maxAbs;
+                  const isPos = (b.net||0) >= 0;
+                  return (
+                    <View key={i} style={{ marginBottom: 12 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>{b.name}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "500", color: isPos ? "#00C48C" : "#FF453A" }}>
+                          {isPos ? "+" : "-"}₹{Math.abs(Math.round(b.net||0)).toLocaleString("en-IN")}
+                        </Text>
+                      </View>
+                      <View style={{ height: 6, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", borderRadius: 3, overflow: "hidden" }}>
+                        <View style={{ width: `${Math.round(pct * 100)}%` as any, height: 6, backgroundColor: isPos ? "#00C48C" : "#FF453A", borderRadius: 3 }} />
+                      </View>
+                      <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>
+                        {isPos ? "Owed to them" : "They owe"}
+                      </Text>
+                    </View>
+                  );
+                })}
+                <View style={{ height: 1, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", marginVertical: 12 }} />
+                <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#F5F3FF", borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(109,93,252,0.2)" : "#E0D9FF" }}>
+                  <Text style={{ fontSize: 11, color: "#6D5DFC", fontWeight: "500", marginBottom: 6 }}>✦ AI says</Text>
+                  <Text style={{ color: c.textPrimary, fontSize: 14, lineHeight: 22 }}>{explanation}</Text>
                 </View>
                 <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 12, textAlign: "center" }}>
                   Powered by Merizo AI

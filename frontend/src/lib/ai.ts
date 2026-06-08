@@ -26,3 +26,16 @@ export async function explainBalances(balances: Record<string, number>, currency
   const r = await api.post("/ai/explain/balances", { balances, currency, language });
   return r.data.explanation as string;
 }
+
+export async function transcribeVoice(audioUri: string, language: string = "en") {
+  const formData = new FormData();
+  formData.append("audio", { uri: audioUri, type: "audio/m4a", name: "voice.m4a" } as any);
+  formData.append("language", language);
+  try {
+    const { api } = await import("./api");
+    const r = await api.post("/ai/voice/transcribe", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return r.data;
+  } catch { return { transcript: "" }; }
+}

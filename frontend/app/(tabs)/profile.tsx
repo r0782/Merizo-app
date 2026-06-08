@@ -34,7 +34,7 @@ export default function ProfileScreen() {
         const total = t.total_spent || 0;
         settled += total;
       });
-      setStats({ count, settled: Math.round(settled) });
+      setStats({ count, settled: Math.round(settled * 10) / 10 });
     } catch {}
   }, []);
 

@@ -16,6 +16,37 @@ import { currencySymbol } from "../../src/lib/tokens";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
+
+// ── AI Smart Tips ────────────────────────────────────────────────────────────
+const TIPS = [
+  { emoji: "💡", title: "Split smarter", body: "Add expenses right after paying — your memory fades faster than you think.", color: "#6D5DFC" },
+  { emoji: "⚡", title: "Settle weekly", body: "Groups settled weekly have 3x fewer disputes. Set a day and stick to it.", color: "#FF9F0A" },
+  { emoji: "📸", title: "Scan receipts", body: "Tap the + → Scan Receipt to extract amounts automatically from any bill.", color: "#00C48C" },
+  { emoji: "🤖", title: "Ask AI anything", body: "Try: \"Who owes the most in Goa trip?\" — AI knows your full history.", color: "#6D5DFC" },
+  { emoji: "🎯", title: "Equal isn't always fair", body: "Use Custom Split when people had different items or joined mid-trip.", color: "#FF453A" },
+];
+
+function SmartTips({ c, isDark }: any) {
+  return (
+    <View style={{ paddingHorizontal: 20, marginTop: 24, marginBottom: 8 }}>
+      <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
+        Merizo tips
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+        {TIPS.map((tip, i) => (
+          <View key={i} style={{ width: 200, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Text style={{ fontSize: 20 }}>{tip.emoji}</Text>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: tip.color, flex: 1 }}>{tip.title}</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: c.textSecondary, lineHeight: 18 }}>{tip.body}</Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 // ── Debt Gravity Stack ──────────────────────────────────────────────────────
 function DebtGravityStack({ trips, router, c, isDark, sym }: any) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -223,16 +254,31 @@ function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netB
               <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary, marginBottom: 4 }}>30-day trajectory</Text>
               <Text style={{ fontSize: 11, color: c.textSecondary, marginBottom: 12 }}>Balance movement over the last month</Text>
               <View style={{ height: chartH + 20, paddingHorizontal: 4 }}>
-                <svg width={chartW} height={chartH} style={{ overflow: "visible" } as any}>
+                <svg width={chartW} height={chartH + 20} style={{ overflow: "visible" } as any}>
                   <defs>
-                    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.3" />
+                    <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.25" />
                       <stop offset="100%" stopColor="#6D5DFC" stopOpacity="0" />
                     </linearGradient>
                   </defs>
+                  {/* Zero line */}
+                  <line x1="0" y1={chartH * 0.6} x2={chartW} y2={chartH * 0.6} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4,4" />
+                  <polyline points={`0,${chartH} ${points} ${chartW},${chartH}`} fill="url(#grad2)" stroke="none" />
                   <polyline points={points} fill="none" stroke="#6D5DFC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <polyline points={`0,${chartH} ${points} ${chartW},${chartH}`} fill="url(#grad)" stroke="none" />
+                  {/* Labels */}
+                  <text x="0" y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">30d ago</text>
+                  <text x={chartW / 2 - 14} y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">15d ago</text>
+                  <text x={chartW - 24} y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">Today</text>
                 </svg>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <View style={{ width: 8, height: 2, backgroundColor: "#6D5DFC", borderRadius: 1 }} />
+                  <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Balance trend</Text>
+                </View>
+                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                  {netBalance >= 0 ? "📈 Positive" : "📉 In debt"}
+                </Text>
+              </View>
               </View>
             </View>
 
@@ -478,6 +524,9 @@ export default function HomeScreen() {
             <DebtGravityStack trips={trips} router={router} c={c} isDark={isDark} sym={sym} />
           )}
         </View>
+
+        {/* AI Smart Tips */}
+        <SmartTips c={c} isDark={isDark} />
       </ScrollView>
 
       {/* FAB */}
