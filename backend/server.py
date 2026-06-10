@@ -841,6 +841,10 @@ Format: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR",
     except Exception as e:
         raise HTTPException(500, str(e))
 
+# Register routers
+app.include_router(api)
+app.include_router(ai_router)
+
 @app.on_event("startup")
 async def startup():
     logger.info("Merizo API starting (Supabase backend)...")
@@ -888,8 +892,7 @@ async def get_audit_log(user: dict = Depends(get_current_user)):
     from core.security import get_recent_audit
     return get_recent_audit(100)
 
-    app.include_router(api)
-    app.include_router(ai_router)
+    pass
     try:
         user = await sb_one("users", email=DEMO_EMAIL)
         if not user:
