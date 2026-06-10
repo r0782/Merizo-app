@@ -40,7 +40,13 @@ export default function AIChatScreen() {
     setInput("");
     setLoading(true);
     try {
-      const reply = await sendChat(text, messages.slice(-10), { language: "en", currency: "INR" });
+      const reply = await sendChat(text, messages.slice(-10), {
+        language: "en",
+        currency: "INR",
+        group_id: "",
+        group_name: "",
+        members: [],
+      });
       const jsonMatch = reply.match(/\{[\s\S]*"amount"[\s\S]*\}/);
       if (jsonMatch) {
         try { const p = JSON.parse(jsonMatch[0]); if (p.amount && p.title) setPendingExpense(p); } catch {}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Alert } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
@@ -16,6 +16,9 @@ export default function InsightsScreen() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showPro, setShowPro] = useState(false);
+  const [showBudget, setShowBudget] = useState(false);
+  const [budgets, setBudgets] = useState<Record<string,number>>({ food:5000, travel:10000, entertainment:2000 });
+  const [editBudget, setEditBudget] = useState<string|null>(null);
   const [proFeature, setProFeature] = useState("AI Insights");
 
   const load = useCallback(async () => {
@@ -218,6 +221,51 @@ export default function InsightsScreen() {
           <CurrencyRateCard base="INR" />
         </View>
 
+
+      {/* Budget Modal */}
+      {showBudget && (
+        <View style={{ position:"absolute", top:0, left:0, right:0, bottom:0, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end", zIndex:100 }}>
+          <View style={{ backgroundColor:c.bg, borderTopLeftRadius:28, borderTopRightRadius:28, padding:24, paddingBottom:40 }}>
+            <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <Text style={{ fontSize:18, fontWeight:"500", color:c.textPrimary }}>Monthly Budgets</Text>
+              <TouchableOpacity onPress={()=>setShowBudget(false)} style={{ width:32, height:32, borderRadius:16, backgroundColor:isDark?"#2C2C2E":"#F0EDE8", alignItems:"center", justifyContent:"center" }}>
+                <Ionicons name="close" size={16} color={c.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            {[
+              { key:"food", label:"Food & Dining", emoji:"🍕" },
+              { key:"travel", label:"Travel", emoji:"✈️" },
+              { key:"entertainment", label:"Entertainment", emoji:"🎬" },
+              { key:"shopping", label:"Shopping", emoji:"🛍️" },
+              { key:"bills", label:"Bills", emoji:"💡" },
+            ].map(cat => (
+              <View key={cat.key} style={{ flexDirection:"row", alignItems:"center", gap:12, marginBottom:14 }}>
+                <Text style={{ fontSize:22, width:36 }}>{cat.emoji}</Text>
+                <View style={{ flex:1 }}>
+                  <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary, marginBottom:4 }}>{cat.label}</Text>
+                  <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
+                    <Text style={{ fontSize:14, color:c.textSecondary }}>₹</Text>
+                    <TextInput
+                      value={String(budgets[cat.key] || "")}
+                      onChangeText={v => setBudgets(prev => ({ ...prev, [cat.key]: parseInt(v)||0 }))}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      placeholderTextColor={c.textMuted}
+                      style={{ flex:1, backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:10, paddingHorizontal:12, paddingVertical:8, fontSize:14, color:c.textPrimary }}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity
+              onPress={()=>{ setShowBudget(false); Alert.alert("Saved", "Monthly budgets saved!"); }}
+              style={{ backgroundColor:"#6D5DFC", borderRadius:14, padding:16, alignItems:"center", marginTop:8 }}
+            >
+              <Text style={{ color:"#fff", fontSize:15, fontWeight:"500" }}>Save budgets</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       <ProGate visible={showPro} onClose={() => setShowPro(false)} feature={proFeature} />
     </View>
   );

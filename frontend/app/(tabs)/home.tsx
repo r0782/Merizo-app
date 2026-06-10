@@ -17,6 +17,47 @@ import { currencySymbol } from "../../src/lib/tokens";
 const { width: SW, height: SH } = Dimensions.get("window");
 
 
+
+// ── Recurring Section ────────────────────────────────────────────────────────
+const RECURRING_ITEMS = [
+  { emoji:"📺", name:"Netflix", amount:"₹649", period:"Monthly", color:"#E50914" },
+  { emoji:"🎵", name:"Spotify", amount:"₹119", period:"Monthly", color:"#1DB954" },
+  { emoji:"🏠", name:"Rent", amount:"₹0", period:"Monthly", color:"#6D5DFC" },
+  { emoji:"💡", name:"Electricity", amount:"₹0", period:"Monthly", color:"#FF9F0A" },
+  { emoji:"📦", name:"Prime", amount:"₹299", period:"Monthly", color:"#FF9900" },
+];
+
+function RecurringSection({ c, isDark, router }: any) {
+  return (
+    <View style={{ marginBottom:16 }}>
+      <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:20, marginBottom:12 }}>
+        <Text style={{ fontSize:11, fontWeight:"500", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase" }}>Recurring</Text>
+        <TouchableOpacity onPress={()=>router.push("/recurring")}>
+          <Text style={{ fontSize:12, color:isDark?"#7B6FFF":"#6D5DFC" }}>Manage</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:20, gap:10 }}>
+        {RECURRING_ITEMS.map((item,i) => (
+          <TouchableOpacity key={i} onPress={()=>router.push("/recurring")} style={{ width:110, backgroundColor:isDark?"#1C1C1E":"#FFFFFF", borderRadius:16, padding:14, borderWidth:0.5, borderColor:isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)", alignItems:"center", gap:6 }}>
+            <View style={{ width:40, height:40, borderRadius:12, backgroundColor:item.color+"15", alignItems:"center", justifyContent:"center" }}>
+              <Text style={{ fontSize:20 }}>{item.emoji}</Text>
+            </View>
+            <Text style={{ fontSize:12, fontWeight:"500", color:c.textPrimary, textAlign:"center" }}>{item.name}</Text>
+            <Text style={{ fontSize:11, color:"#6D5DFC", fontWeight:"500" }}>{item.amount}</Text>
+            <Text style={{ fontSize:10, color:c.textSecondary }}>{item.period}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={()=>router.push("/recurring")} style={{ width:110, backgroundColor:isDark?"#1C1C1E":"#FFFFFF", borderRadius:16, padding:14, borderWidth:0.5, borderColor:isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)", alignItems:"center", justifyContent:"center", gap:6 }}>
+          <View style={{ width:40, height:40, borderRadius:12, backgroundColor:"rgba(109,93,252,0.1)", alignItems:"center", justifyContent:"center" }}>
+            <Ionicons name="add" size={20} color="#6D5DFC" />
+          </View>
+          <Text style={{ fontSize:11, color:"#6D5DFC", fontWeight:"500", textAlign:"center" }}>Add more</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}
+
 // ── AI Smart Tips ────────────────────────────────────────────────────────────
 const TIPS = [
   { emoji: "💡", title: "Split smarter", body: "Add expenses right after paying — your memory fades faster than you think.", color: "#6D5DFC" },
@@ -524,6 +565,9 @@ export default function HomeScreen() {
             <DebtGravityStack trips={trips} router={router} c={c} isDark={isDark} sym={sym} />
           )}
         </View>
+
+        {/* Recurring */}
+        <RecurringSection c={c} isDark={isDark} router={router} />
 
         {/* AI Smart Tips */}
         <SmartTips c={c} isDark={isDark} />

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { detectUserLocation, validateEmail as validateEmailAPI } from "../src/lib/externalApis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth } from "../src/lib/auth";
