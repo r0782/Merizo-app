@@ -14,7 +14,8 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
 
-const { width: SW, height: SH } = Dimensions.get("window");
+const { width: SW } = Dimensions.get("window");
+const SH = Dimensions.get("window").height || 800;
 
 
 
@@ -213,149 +214,172 @@ function DebtGravityStack({ trips, router, c, isDark, sym }: any) {
 
 // ── Balance Dashboard Modal ──────────────────────────────────────────────────
 function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netBalance, sym, c, isDark }: any) {
-  const slideY = useSharedValue(SH);
+  const screenH = Dimensions.get("window").height || 800;
+  const slideY = useSharedValue(screenH);
 
   useEffect(() => {
     if (visible) slideY.value = withSpring(0, { damping: 20, stiffness: 200 });
-    else slideY.value = withTiming(SH, { duration: 300 });
+    else slideY.value = withTiming(screenH, { duration: 300 });
   }, [visible]);
 
   const slideStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: slideY.value }],
   }));
 
-  const chartData = useMemo(() => {
-    const days = 30;
-    const base = netBalance;
-    return Array.from({ length: days }, (_, i) => ({
-      day: i + 1,
-      value: base + (Math.random() - 0.6) * 200 * (i / days),
-    }));
-  }, [netBalance]);
+  const txns = trips.flatMap((t: any) => t.settlement_transactions || []);
+  const topDebtors = trips.filter((t: any) => (t.my_net || 0) < -1).sort((a: any, b: any) => (a.my_net||0) - (b.my_net||0)).slice(0, 3);
+  const topCreditors = trips.filter((t: any) => (t.my_net || 0) > 1).sort((a: any, b: any) => (b.my_net||0) - (a.my_net||0)).slice(0, 3);
 
-  const minV = Math.min(...chartData.map(d => d.value));
-  const maxV = Math.max(...chartData.map(d => d.value));
-  const range = maxV - minV || 1;
+  const statusText = netBalance > 100
+    ? "Excellent! You're overall net positive this month."
+    : netBalance < -100
+    ? "You owe more than you're owed. Settle soon to stay balanced."
+    : "You're nearly balanced. Great job!";
+
+  const statusColor = netBalance > 0 ? "#00C48C" : netBalance < 0 ? "#FF453A" : "#FF9F0A";
+
+  // Chart data
   const chartW = SW - 80;
   const chartH = 80;
-  const points = chartData.map((d, i) => `${(i / (chartData.length - 1)) * chartW},${chartH - ((d.value - minV) / range) * chartH}`).join(" ");
+  const chartData = Array.from({ length: 7 }, (_, i) => ({
+    val: netBalance + (Math.random() - 0.5) * Math.abs(netBalance) * 0.3,
+    label: ["May 1","May 8","May 15","May 22","May 29","Jun 1","Today"][i],
+  }));
+  const vals = chartData.map(d => d.val);
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals) || 1;
+  const range = maxV - minV || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length-1)) * chartW},${chartH - ((v-minV)/range) * chartH}`).join(" ");
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <Animated.View style={[{ backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: SH * 0.85, overflow: "hidden" }, slideStyle]}>
+      <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.55)" }}>
+        <Pressable style={{ flex:1 }} onPress={onClose} />
+        <Animated.View style={[{ backgroundColor:c.bg, borderTopLeftRadius:28, borderTopRightRadius:28, maxHeight:screenH*0.9, overflow:"hidden" }, slideStyle]}>
           {/* Handle */}
-          <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 4 }}>
-            <View style={{ width: 36, height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)", borderRadius: 2 }} />
+          <View style={{ alignItems:"center", paddingTop:12, paddingBottom:4 }}>
+            <View style={{ width:36, height:4, backgroundColor:isDark?"rgba(255,255,255,0.15)":"rgba(0,0,0,0.15)", borderRadius:2 }} />
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-            {/* Hero balance */}
-            <View style={{ backgroundColor: "#111", borderRadius: 20, padding: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Net balance</Text>
-              <Text style={{ fontSize: 42, fontWeight: "500", color: "#fff", letterSpacing: -2, marginBottom: 4 }}>
-                {netBalance >= 0 ? "+" : "-"}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
-              </Text>
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-                <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 12 }}>
-                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Owed to you</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "500", color: "#00C48C" }}>+{sym}{Math.round(totalOwed).toLocaleString("en-IN")}</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 12 }}>
-                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>You owe</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "500", color: "#FF453A" }}>-{sym}{Math.round(totalOwing).toLocaleString("en-IN")}</Text>
-                </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding:20, paddingBottom:40 }}>
+
+            {/* Net position card */}
+            <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:18, padding:18, marginBottom:14, borderWidth:0.5, borderColor:c.border }}>
+              <Text style={{ fontSize:10, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8 }}>Your net position</Text>
+              <View style={{ flexDirection:"row", alignItems:"center", gap:8, marginBottom:6 }}>
+                <Ionicons name={netBalance >= 0 ? "trending-up" : "trending-down"} size={22} color={statusColor} />
+                <Text style={{ fontSize:36, fontWeight:"500", color:statusColor, letterSpacing:-1 }}>
+                  {netBalance >= 0 ? "+" : ""}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
+                </Text>
               </View>
+              <Text style={{ fontSize:14, color:statusColor, lineHeight:20 }}>{statusText}</Text>
             </View>
 
-            {/* AI Insight */}
-            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#6D5DFC" }} />
-                <Text style={{ fontSize: 10, color: "#6D5DFC", fontWeight: "500", letterSpacing: 0.5 }}>MERIZO AI INSIGHT</Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, lineHeight: 21, marginBottom: 8 }}>
-                {trips.length > 0
-                  ? `${trips[0]?.name} accounts for ${trips.length > 0 ? Math.round(Math.abs(trips[0]?.my_net || 0) / Math.max(totalOwing, 1) * 100) : 0}% of your total debt. Settling with ${trips[0]?.member_count || 0} members will significantly clear this up.`
-                  : "You're all settled up! Great financial discipline this month."}
-              </Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
-                  <Text style={{ fontSize: 11, color: c.textSecondary }}>{trips.length} groups active</Text>
+            {/* AI Smart Shortcut */}
+            {(topDebtors.length > 0 || topCreditors.length > 0) && (
+              <View style={{ backgroundColor:isDark?"rgba(109,93,252,0.12)":"#F5F3FF", borderRadius:18, padding:16, marginBottom:14, borderWidth:0.5, borderColor:isDark?"rgba(109,93,252,0.25)":"#DDD6FE" }}>
+                <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:8 }}>
+                  <Text style={{ fontSize:12 }}>✨</Text>
+                  <Text style={{ fontSize:11, fontWeight:"600", color:"#6D5DFC", letterSpacing:1 }}>MERIZO AI SMART SHORTCUT</Text>
                 </View>
-                <View style={{ backgroundColor: "#EDE9FE", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
-                  <Text style={{ fontSize: 11, color: "#6D5DFC" }}>Settle now →</Text>
-                </View>
+                <Text style={{ fontSize:14, color:c.textPrimary, lineHeight:22, marginBottom:12 }}>
+                  {netBalance > 0
+                    ? `You're owed ${sym}${Math.round(totalOwed).toLocaleString("en-IN")} across ${topCreditors.length || trips.length} group${trips.length !== 1 ? "s" : ""}. Sending reminders is the fastest way to collect.`
+                    : `You owe ${sym}${Math.round(totalOwing).toLocaleString("en-IN")} across ${topDebtors.length || trips.length} group${trips.length !== 1 ? "s" : ""}. Settling now avoids interest in trust.`
+                  }
+                </Text>
+                <TouchableOpacity onPress={onClose} style={{ borderRadius:10, borderWidth:1, borderColor:isDark?"rgba(109,93,252,0.4)":"#A78BFA", paddingVertical:10, alignItems:"center" }}>
+                  <Text style={{ fontSize:13, color:"#6D5DFC", fontWeight:"500" }}>
+                    {netBalance > 0 ? "⚡ Send Quick Reminders" : "⚡ View Settlement Plan"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            )}
 
-            {/* Balance chart */}
-            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <Text style={{ fontSize: 12, fontWeight: "500", color: c.textPrimary, marginBottom: 4 }}>30-day trajectory</Text>
-              <Text style={{ fontSize: 11, color: c.textSecondary, marginBottom: 12 }}>Balance movement over the last month</Text>
-              <View style={{ height: chartH + 20, paddingHorizontal: 4 }}>
-                <svg width={chartW} height={chartH + 20} style={{ overflow: "visible" } as any}>
+            {/* Balance trend chart */}
+            <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:18, padding:16, marginBottom:14, borderWidth:0.5, borderColor:c.border }}>
+              <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:12 }}>
+                <Text style={{ fontSize:14 }}>📈</Text>
+                <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary, letterSpacing:0.3 }}>BALANCE TREND (LAST 30 DAYS)</Text>
+              </View>
+              <View style={{ height:chartH+36 }}>
+                <svg width={chartW} height={chartH} style={{ overflow:"visible" } as any}>
                   <defs>
-                    <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#6D5DFC" stopOpacity="0" />
+                    <linearGradient id="bdash" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#6D5DFC" stopOpacity="0.02" />
                     </linearGradient>
                   </defs>
                   {/* Zero line */}
-                  <line x1="0" y1={chartH * 0.6} x2={chartW} y2={chartH * 0.6} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4,4" />
-                  <polyline points={`0,${chartH} ${points} ${chartW},${chartH}`} fill="url(#grad2)" stroke="none" />
-                  <polyline points={points} fill="none" stroke="#6D5DFC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  {/* Labels */}
-                  <text x="0" y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">30d ago</text>
-                  <text x={chartW / 2 - 14} y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">15d ago</text>
-                  <text x={chartW - 24} y={chartH + 16} fontSize="9" fill="rgba(255,255,255,0.35)">Today</text>
+                  <line x1="0" y1={chartH*0.6} x2={chartW} y2={chartH*0.6} stroke="rgba(109,93,252,0.2)" strokeWidth="1" strokeDasharray="4,3" />
+                  <text x="0" y={chartH*0.6-3} fontSize="8" fill={isDark?"rgba(255,255,255,0.3)":"rgba(0,0,0,0.3)"}>₹0 (Settled)</text>
+                  <polyline points={`0,${chartH} ${pts} ${chartW},${chartH}`} fill="url(#bdash)" stroke="none" />
+                  <polyline points={pts} fill="none" stroke="#6D5DFC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  {/* Peak dot */}
+                  {(() => {
+                    const maxIdx = vals.indexOf(Math.max(...vals));
+                    const px = (maxIdx/(vals.length-1))*chartW;
+                    const py = chartH - ((vals[maxIdx]-minV)/range)*chartH;
+                    return <>
+                      <circle cx={px} cy={py} r="4" fill="#6D5DFC" />
+                      <text x={Math.min(px+6, chartW-60)} y={py-6} fontSize="9" fill={isDark?"rgba(255,255,255,0.7)":"rgba(0,0,0,0.6)"}>Peak: {sym}{Math.round(Math.max(...vals)).toLocaleString("en-IN")}</text>
+                    </>;
+                  })()}
                 </svg>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <View style={{ width: 8, height: 2, backgroundColor: "#6D5DFC", borderRadius: 1 }} />
-                  <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Balance trend</Text>
+                <View style={{ flexDirection:"row", justifyContent:"space-between", marginTop:4 }}>
+                  {["May 1","May 15","May 29","Jun 1"].map((l,i) => (
+                    <Text key={i} style={{ fontSize:9, color:c.textMuted }}>{l}</Text>
+                  ))}
                 </View>
-                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-                  {netBalance >= 0 ? "📈 Positive" : "📉 In debt"}
-                </Text>
-              </View>
               </View>
             </View>
 
-            {/* Group breakdown */}
-            <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Group breakdown</Text>
-            <View style={{ gap: 10, marginBottom: 16 }}>
-              {trips.map((trip: any) => {
-                const net = trip.my_net || 0;
-                const isOwed = net > 0;
-                const settled = Math.floor((trip.member_count || 1) * 0.4);
-                const total = trip.member_count || 1;
-                const pct = settled / total;
-                const emoji = trip.category === "food" ? "🍕" : trip.category === "travel" ? "✈️" : trip.category === "home" ? "🏠" : "📁";
-                return (
-                  <View key={trip.id} style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      <Text style={{ fontSize: 18 }}>{emoji}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>{trip.name}</Text>
-                        <Text style={{ fontSize: 11, color: c.textSecondary }}>{settled}/{total} members settled</Text>
+            {/* Immediate actions */}
+            {trips.length > 0 && (
+              <View style={{ marginBottom:8 }}>
+                <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:12 }}>
+                  <Text style={{ fontSize:14 }}>🚨</Text>
+                  <Text style={{ fontSize:13, fontWeight:"600", color:c.textPrimary, letterSpacing:0.5 }}>IMMEDIATE ACTIONS</Text>
+                </View>
+                {trips.slice(0,4).map((trip: any, i: number) => {
+                  const net = trip.my_net || 0;
+                  const isOwed = net > 0.5;
+                  const isOwing = net < -0.5;
+                  if (!isOwed && !isOwing) return null;
+                  return (
+                    <View key={i} style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, flexDirection:"row", alignItems:"center", gap:12, marginBottom:10, borderWidth:0.5, borderColor:c.border }}>
+                      <View style={{ width:40, height:40, borderRadius:20, backgroundColor:isOwed?"rgba(0,196,140,0.1)":"rgba(255,67,58,0.1)", alignItems:"center", justifyContent:"center" }}>
+                        <Text style={{ fontSize:16 }}>{isOwed?"💰":"💳"}</Text>
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>
-                        {isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}
-                      </Text>
+                      <View style={{ flex:1 }}>
+                        <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary }}>{trip.name}</Text>
+                        <Text style={{ fontSize:12, color:isOwed?"#00C48C":"#FF453A", marginTop:2 }}>
+                          {isOwed ? `Others owe you ${sym}${Math.round(net).toLocaleString("en-IN")}` : `You owe ${sym}${Math.round(Math.abs(net)).toLocaleString("en-IN")}`}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={onClose} style={{ backgroundColor:isOwed?"rgba(0,196,140,0.1)":"rgba(109,93,252,0.1)", borderRadius:10, paddingHorizontal:12, paddingVertical:7, borderWidth:0.5, borderColor:isOwed?"rgba(0,196,140,0.3)":"rgba(109,93,252,0.3)" }}>
+                        <Text style={{ fontSize:12, fontWeight:"500", color:isOwed?"#00C48C":"#6D5DFC" }}>
+                          {isOwed ? "Ping" : "Settle"}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                    {/* Progress bar */}
-                    <View style={{ height: 4, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F0EDE8", borderRadius: 2, marginBottom: 10 }}>
-                      <View style={{ width: `${Math.round(pct * 100)}%`, height: 4, backgroundColor: "#6D5DFC", borderRadius: 2 }} />
-                    </View>
-                    <TouchableOpacity style={{ backgroundColor: "#6D5DFC", borderRadius: 10, paddingVertical: 8, alignItems: "center" }} onPress={onClose}>
-                      <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>Settle instantly ✓</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Owed/Owing summary */}
+            <View style={{ flexDirection:"row", gap:10 }}>
+              <View style={{ flex:1, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, borderWidth:0.5, borderColor:c.border }}>
+                <Text style={{ fontSize:10, color:c.textSecondary, marginBottom:6 }}>Owed to you</Text>
+                <Text style={{ fontSize:18, fontWeight:"500", color:"#00C48C" }}>+{sym}{Math.round(totalOwed).toLocaleString("en-IN")}</Text>
+              </View>
+              <View style={{ flex:1, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, borderWidth:0.5, borderColor:c.border }}>
+                <Text style={{ fontSize:10, color:c.textSecondary, marginBottom:6 }}>You owe</Text>
+                <Text style={{ fontSize:18, fontWeight:"500", color:"#FF453A" }}>-{sym}{Math.round(totalOwing).toLocaleString("en-IN")}</Text>
+              </View>
             </View>
+
           </ScrollView>
         </Animated.View>
       </View>
@@ -363,7 +387,7 @@ function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netB
   );
 }
 
-// ── FAB ──────────────────────────────────────────────────────────────────────
+// ── FAB// ── FAB ──────────────────────────────────────────────────────────────────────
 function FAB({ router, isDark, c }: any) {
   const [open, setOpen] = useState(false);
   const rot = useSharedValue(0);

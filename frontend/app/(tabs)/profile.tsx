@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking, Modal } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking, Modal, TextInput } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
@@ -31,7 +31,7 @@ function Divider({ c }: any) {
   return <View style={{ height:0.5, backgroundColor:c.border, marginLeft:62 }} />;
 }
 
-function Section({ title, children, c }: any) {
+function Section({ title, children, c, isDark }: any) {
   return (
     <View style={{ marginHorizontal:20, marginBottom:20 }}>
       <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>{title}</Text>
@@ -50,6 +50,8 @@ export default function ProfileScreen() {
   const [showPro, setShowPro] = useState(false);
   const [currency, setCurrency] = useState("INR");
   const [language, setLanguage] = useState("English");
+  const [editProfile, setEditProfile] = useState(false);
+  const [editName, setEditName] = useState(user?.name || "");
   const [notifications, setNotifications] = useState(true);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -251,7 +253,7 @@ export default function ProfileScreen() {
           <View style={{ backgroundColor:c.bg, borderTopLeftRadius:24, borderTopRightRadius:24, padding:20, paddingBottom:40 }}>
             <Text style={{ fontSize:16, fontWeight:"500", color:c.textPrimary, marginBottom:16 }}>Select Language</Text>
             {LANGUAGES.map(lang => (
-              <TouchableOpacity key={lang} onPress={()=>{setLanguage(lang);setShowLangPicker(false);}} style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:c.border }}>
+              <TouchableOpacity key={lang} onPress={()=>{ setLanguage(lang); setShowLangPicker(false); Alert.alert('Language updated', `App language set to ${lang}. Full translation coming soon.`); }} style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:c.border }}>
                 <Text style={{ fontSize:15, color:c.textPrimary }}>{lang}</Text>
                 {language===lang && <Ionicons name="checkmark" size={18} color="#6D5DFC" />}
               </TouchableOpacity>
@@ -259,6 +261,46 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={editProfile} transparent animationType="slide" onRequestClose={()=>setEditProfile(false)}>
+        <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end" }}>
+          <View style={{ backgroundColor:c.bg, borderTopLeftRadius:28, borderTopRightRadius:28, padding:24, paddingBottom:40 }}>
+            <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <Text style={{ fontSize:18, fontWeight:"500", color:c.textPrimary }}>Edit Profile</Text>
+              <TouchableOpacity onPress={()=>setEditProfile(false)} style={{ width:32, height:32, borderRadius:16, backgroundColor:isDark?"#2C2C2E":"#F0EDE8", alignItems:"center", justifyContent:"center" }}>
+                <Ionicons name="close" size={16} color={c.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize:12, color:c.textSecondary, marginBottom:6 }}>Display Name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Your name"
+              placeholderTextColor={c.textMuted}
+              style={{ backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:12, paddingHorizontal:14, paddingVertical:12, fontSize:15, color:c.textPrimary, marginBottom:16 }}
+            />
+            <Text style={{ fontSize:12, color:c.textSecondary, marginBottom:6 }}>Email</Text>
+            <View style={{ backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:12, paddingHorizontal:14, paddingVertical:12, marginBottom:20, opacity:0.6 }}>
+              <Text style={{ fontSize:15, color:c.textSecondary }}>{user?.email}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await api.patch("/auth/profile", { name: editName });
+                  setEditProfile(false);
+                  Alert.alert("✓ Updated", "Profile updated successfully!");
+                } catch {
+                  Alert.alert("Error", "Could not update profile. Please try again.");
+                }
+              }}
+              style={{ backgroundColor:"#6D5DFC", borderRadius:14, padding:16, alignItems:"center" }}>
+              <Text style={{ color:"#fff", fontSize:15, fontWeight:"500" }}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
 
       <ProGate visible={showPro} onClose={()=>setShowPro(false)} feature="Pro Features" />
     </View>
