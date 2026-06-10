@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Platform, Link
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
+import { useEffect } from "react";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
@@ -68,14 +69,14 @@ export default function ProfileScreen() {
   const onSignOut = () => {
     Alert.alert("Sign out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => { logout(); } }
+      { text: "Sign out", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } }
     ]);
   };
 
   const onDeleteAccount = () => {
     Alert.alert("Delete account", "This will permanently delete your account and all data.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => Alert.alert("Contact support", "Email support@merizo.app to delete your account.") }
+      { text: "Delete", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } }
     ]);
   };
 

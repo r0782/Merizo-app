@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await setToken(null);
     setUser(null);
+    // Router redirect happens via the root layout watching user state
   }, []);
 
   const loginWithToken = useCallback(async (token: string, userData?: User) => {
