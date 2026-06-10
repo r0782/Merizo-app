@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Platform, Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { validateEmail as validateEmailAPI, detectUserLocation } from "../src/lib/externalApis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth }  from "../src/lib/auth";
@@ -65,6 +66,9 @@ export default function LoginScreen() {
 
   const doLogin = async () => {
     if (!email.trim() || !password) { Alert.alert("Fill in all fields"); return; }
+    // Validate email format
+    const emailCheck = await validateEmailAPI(email.trim());
+    if (!emailCheck.format) { Alert.alert("Invalid email", "Please enter a valid email address."); return; }
     setLoading(true);
     try {
       const r = await api.post("/auth/login", {

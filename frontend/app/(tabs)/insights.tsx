@@ -6,6 +6,7 @@ import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { categoryMeta, currencySymbol } from "../../src/lib/tokens";
 import { ProGate, ProBadge } from "../../src/components/ProGate";
+import { CurrencyRateCard } from "../../src/components/CurrencyConverter";
 
 type Period = "1M" | "3M" | "6M" | "1Y";
 
@@ -210,6 +211,12 @@ export default function InsightsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+        {/* Live exchange rates */}
+        <View style={{ marginHorizontal:20, marginBottom:20 }}>
+          <Text style={{ fontSize:11, fontWeight:"500", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>Live exchange rates</Text>
+          <CurrencyRateCard base="INR" />
+        </View>
 
       <ProGate visible={showPro} onClose={() => setShowPro(false)} feature={proFeature} />
     </View>
