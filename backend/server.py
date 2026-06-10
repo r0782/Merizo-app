@@ -8,6 +8,13 @@ import json, uuid, json, logging, secrets, asyncio, hashlib, base64, random, str
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import bcrypt, jwt, httpx
+from core.security import (
+    check_rate_limit, check_account_locked, record_failed_login,
+    clear_failed_attempts, validate_email, validate_password,
+    sanitize_name, sanitize_string, register_session,
+    invalidate_all_sessions, require_owner, audit, get_client_ip,
+    check_permission
+)
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -837,6 +844,50 @@ Format: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR",
 @app.on_event("startup")
 async def startup():
     logger.info("Merizo API starting (Supabase backend)...")
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: dict, request: Request):
+    """Send password reset email — generic response always."""
+    from core.security import create_reset_token
+    ip = get_client_ip(request)
+    check_rate_limit(ip, "forgot")
+    email = validate_email(body.get("email", ""))
+    user = await sb_one("users", email=email)
+    if user:
+        token = create_reset_token(email)
+        # TODO: send email via SMTP
+        # For now: return token in dev (remove in production)
+        logger.info(f"Password reset token for {email}: {token}")
+    # Always return same response — don't reveal if email exists
+    return {"message": "If this email is registered, you will receive a reset link shortly."}
+
+@api.post("/auth/reset-password")
+async def reset_password(body: dict, request: Request):
+    """Reset password using token."""
+    from core.security import consume_reset_token, invalidate_all_sessions
+    ip = get_client_ip(request)
+    check_rate_limit(ip, "reset")
+    token = body.get("token", "")
+    new_password = body.get("password", "")
+    validate_password(new_password)
+    email = consume_reset_token(token)
+    user = await sb_one("users", email=email)
+    if not user:
+        raise HTTPException(400, "Invalid reset request")
+    # Update password
+    await sb_update("users", {"password_hash": hash_pw(new_password)}, email=email)
+    # Invalidate all existing sessions
+    invalidate_all_sessions(user["id"])
+    audit("PASSWORD_RESET", user_id=user["id"], ip=ip)
+    return {"message": "Password updated successfully. Please sign in again."}
+
+@api.get("/auth/audit")
+async def get_audit_log(user: dict = Depends(get_current_user)):
+    """Admin only — view security audit log."""
+    check_permission(user, "read_all")
+    from core.security import get_recent_audit
+    return get_recent_audit(100)
+
     app.include_router(api)
     app.include_router(ai_router)
     try:
