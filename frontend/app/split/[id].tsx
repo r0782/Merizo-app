@@ -24,7 +24,7 @@ import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { confirmAction } from "../../src/lib/confirm";
-import { GaugeDial, HybridBar } from "../../src/components/Charts";
+import { GaugeDial, HybridBar, DonutRing } from "../../src/components/Charts";
 import { AnimatedSmartNum } from "../../src/components/AnimatedSmartNum";
 import {
   resolveCover,
@@ -53,24 +53,23 @@ if (typeof document !== "undefined") {
 
 
 // Web-safe input that doesn't lose focus in ScrollView
-function WebInput({ value, onChange, placeholder, style, type = "text" }: any) {
-  if (typeof window !== "undefined") {
-    return (
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          background: "transparent", border: "none", outline: "none",
-          color: style?.color || "#000", fontSize: style?.fontSize || 14,
-          fontWeight: style?.fontWeight || "normal", width: "100%",
-          minWidth: style?.minWidth || "auto",
-        }}
-      />
-    );
-  }
-  return null;
+function WebInput({ value, onChange, placeholder, style }: any) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChange}
+      placeholder={placeholder}
+      placeholderTextColor="#999"
+      keyboardType="decimal-pad"
+      style={{
+        color: style?.color || "#000",
+        fontSize: style?.fontSize || 15,
+        fontWeight: style?.fontWeight?.toString() || "700",
+        minWidth: style?.minWidth || 60,
+        paddingVertical: 0,
+      }}
+    />
+  );
 }
 
 
@@ -271,15 +270,24 @@ export default function SplitDetailScreen() {
       const inv = await api.get(`/trips/${tripId}/invite`);
       const token = inv.data.token;
       const webLink = `https://merizo-app.onrender.com/join/${token}`;
-      const message = `Join "${trip.name}" on Merizo!\n\nI'm using Merizo to split expenses. Click to join:\n${webLink}\n\nOr open Merizo app and enter code: ${token}`;
+      const message = [
+        `Join "${trip.name}" on Merizo! 💸`,
+        "",
+        "Split expenses effortlessly with the group.",
+        "",
+        `👇 Tap to join:`,
+        webLink,
+        "",
+        `Or open the Merizo app and use invite code: ${token}`,
+      ].join("\n");
       if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `Join ${trip.name}`, text: message, url: webLink });
+        await navigator.share({ title: `Join ${trip.name} on Merizo`, text: message, url: webLink });
       } else {
         await Share.share({ message, title: `Join ${trip.name} on Merizo` });
       }
     } catch (e: any) {
       if (e?.message !== "Share canceled") {
-        Alert.alert("Share", "Link copied! Send it to your friends.");
+        Alert.alert("Invite link ready", "Link copied! Send it to your friends.");
       }
     }
   };
@@ -367,7 +375,7 @@ export default function SplitDetailScreen() {
           </View>
         </View>
 
-        {tab === "journal"  && <LedgerTab   trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
+        {tab === "journal"  && <LedgerTab   trip={trip} onChange={silentLoad} userId={user?.id || ""} onAddExpense={() => setShowAdd(true)} />}
         {tab === "settle"   && <BalancesTab trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
         {tab === "insights" && <InsightsTab trip={trip} />}
         {tab === "members"  && <MembersTab  trip={trip} onAdd={() => setShowMember(true)} onShare={onShareInvite} onUpdate={load} />}
@@ -544,7 +552,7 @@ function AIOverviewSection({ trip }: { trip: any }) {
                   style={{
                     color: personalityFg,
                     fontSize: 18,
-                    fontFamily: "Syne_700Bold",
+                    fontFamily: "Manrope_700Bold",
                     marginLeft: 10,
                     flex: 1,
                   }}
@@ -588,7 +596,7 @@ function AIOverviewSection({ trip }: { trip: any }) {
                     style={{
                       color: c.textPrimary,
                       fontSize: 13,
-                      fontFamily: "Syne_500Medium",
+                      fontFamily: "Manrope_500Medium",
                       lineHeight: 18,
                       marginTop: 8,
                       flex: 1,
@@ -626,7 +634,7 @@ function Skeleton({ style }: { style: any }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // LEDGER TAB - chronological financial timeline
 // ═══════════════════════════════════════════════════════════════════════════════
-function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void; userId: string }) {
+function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChange: () => void; userId: string; onAddExpense: () => void }) {
   const { c, isDark } = useTheme();
   const expenses: any[] = trip.expenses || [];
   const currency = trip.currency || "INR";
@@ -655,7 +663,7 @@ function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void
   };
 
   if (expenses.length === 0) {
-    return <EmptyExpenses onPrimary={() => {}} />;
+    return <EmptyExpenses onPrimary={onAddExpense} onSecondary={onAddExpense} />;
   }
 
   return (
@@ -724,7 +732,7 @@ function LedgerTab({ trip, onChange, userId }: { trip: any; onChange: () => void
                     </Text>
                   </View>
                   <View style={{ alignItems: "flex-end", flexShrink: 0, marginLeft: 8 }}>
-                    <Text style={{ fontFamily: "RobotoMono_700Bold", fontSize: 18, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
+                    <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 18, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
                       {sym}{Math.round(exp.amount).toLocaleString("en-IN")}
                     </Text>
                     <TouchableOpacity onPress={doDelete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -1057,7 +1065,15 @@ Tracked with Merizo - merizo.app`;
                   <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
                   <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>WhatsApp</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => Alert.alert("Copied", "Summary copied to clipboard")} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
+                <TouchableOpacity onPress={async () => {
+                  const msg = `${trip.name} - Split Summary\nTotal: ${sym}${Math.round(total).toLocaleString("en-IN")}\n\n${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("\n")}\n\nTracked with Merizo - merizo.app`;
+                  if (Platform.OS === "web") {
+                    try { await (navigator as any).clipboard.writeText(msg); Alert.alert("Copied!", "Summary copied to clipboard."); }
+                    catch { Share.share({ message: msg, title: trip.name }); }
+                  } else {
+                    Share.share({ message: msg, title: trip.name });
+                  }
+                }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
                   <Ionicons name="copy-outline" size={18} color={c.textPrimary} />
                   <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>Copy</Text>
                 </TouchableOpacity>
@@ -1186,15 +1202,6 @@ function InsightsTab({ trip }: { trip: any }) {
       </View>
     );
   }
-  if (total === 0 && (trip.expense_count || 0) === 0) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
-        <Text style={{ fontSize: 32 }}>📊</Text>
-        <Text style={{ fontSize: 17, fontWeight: "500", color: c.textPrimary, textAlign: "center" }}>No spending data yet</Text>
-        <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>Add expenses to see AI insights, financial score, and settlement recommendations.</Text>
-      </View>
-    );
-  }
   const topPayer   = [...balances].sort((a: any, b: any) => (b.paid || 0) - (a.paid || 0))[0];
   const categories = trip.by_category || {};
   const topCatKey  = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
@@ -1276,6 +1283,67 @@ function InsightsTab({ trip }: { trip: any }) {
           <Text style={{ fontSize: 12, color: c.textSecondary }}>· {health.detail}</Text>
         </View>
       </View>
+
+      {/* ── Sketch spending donut ── */}
+      {topCatKey && total > 0 && (() => {
+        const CAT_COLORS: Record<string, string> = {
+          food: "#FF8B7B", travel: "#60A5FA", entertainment: "#A78BFA",
+          utilities: "#FBBF24", shopping: "#F472B6", health: "#34D399",
+          accommodation: "#E8B04E", trip: "#9D7BFF", other: "#9CA3AF",
+        };
+        const CAT_LABELS: Record<string, string> = {
+          food: "Food", travel: "Travel", entertainment: "Fun",
+          utilities: "Bills", shopping: "Shopping", health: "Health",
+          accommodation: "Stay", trip: "Trip", other: "Other",
+        };
+        const CAT_EMOJI: Record<string, string> = {
+          food: "🍽️", travel: "✈️", entertainment: "🎬",
+          utilities: "⚡", shopping: "🛍️", health: "💊",
+          accommodation: "🏨", trip: "🗺️", other: "📦",
+        };
+        const entries = Object.entries(categories)
+          .filter(([, v]) => (v as number) > 0)
+          .sort((a, b) => (b[1] as number) - (a[1] as number))
+          .slice(0, 6);
+        const segments = entries.map(([k, v]) => ({
+          color: CAT_COLORS[k] || "#9CA3AF",
+          value: v as number,
+        }));
+        return (
+          <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
+            <View style={{ padding: 16, borderBottomWidth: 0.5, borderBottomColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)", flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>Spending Breakdown</Text>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isDark ? "#A78BFA" : "#6D5DFC" }} />
+            </View>
+            <View style={{ padding: 16, flexDirection: "row", alignItems: "center", gap: 16 }}>
+              {/* Donut chart */}
+              <DonutRing size={130} thickness={22} segments={segments}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: c.textMuted, textAlign: "center" }}>
+                  {CAT_EMOJI[topCatKey] || "📦"}
+                </Text>
+                <Text style={{ fontSize: 9, color: c.textMuted, textAlign: "center" }}>
+                  {topCatPct}%
+                </Text>
+              </DonutRing>
+              {/* Legend */}
+              <View style={{ flex: 1, gap: 6 }}>
+                {entries.map(([k, v]) => {
+                  const pct = total > 0 ? Math.round((v as number) / total * 100) : 0;
+                  return (
+                    <View key={k} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: CAT_COLORS[k] || "#9CA3AF", flexShrink: 0 }} />
+                      <Text style={{ flex: 1, fontSize: 12, color: c.textSecondary }} numberOfLines={1}>
+                        {CAT_EMOJI[k]} {CAT_LABELS[k] || k}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: c.textPrimary }}>{pct}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        );
+      })()}
 
       {/* ── Key insights ── */}
       <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 20, overflow: "hidden", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
@@ -1460,15 +1528,10 @@ function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
 
   const onExportCSV = async () => {
     try {
-      const base = process.env.EXPO_PUBLIC_BACKEND_URL || "";
-      const token = await import("../../src/lib/api").then((m) => m.getToken());
-      const url = `${base}/api/trips/${trip.id}/export/csv`;
-      // On mobile open in browser; on web trigger download
-      await import("expo-web-browser").then((wb) =>
-        wb.openBrowserAsync(url + `?token=${token}`)
-      );
+      const response = await api.get(`/trips/${trip.id}/export/csv`, { responseType: "text" });
+      await Share.share({ message: response.data, title: `${trip.name}-expenses.csv` });
     } catch {
-      Alert.alert("Export", "Open your browser to download the CSV.");
+      Alert.alert("Export", "Could not export expenses. Please try again.");
     }
   };
 
@@ -1958,7 +2021,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }} keyboardShouldPersistTaps="always" style={Platform.OS === "web" ? { overflow: "auto" } as any : undefined}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }}>
-            <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>Add expense</Text>
+            <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" }}>Add expense</Text>
             <TouchableOpacity onPress={onClose} testID="add-exp-close">
               <Ionicons name="close" size={24} color={c.textPrimary} />
             </TouchableOpacity>
@@ -2279,7 +2342,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
       <Modal visible={showUpi} animationType="fade" transparent onRequestClose={() => setShowUpi(false)}>
         <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
           <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border }]}>
-            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>
+            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold" }}>
               Paste your UPI message
             </Text>
             <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
@@ -2353,7 +2416,7 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
           <View style={[styles.handleBar, { backgroundColor: c.textMuted }]} />
         </View>
         <View style={{ paddingHorizontal: 20 }}>
-          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>Add member</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" }}>Add member</Text>
           <TextInput
             testID="add-member-name"
             value={name}
@@ -2428,7 +2491,7 @@ function SettingsSheet({ trip, isOwner: _isOwner, onClose, onShare, onAddMember,
           <View style={[styles.handleBar, { backgroundColor: c.textMuted }]} />
         </View>
         <View style={{ paddingHorizontal: 20 }}>
-          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>{trip.name}</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" }}>{trip.name}</Text>
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
             {trip.members.length} members · {(trip.expenses || []).filter((e: any) => !e.is_settlement).length} expenses · {trip.currency || "INR"}
           </Text>
@@ -2465,7 +2528,7 @@ function CurrencyPicker({ current, onPick, onClose }: { current: string; onPick:
   return (
     <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
       <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border, maxWidth: 420, padding: 18 }]}>
-        <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Syne_700Bold" }}>Change currency</Text>
+        <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold" }}>Change currency</Text>
         <TextInput
           testID="cur-search"
           value={query}

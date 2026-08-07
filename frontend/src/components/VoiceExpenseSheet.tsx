@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
-import { currencySymbol, categoryMeta } from "../lib/tokens";
+import { currencySymbol, categoryMeta, detectCategory } from "../lib/tokens";
 
 type Props = { trip: any; onClose: () => void; onAdded: () => Promise<void>; };
 
@@ -41,67 +41,52 @@ function extractAmount(text: string): number {
   return nums.length > 0 ? Math.max(...nums) : 0;
 }
 
-// ── AI-powered parsing via Anthropic API ─────────────────────────────────────
+// ── AI-powered parsing via Merizo backend ─────────────────────────────────────
 async function parseWithAI(
   text: string,
   members: any[],
   currentUserId: string,
   currency: string,
 ): Promise<any> {
-  const memberList = members.map((m: any) => `${m.name} (id: ${m.id})`).join("\n");
-  const currentMember = members.find((m: any) => m.id === currentUserId);
-  const currentName = currentMember?.name || "You (current user)";
+  const memberNames = members.map((m: any) => m.name);
+  const r = await api.post("/ai/expense/parse", { text, members: memberNames, currency });
+  const data = r.data;
+  if (data.error) throw new Error(data.error);
 
-  const normalized = normalizeNumbers(text);
-  const prompt = `You are parsing a natural language expense description for a bill-splitting app.
+  const findMember = (name: string | null) => {
+    if (!name) return null;
+    const nl = name.toLowerCase().replace(/\s+/g, "");
+    return members.find((m: any) => {
+      const mn = m.name.toLowerCase().replace(/\s+/g, "");
+      return mn === nl || mn.includes(nl) || nl.includes(mn);
+    }) ?? null;
+  };
 
-TRIP MEMBERS (use EXACT names and IDs from this list):
-${memberList}
+  const paidByMember =
+    findMember(data.paid_by) ?? members.find((m: any) => m.id === currentUserId) ?? members[0];
 
-CURRENT USER: ${currentName} (id: ${currentUserId})
-CURRENCY: ${currency}
+  const rawParticipants: string[] = data.participants || [];
+  let splitMembers = rawParticipants
+    .map((n: string) => findMember(n))
+    .filter(Boolean) as any[];
+  if (splitMembers.length === 0) splitMembers = members;
 
-USER SAID: "${normalized}"
-(original: "${text}")
+  // Fallback category via local keyword detection if AI returned "other"
+  let category: string = data.category || "other";
+  if (category === "other") {
+    category = detectCategory(data.title || text);
+  }
 
-Extract the expense details. Return ONLY valid JSON, no explanation:
-{
-  "name": "what the expense is for (short description)",
-  "amount": 0,
-  "paidById": "exact member id from the list who paid (default to current user id if unclear)",
-  "paidByName": "exact name of who paid",
-  "splitAmongIds": ["array of member ids who share this expense"],
-  "splitAmongNames": ["array of member names who share this expense"],
-  "category": "food|trip|home|friends|shopping|bills|other",
-  "confidence": "high|medium|low"
-}
-
-Rules:
-- "amount" must be a NUMBER (e.g. 500 not "500")
-- Indian comma format: "4,00" = 400, "4,000" = 4000, "40,000" = 40000 — remove commas
-- "1.5k" or "1.5K" = 1500, "2k" = 2000
-- Never return less than 1 for a real expense amount  
-- If text says "member 1 paid" → find member 1 in the list
-- If text says "split among only X, Y, Z" → only include X, Y, Z in splitAmongIds
-- If text says "everyone" or "all" → include all members
-- If text says "except X" → include everyone EXCEPT X
-- Match names case-insensitively and handle typos (e.g. "memebr" = "member")
-- "name" should be the item/purpose, not the payer`;
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  const data = await response.json();
-  const raw = data.content?.[0]?.text || "";
-  const clean = raw.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  return {
+    name: data.title || text.slice(0, 40),
+    amount: data.amount || 0,
+    paidById: paidByMember?.id || currentUserId,
+    paidByName: paidByMember?.name || "You",
+    splitAmongIds: splitMembers.map((m: any) => m.id),
+    splitAmongNames: splitMembers.map((m: any) => m.name),
+    category,
+    confidence: (data.confidence ?? 0) >= 0.8 ? "high" : "medium",
+  };
 }
 
 // ── Fallback: simple but improved regex parser ─────────────────────────────────
@@ -153,6 +138,9 @@ function parseFallback(text: string, members: any[], userId: string) {
   // ── Split among ─────────────────────────────────────────────────────────────
   const splitSection = text.match(/split\s+(?:among|between|with|only)\s+(.+?)(?:\s*$)/i)?.[1];
   const exceptSection = text.match(/(?:except|not|excluding)\s+([a-zA-Z\s,]+?)(?:\s*$)/i)?.[1];
+
+  // Apply keyword detection — fallback default "other" is too broad
+  result.category = detectCategory(result.name || text);
 
   if (splitSection) {
     // Extract names from the split section

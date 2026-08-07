@@ -4,7 +4,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
-import json, uuid, json, logging, secrets, asyncio, hashlib, base64, random, string, csv, io
+import json, uuid, json, logging, secrets, asyncio, hashlib, base64, random, string, csv, io, time
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import bcrypt, jwt, httpx
@@ -122,13 +122,46 @@ def create_token(uid, email):
         "exp": datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)},
         JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+FAST2SMS_KEY     = os.getenv("FAST2SMS_API_KEY", "")
+MAILBOXLAYER_KEY = os.getenv("MAILBOXLAYER_KEY", "")
+
+async def check_email_deliverable(email: str):
+    """Reject disposable or undeliverable addresses via Mailboxlayer."""
+    if not MAILBOXLAYER_KEY:
+        return  # key not configured — skip, regex already validated format
+    try:
+        async with httpx.AsyncClient(timeout=6) as client:
+            r = await client.get(
+                "https://apilayer.net/api/check",
+                params={"access_key": MAILBOXLAYER_KEY, "email": email, "smtp": "1", "format": "1"},
+            )
+            data = r.json()
+        if not data.get("format_valid", True):
+            raise HTTPException(422, "Invalid email format")
+        if data.get("disposable", False):
+            raise HTTPException(422, "Disposable email addresses are not allowed")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # network error — fail open so registration still works
+
 app = FastAPI(title="Merizo API")
 api = APIRouter(prefix="/api")
 bearer_scheme = HTTPBearer(auto_error=False)
-otp_store: dict = {}
+otp_store: dict = {}           # phone → {code, expires, attempts}
+_otp_send_log: dict = {}       # phone → [send_timestamps]  (per-phone rate limit)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware,
+    allow_origins=[
+        "https://merizo-app.onrender.com",
+        "http://localhost:8081",
+        "http://localhost:19006",
+        "http://localhost:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 async def get_current_user(request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)) -> dict:
@@ -167,7 +200,7 @@ async def _resolve_member(name_or_id: str) -> str:
     gid = str(uuid.uuid4())
     await sb_insert("users", {"id": gid, "name": name_or_id,
         "email": f"guest_{gid[:8]}@merizo.app", "is_guest": True,
-        "created_at": datetime.utcnow().isoformat()})
+        "created_at": datetime.now(timezone.utc).isoformat()})
     return gid
 
 # ── Balance helper ────────────────────────────────────────────────────────────
@@ -233,7 +266,7 @@ async def social_login(req: SocialLoginReq):
             await sb_insert("users", {
                 "id": uid, "email": em, "name": name,
                 "password_hash": hash_pw(str(uuid.uuid4())),  # random, login via OTP
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             })
             user = await sb_one("users", email=em)
     elif sb_user.phone or req.phone:
@@ -246,14 +279,14 @@ async def social_login(req: SocialLoginReq):
             await sb_insert("users", {
                 "id": uid, "email": em, "name": name, "phone": ph,
                 "password_hash": hash_pw(str(uuid.uuid4())),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             })
             user = await sb_one("users", phone=ph)
 
     if not user:
         raise HTTPException(500, "Could not create user")
 
-    token = make_jwt(user["id"])
+    token = create_token(user["id"], user.get("email", ""))
     return {
         "token": token,
         "user": {
@@ -264,34 +297,61 @@ async def social_login(req: SocialLoginReq):
     }
 
 @api.post("/auth/login")
-async def login(req: LoginRequest):
-    user = await sb_one("users", email=req.email)
+async def login(req: LoginRequest, request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "login")
+
+    email = validate_email(req.email)
+    check_account_locked(email)
+
+    user = await sb_one("users", email=email)
     if not user or not verify_pw(req.password, user.get("password_hash", "")):
+        record_failed_login(email, client_ip)
         raise HTTPException(401, "Invalid email or password")
-    return {"access_token": create_token(user["id"], user["email"]), "token_type": "bearer",
-            "user": {k: user[k] for k in ("id","email","name") if k in user}}
+
+    clear_failed_attempts(email)
+    token = create_token(user["id"], user["email"])
+    register_session(user["id"], token)
+    return {"access_token": token, "token_type": "bearer",
+            "user": {k: user[k] for k in ("id", "email", "name") if k in user}}
 
 @api.post("/auth/register")
-async def register(req: RegisterRequest):
-    if await sb_one("users", email=req.email):
+async def register(req: RegisterRequest, request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "register")
+
+    email    = validate_email(req.email)
+    validate_password(req.password)
+    name     = sanitize_name(req.name)
+
+    await check_email_deliverable(email)
+
+    if await sb_one("users", email=email):
         raise HTTPException(400, "Email already registered")
+
     uid = str(uuid.uuid4())
-    doc = {"id": uid, "email": req.email, "name": req.name,
-           "password_hash": hash_pw(req.password), "created_at": datetime.utcnow().isoformat()}
+    doc = {"id": uid, "email": email, "name": name,
+           "password_hash": hash_pw(req.password),
+           "created_at": datetime.now(timezone.utc).isoformat()}
     await sb_insert("users", doc)
-    return {"access_token": create_token(uid, req.email), "token_type": "bearer",
-            "user": {"id": uid, "email": req.email, "name": req.name}}
+    token = create_token(uid, email)
+    register_session(uid, token)
+    return {"access_token": token, "token_type": "bearer",
+            "user": {"id": uid, "email": email, "name": name}}
 
 @api.post("/auth/demo-login")
-async def demo_login():
+async def demo_login(request: Request):
+    check_rate_limit(get_client_ip(request), "demo-login")
     user = await sb_one("users", email=DEMO_EMAIL)
     if not user:
-        uid = str(uuid.uuid4())
+        uid  = str(uuid.uuid4())
         user = {"id": uid, "email": DEMO_EMAIL, "name": DEMO_NAME,
-                "password_hash": hash_pw(DEMO_PASSWORD), "created_at": datetime.utcnow().isoformat()}
+                "password_hash": hash_pw(DEMO_PASSWORD),
+                "created_at": datetime.now(timezone.utc).isoformat()}
         await sb_insert("users", user)
-    return {"access_token": create_token(user["id"], user["email"]), "token_type": "bearer",
-            "user": {k: user.get(k) for k in ("id","email","name")}}
+    token = create_token(user["id"], user["email"])
+    return {"access_token": token, "token_type": "bearer",
+            "user": {k: user.get(k) for k in ("id", "email", "name")}}
 
 @api.patch("/auth/profile")
 async def update_profile(request: Request, current_user: dict = Depends(get_current_user)):
@@ -306,35 +366,100 @@ async def update_profile(request: Request, current_user: dict = Depends(get_curr
 async def me(current_user: dict = Depends(get_current_user)):
     return {k: current_user.get(k) for k in ("id","email","name","upi_id","avatar_url")}
 
-# OTP endpoints (simplified)
+# OTP endpoints
 @app.post("/api/auth/send-otp")
 async def send_otp(request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "send-otp")   # 10 requests / 15 min per IP
+
     data = await request.json()
-    phone = data.get("phone","").strip()
-    if not phone or len(phone) != 10: raise HTTPException(400,"Invalid phone")
-    code = ''.join(random.choices(string.digits, k=6))
-    otp_store[phone] = {"code": code, "expires": datetime.utcnow() + timedelta(minutes=10)}
-    logger.info(f"OTP for {phone}: {code}")
+    phone = data.get("phone", "").strip()
+    if not phone or not phone.isdigit() or len(phone) != 10:
+        raise HTTPException(400, "Invalid phone number — must be 10 digits")
+
+    # Per-phone rate limit: max 3 OTPs per hour (prevents OTP bombing a victim's number)
+    now = time.time()
+    _otp_send_log[phone] = [t for t in _otp_send_log.get(phone, []) if now - t < 3600]
+    if len(_otp_send_log[phone]) >= 3:
+        raise HTTPException(429, "Too many OTP requests for this number. Please try again in an hour.")
+    _otp_send_log[phone].append(now)
+
+    code = "".join(random.choices(string.digits, k=6))
+    otp_store[phone] = {
+        "code": code,
+        "expires": datetime.now(timezone.utc) + timedelta(minutes=10),
+        "attempts": 0,
+    }
+
+    # Send via Fast2SMS
+    sms_sent = False
+    if FAST2SMS_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.post(
+                    "https://www.fast2sms.com/dev/bulkV2",
+                    headers={"authorization": FAST2SMS_KEY},
+                    json={"route": "otp", "variables_values": code, "flash": "0", "numbers": phone},
+                )
+                sms_sent = r.json().get("return", False)
+                if not sms_sent:
+                    logger.warning(f"Fast2SMS rejected: {r.text}")
+        except Exception as e:
+            logger.warning(f"Fast2SMS error: {e}")
+
+    if not sms_sent:
+        # Dev / fallback — never log raw codes in production without masking
+        logger.info(f"OTP (SMS failed) for ***{phone[-4:]}: {code}")
+
     return {"success": True, "message": "OTP sent"}
+
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp(request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "verify-otp")   # 10 requests / 15 min per IP
+
     data = await request.json()
-    phone, otp = data.get("phone","").strip(), data.get("otp","").strip()
-    if phone not in otp_store: raise HTTPException(400,"OTP expired")
-    stored = otp_store[phone]
-    if datetime.utcnow() > stored["expires"]: del otp_store[phone]; raise HTTPException(400,"OTP expired")
-    if stored["code"] != otp: raise HTTPException(400,"Invalid OTP")
-    del otp_store[phone]
+    phone = data.get("phone", "").strip()
+    otp   = data.get("otp",   "").strip()
+
+    entry = otp_store.get(phone)
+    if not entry:
+        raise HTTPException(400, "OTP not found or already used — please request a new one")
+
+    if datetime.now(timezone.utc) > entry["expires"]:
+        otp_store.pop(phone, None)
+        raise HTTPException(400, "OTP expired — please request a new one")
+
+    # Increment attempts before checking (prevents timing-based enumeration)
+    entry["attempts"] += 1
+    if entry["attempts"] > 3:
+        otp_store.pop(phone, None)
+        raise HTTPException(400, "Too many incorrect attempts — please request a new OTP")
+
+    if entry["code"] != otp:
+        remaining = 3 - entry["attempts"] + 1
+        raise HTTPException(400, f"Invalid OTP — {max(remaining, 0)} attempt{'s' if remaining != 1 else ''} remaining")
+
+    otp_store.pop(phone, None)   # consumed — single use
+
     user = await sb_one("users", phone=phone)
     if not user:
-        uid = str(uuid.uuid4())
-        user = {"id": uid, "phone": phone, "email": f"user_{phone}@merizo.app",
-                "name": f"User {phone[-4:]}", "password_hash": hash_pw(secrets.token_hex(8)),
-                "created_at": datetime.utcnow().isoformat()}
+        uid  = str(uuid.uuid4())
+        user = {
+            "id": uid, "phone": phone,
+            "email": f"user_{phone[-4:]}@merizo.app",
+            "name":  f"User {phone[-4:]}",
+            "password_hash": hash_pw(secrets.token_hex(16)),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
         await sb_insert("users", user)
-    return {"access_token": create_token(user["id"], user.get("email","")),
-            "token_type": "bearer", "user": {k: user.get(k) for k in ("id","name","email")}}
+
+    return {
+        "access_token": create_token(user["id"], user.get("email", "")),
+        "token_type": "bearer",
+        "user": {k: user.get(k) for k in ("id", "name", "email")},
+    }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TRIP ENDPOINTS
@@ -346,22 +471,26 @@ async def create_trip(trip: Trip, current_user: dict = Depends(get_current_user)
     for m in trip.members:
         mid = await _resolve_member(m)
         if mid not in resolved: resolved.append(mid)
-    doc = {"id": tid, "name": trip.name, "description": trip.description,
+    trip_name = sanitize_string(trip.name, max_len=100)
+    trip_desc = sanitize_string(trip.description or "", max_len=500) or None
+    doc = {"id": tid, "name": trip_name, "description": trip_desc,
            "currency": trip.currency, "split_category": trip.split_category or trip.category or "trip",
            "start_date": trip.start_date, "end_date": trip.end_date, "due_date": trip.due_date,
            "cover_key": trip.cover_key, "members": resolved, "owner_id": current_user["id"],
-           "invite_token": secrets.token_urlsafe(12), "created_at": datetime.utcnow().isoformat()}
+           "invite_token": secrets.token_urlsafe(12), "created_at": datetime.now(timezone.utc).isoformat()}
     await sb_insert("trips", doc)
     return {"id": tid, "message": "Trip created"}
 
 @api.get("/trips")
 async def get_trips(current_user: dict = Depends(get_current_user)):
     raw = await sb_get("trips", _contains={"members": current_user["id"]})
-    result = []
-    for t in raw:
-        summary = await compute_trip_summary(t, current_user["id"])
-        result.append(summary)
-    return result
+    # Fetch all trip summaries concurrently instead of one-by-one — each
+    # summary needs 2 Supabase round trips, so this turns N sequential
+    # calls into a single parallel batch.
+    result = await asyncio.gather(*[
+        compute_trip_summary(t, current_user["id"]) for t in raw
+    ])
+    return list(result)
 
 @api.get("/trips/{trip_id}")
 async def get_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
@@ -492,6 +621,33 @@ async def join_trip(trip_id: str, request: Request, current_user: dict = Depends
         await sb_update("trips", {"members": members}, id=trip_id)
     return {"message": "Joined successfully"}
 
+@api.get("/invite/{token}")
+async def get_invite_by_token(token: str):
+    """Public — look up trip by invite token so guest can see trip name before logging in."""
+    rows = await sb_get("trips", invite_token=token)
+    if not rows:
+        raise HTTPException(404, "Invalid invite link")
+    trip = rows[0]
+    return {
+        "trip_id": trip["id"],
+        "trip_name": trip["name"],
+        "member_count": len(trip.get("members") or []),
+        "currency": trip.get("currency", "INR"),
+    }
+
+@api.post("/invite/{token}/join")
+async def join_by_token(token: str, current_user: dict = Depends(get_current_user)):
+    """Authenticated — join a trip using only its invite token."""
+    rows = await sb_get("trips", invite_token=token)
+    if not rows:
+        raise HTTPException(404, "Invalid invite link")
+    trip = rows[0]
+    if current_user["id"] not in (trip.get("members") or []):
+        members = list(trip.get("members") or [])
+        members.append(current_user["id"])
+        await sb_update("trips", {"members": members}, id=trip["id"])
+    return {"message": "Joined successfully", "trip_id": trip["id"], "trip_name": trip["name"]}
+
 @api.post("/trips/{trip_id}/members")
 async def add_member(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     trip = await sb_one("trips", id=trip_id)
@@ -515,6 +671,24 @@ async def delete_member(trip_id: str, member_id: str, current_user: dict = Depen
     members = [m for m in (trip.get("members") or []) if m != member_id]
     await sb_update("trips", {"members": members}, id=trip_id)
     return {"message": "Removed"}
+
+@api.patch("/trips/{trip_id}")
+async def update_trip(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    trip = await sb_one("trips", id=trip_id)
+    if not trip or current_user["id"] not in (trip.get("members") or []):
+        raise HTTPException(404, "Trip not found")
+    data = await request.json()
+    updates: dict = {}
+    if "name" in data:
+        updates["name"] = sanitize_string(str(data["name"]), max_len=100)
+    if "description" in data:
+        updates["description"] = sanitize_string(str(data.get("description") or ""), max_len=500) or None
+    if "currency" in data:
+        updates["currency"] = str(data["currency"])[:10]
+    if not updates:
+        raise HTTPException(400, "No valid fields to update")
+    await sb_update("trips", updates, id=trip_id)
+    return {"message": "Updated", "id": trip_id, **updates}
 
 @api.delete("/trips/{trip_id}")
 async def delete_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
@@ -542,12 +716,12 @@ async def add_expense(trip_id: str, request: Request, current_user: dict = Depen
     doc = {"id": eid, "trip_id": trip_id, "paid_by": pid,
            "paid_by_name": (payer or {}).get("name", current_user.get("name","")),
            "split_among": split,
-           "description": data.get("name") or data.get("description") or "Expense",
-           "name": data.get("name") or data.get("description") or "Expense",
+           "description": sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200),
+           "name": sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200),
            "amount": float(data.get("amount",0)), "currency": data.get("currency", trip.get("currency","INR")),
            "category": data.get("category","other"), "is_settlement": False,
-           "date": data.get("date") or datetime.utcnow().strftime("%Y-%m-%d"),
-           "created_at": datetime.utcnow().isoformat()}
+           "date": data.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+           "created_at": datetime.now(timezone.utc).isoformat()}
     await sb_insert("expenses", doc)
     return {"id": eid, "message": "Expense added"}
 
@@ -570,7 +744,7 @@ async def settle(trip_id: str, request: Request, current_user: dict = Depends(ge
     await sb_insert("settlements", {"id": sid, "trip_id": trip_id,
         "from_user": data.get("from_member"), "to_user": data.get("to_member"),
         "amount": float(data.get("amount",0)), "status": "completed",
-        "proof_uri": data.get("proof_uri"), "created_at": datetime.utcnow().isoformat()})
+        "proof_uri": data.get("proof_uri"), "created_at": datetime.now(timezone.utc).isoformat()})
     return {"id": sid, "message": "Settlement recorded"}
 
 @api.get("/settlements/{trip_id}")
@@ -585,10 +759,9 @@ async def smart_limit(current_user: dict = Depends(get_current_user)):
     uid = current_user["id"]
     trips = await sb_get("trips", _contains={"members": uid})
     tids  = [t["id"] for t in trips]
-    all_exp = []
-    for tid in tids:
-        all_exp += await sb_get("expenses", trip_id=tid)
-    now = datetime.utcnow()
+    exp_lists = await asyncio.gather(*[sb_get("expenses", trip_id=tid) for tid in tids])
+    all_exp = [e for lst in exp_lists for e in lst]
+    now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
     cur_week = 0.0
@@ -596,7 +769,7 @@ async def smart_limit(current_user: dict = Depends(get_current_user)):
     for e in all_exp:
         if e.get("is_settlement") or e.get("paid_by") != uid: continue
         try:
-            d = datetime.strptime(e.get("date","")[:10], "%Y-%m-%d")
+            d = datetime.strptime(e.get("date","")[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
             if d >= week_start: cur_week += e.get("amount",0)
             wk = (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
             weekly[wk] = weekly.get(wk,0) + e.get("amount",0)
@@ -610,23 +783,71 @@ async def smart_limit(current_user: dict = Depends(get_current_user)):
 @api.get("/insights")
 async def insights(period: str = "month", current_user: dict = Depends(get_current_user)):
     uid  = current_user["id"]
-    now  = datetime.utcnow()
-    cuts = {"week": 7, "month": 30}.get(period, 36500)
-    cutoff = now - timedelta(days=cuts)
+    now  = datetime.now(timezone.utc)
+    period_days = {"week": 7, "1M": 30, "month": 30, "3M": 90, "6M": 180, "1Y": 365}.get(period, 30)
+    cutoff = now - timedelta(days=period_days)
     trips = await sb_get("trips", _contains={"members": uid})
-    by_cat: dict = {}; total = 0.0
-    for t in trips:
-        exps = await sb_get("expenses", trip_id=t["id"])
+    exp_lists, settle_lists = await asyncio.gather(
+        asyncio.gather(*[sb_get("expenses", trip_id=t["id"]) for t in trips]),
+        asyncio.gather(*[sb_get("settlements", trip_id=t["id"], status="completed") for t in trips]),
+    )
+
+    by_cat: dict = {}; monthly: dict = {}; total = 0.0; owed_to_you = 0.0; you_owe = 0.0
+
+    for trip, exps in zip(trips, exp_lists):
+        mids = trip.get("members", [])
         for e in exps:
-            if e.get("is_settlement") or e.get("paid_by") != uid: continue
+            if e.get("is_settlement"): continue
+            sids = e.get("split_among") or mids
+            if uid not in sids or not sids: continue
             try:
-                if datetime.strptime(e.get("date","")[:10],"%Y-%m-%d") < cutoff: continue
-            except: pass
-            cat = e.get("category","other"); amt = e.get("amount",0)
-            by_cat[cat] = by_cat.get(cat,0)+amt; total += amt
-    return {"period": period, "total": round(total,2), "currency": "INR",
-            "by_category": [{"category":c,"amount":round(a,2),"percent":round(a/total*100,1) if total else 0}
-                             for c,a in sorted(by_cat.items(),key=lambda x:-x[1])]}
+                d = datetime.strptime(e.get("date","")[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                if d < cutoff: continue
+                month_key = d.strftime("%b %Y")
+            except:
+                month_key = "Other"
+            # User's share of this expense
+            my_share = e.get("amount", 0) / len(sids)
+            cat = e.get("category", "other")
+            by_cat[cat] = by_cat.get(cat, 0) + my_share
+            total += my_share
+            monthly[month_key] = monthly.get(month_key, 0) + my_share
+
+    # Build monthly trend sorted chronologically
+    try:
+        sorted_months = sorted(monthly.keys(), key=lambda m: datetime.strptime(m, "%b %Y"))
+    except:
+        sorted_months = list(monthly.keys())
+    monthly_trend = [{"month": m, "total": round(monthly[m], 2)} for m in sorted_months]
+
+    # Compute net balances using the same settlement-aware my_net formula as /trips
+    for trip, exps, settlements in zip(trips, exp_lists, settle_lists):
+        mids = trip.get("members", [])
+        paid = sum(e.get("amount", 0) for e in exps if e.get("paid_by") == uid and not e.get("is_settlement"))
+        share = 0.0
+        for e in exps:
+            if e.get("is_settlement"): continue
+            sids = e.get("split_among") or mids
+            if uid in sids and sids:
+                share += e.get("amount", 0) / len(sids)
+        my_net = paid - share
+        for s in settlements:
+            if s.get("to_user") == uid: my_net += s.get("amount", 0)
+            elif s.get("from_user") == uid: my_net -= s.get("amount", 0)
+        if my_net > 0:
+            owed_to_you += my_net
+        else:
+            you_owe += abs(my_net)
+
+    return {
+        "period": period, "total": round(total, 2), "currency": "INR",
+        "owed_to_you": round(owed_to_you, 2), "you_owe": round(you_owe, 2),
+        "by_category": [
+            {"category": c, "amount": round(a, 2), "percent": round(a/total*100, 1) if total else 0}
+            for c, a in sorted(by_cat.items(), key=lambda x: -x[1])
+        ],
+        "monthly_trend": monthly_trend,
+    }
 
 @api.get("/reminders")
 async def get_reminders(current_user: dict = Depends(get_current_user)):
@@ -638,7 +859,7 @@ async def create_reminder(reminder: ReminderCreate, current_user: dict = Depends
     await sb_insert("reminders", {"id": rid, "user_id": current_user["id"],
         "trip_id": reminder.trip_id, "title": reminder.title,
         "message": reminder.message, "due_date": reminder.due_date,
-        "status": "active", "created_at": datetime.utcnow().isoformat()})
+        "status": "active", "created_at": datetime.now(timezone.utc).isoformat()})
     return {"id": rid}
 
 @api.delete("/reminders/{rid}")
@@ -715,9 +936,20 @@ async def export_csv(trip_id: str, current_user: dict = Depends(get_current_user
         headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
 
 @api.post("/scan-bill")
-async def scan_bill(request: Request, current_user: dict = Depends(get_current_user)):
-    return {"amount":500,"vendor":"Unknown","date":datetime.utcnow().strftime("%Y-%m-%d"),
-            "currency":"INR","category":"food","items":[],"suggested_name":"Bill"}
+async def scan_bill(image: UploadFile = File(None), request: Request = None,
+                    _: dict = Depends(get_current_user)):
+    from ai.ocr import scan_bill as ocr_scan_bill
+    if image:
+        return await ocr_scan_bill(await image.read(), [], "INR")
+    # JSON body with base64 image
+    try:
+        body = await request.json()
+        import base64
+        img_bytes = base64.b64decode(body.get("image_base64", ""))
+        return await ocr_scan_bill(img_bytes, [], body.get("currency", "INR"))
+    except Exception:
+        return {"amount": 0, "vendor": "Unknown", "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "currency": "INR", "category": "other", "items": [], "suggested_name": "Bill"}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STARTUP
@@ -728,75 +960,11 @@ class SmartSplitReq(BaseModel):
 
 @api.post("/smart-split")
 async def smart_split(req: SmartSplitReq):
-    """AI expense splitting — parses natural language in any language."""
-    import httpx
-    ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not ANTHROPIC_KEY:
-        raise HTTPException(500, "AI not configured")
-
-    system = """You are Smart Split inside Merizo, an AI expense splitting assistant.
-You understand ANY language: English, Hindi, Telugu, Tamil, Kannada, Hinglish, mixed languages.
-
-CRITICAL: Always look at the FULL conversation history. If the user gives a single number like "3" or "5",
-it is answering your previous question (e.g. how many people). Use that number accordingly.
-
-Examples:
-- "i paid 5000 for lunch with four people" → total=5000, INR, people=4, done=true
-- "neynu 500 pay cheysa 5 members ki" → total=500, INR, people=5, done=true (Telugu)
-- "bhai 4200 ka dinner tha hum 6 the" → total=4200, INR, people=6, done=true (Hinglish)
-- "2k petrol split 3 ways" → total=2000, INR, people=3, done=true
-- "hotel 6000 five people" → total=6000, INR, people=5, done=true
-- Previous AI asked "How many people?" → User says "3" → people=3, use last known amount
-
-Number words: two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9, ten=10
-Telugu: rendu=2, moodu=3, nalugu=4, aidu=5, aaru=6
-Hindi: do=2, teen=3, char=4, paanch=5, chhe=6
-"2k"=2000, "1.5k"=1500, "1L"/"1 lakh"=100000
-
-Rules:
-1. done=true when you have BOTH total amount AND number of people
-2. done=false: ask ONE short question (max 10 words)
-3. If conversation shows AI already asked for people count and user replied with a number → use it
-4. Rows: use names if given, else "Person 1", "Person 2" etc
-5. Reply when done=true: "₹X each for N people ✓" (short, warm)
-6. ONLY output JSON. No markdown. No extra text.
-
-JSON: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR","people":number,"description":"string","each":number,"rows":[{"name":"string","amount":number}],"tip":number|null}}"""
-
-    try:
-        gemini_key = os.environ.get("GEMINI_KEY", "")
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": system + "\n\n" + req.conversation}]}],
-                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 600},
-                }
-            )
-        data = r.json()
-        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-        # Extract JSON
-        import re
-        m = re.search(r'\{.*\}', text, re.DOTALL)
-        if m:
-            return JSONResponse(content=json.loads(m.group()))
-        return {"done": False, "reply": "Could not understand. Try again?"}
-    except Exception as e:
-        logger.error(f"smart-split error: {e}")
-        return {"done": False, "reply": "AI unavailable. Try: '₹500 for 3 people'"}
-
-
-class SmartSplitReq(BaseModel):
-    conversation: str
-
-@api.post("/smart-split")
-async def smart_split(req: SmartSplitReq):
     """AI expense parser — uses Google Gemini Flash (FREE: 1M tokens/day)."""
-    import httpx, os, re as re2
+    import re as re2
     key = os.environ.get("GEMINI_KEY", "")
     if not key:
-        raise HTTPException(500, "GEMINI_KEY not set in environment")
+        return JSONResponse(content={"done": False, "reply": "Smart Split AI is not configured yet. Try: '₹500 for 3 people'"})
 
     system = """You are Smart Split inside Merizo, an AI expense splitting assistant.
 Understand ANY language or informal text: English, Hindi, Telugu, Tamil, Kannada, Hinglish.
@@ -837,17 +1005,28 @@ Format: {"done":bool,"reply":"string","result":{"total":number,"currency":"INR",
         data = r.json()
         text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
         m = re2.search(r"\{[\s\S]*\}", text)
-        return {"ok": True, "data": m.group() if m else "{}"}
+        if m:
+            return JSONResponse(content=json.loads(m.group()))
+        return {"done": False, "reply": "Could not understand. Try again?"}
     except Exception as e:
-        raise HTTPException(500, str(e))
-
-# Register routers
-app.include_router(api)
-app.include_router(ai_router)
+        logger.error(f"smart-split error: {e}")
+        return {"done": False, "reply": "AI unavailable. Try: '₹500 for 3 people'"}
 
 @app.on_event("startup")
 async def startup():
     logger.info("Merizo API starting (Supabase backend)...")
+    try:
+        user = await sb_one("users", email=DEMO_EMAIL)
+        if not user:
+            uid = str(uuid.uuid4())
+            await sb_insert("users", {"id": uid, "email": DEMO_EMAIL, "name": DEMO_NAME,
+                "password_hash": hash_pw(DEMO_PASSWORD), "created_at": datetime.now(timezone.utc).isoformat()})
+            logger.info(f"Demo user created: {DEMO_EMAIL}")
+        else:
+            logger.info("Demo user exists ✓")
+    except Exception as e:
+        logger.warning(f"Startup check failed — have you run schema.sql in Supabase? Error: {e}")
+        logger.warning("API will still start. Run schema.sql then restart.")
 
 @api.post("/auth/forgot-password")
 async def forgot_password(body: dict, request: Request):
@@ -892,22 +1071,12 @@ async def get_audit_log(user: dict = Depends(get_current_user)):
     from core.security import get_recent_audit
     return get_recent_audit(100)
 
-    pass
-    try:
-        user = await sb_one("users", email=DEMO_EMAIL)
-        if not user:
-            uid = str(uuid.uuid4())
-            await sb_insert("users", {"id":uid,"email":DEMO_EMAIL,"name":DEMO_NAME,
-                "password_hash":hash_pw(DEMO_PASSWORD),"created_at":datetime.utcnow().isoformat()})
-            logger.info(f"Demo user created: {DEMO_EMAIL}")
-        else:
-            logger.info("Demo user exists ✓")
-    except Exception as e:
-        logger.warning(f"Startup check failed — have you run schema.sql in Supabase? Error: {e}")
-        logger.warning("API will still start. Run schema.sql then restart.")
-
 @app.get("/")
 async def root(): return {"message":"Merizo API v2 (Supabase)","status":"ok"}
+
+# ── Register routers (must come after all route definitions) ──────────────────
+app.include_router(api)
+app.include_router(ai_router)
 
 if __name__ == "__main__":
     import uvicorn
