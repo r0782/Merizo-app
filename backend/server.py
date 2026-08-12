@@ -154,10 +154,8 @@ _otp_send_log: dict = {}       # phone → [send_timestamps]  (per-phone rate li
 app.add_middleware(CORSMiddleware,
     allow_origins=[
         "https://merizo-app.onrender.com",
-        "http://localhost:8081",
-        "http://localhost:19006",
-        "http://localhost:3000",
     ],
+    allow_origin_regex=r"http://localhost:\d+",   # any localhost port (Expo web, dev servers)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
