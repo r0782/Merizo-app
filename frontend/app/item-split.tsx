@@ -144,10 +144,10 @@ export default function ItemSplitScreen() {
           <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 12 }}>
             <Ionicons name="arrow-back" size={20} color={c.textPrimary} />
           </TouchableOpacity>
-          <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 3, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 4 }}>
+          <Text style={{ color: c.textMuted, fontSize: 8, letterSpacing: 3, fontFamily: "Manrope_400Regular" as any, marginBottom: 4 }}>
             ITEM-LEVEL SPLIT
           </Text>
-          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" as any, letterSpacing: -0.5 }}>
+          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" as any, letterSpacing: -0.5 }}>
             {trip.name}
           </Text>
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
@@ -159,7 +159,7 @@ export default function ItemSplitScreen() {
 
           {/* Who paid */}
           <View>
-            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 8 }}>WHO PAID THE BILL</Text>
+            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "Manrope_400Regular" as any, marginBottom: 8 }}>WHO PAID THE BILL</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {members.map((m: Member) => (
@@ -176,7 +176,7 @@ export default function ItemSplitScreen() {
 
           {/* Add item */}
           <View>
-            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 8 }}>ADD ITEMS</Text>
+            <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "Manrope_400Regular" as any, marginBottom: 8 }}>ADD ITEMS</Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <TextInput
                 value={newItemName}
@@ -194,7 +194,7 @@ export default function ItemSplitScreen() {
                   placeholderTextColor={c.textMuted}
                   keyboardType="decimal-pad"
                   onSubmitEditing={addItem}
-                  style={{ flex: 1, color: c.textPrimary, fontSize: 13, fontFamily: "RobotoMono_700Bold" as any, padding: 10 } as any}
+                  style={{ flex: 1, color: c.textPrimary, fontSize: 13, fontFamily: "Manrope_700Bold" as any, padding: 10 } as any}
                 />
               </View>
               <TouchableOpacity onPress={addItem}
@@ -220,7 +220,7 @@ export default function ItemSplitScreen() {
                     <Text style={{ color: "#FF8B7B", fontSize: 11, marginTop: 2 }}>⚠️ No one assigned yet</Text>
                   )}
                 </View>
-                <Text style={{ fontFamily: "RobotoMono_700Bold" as any, fontSize: 16, color: c.textPrimary, marginRight: 12, fontVariant: ["tabular-nums"] as any }}>
+                <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 16, color: c.textPrimary, marginRight: 12, fontVariant: ["tabular-nums"] as any }}>
                   {sym}{item.price.toLocaleString("en-IN")}
                 </Text>
                 <TouchableOpacity onPress={() => removeItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -231,7 +231,7 @@ export default function ItemSplitScreen() {
               {/* Member assignment */}
               <View style={{ paddingHorizontal: 14, paddingBottom: 12, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 1.5, fontFamily: "RobotoMono_400Regular" as any }}>WHO HAD THIS?</Text>
+                  <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 1.5, fontFamily: "Manrope_400Regular" as any }}>WHO HAD THIS?</Text>
                   <TouchableOpacity onPress={() => assignAll(item.id)}>
                     <Text style={{ color: isDark ? "#9D7BFF" : "#6D28D9", fontSize: 11, fontWeight: "700" }}>Everyone</Text>
                   </TouchableOpacity>
@@ -259,13 +259,13 @@ export default function ItemSplitScreen() {
           {/* Summary */}
           {items.length > 0 && (
             <View style={{ backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14 }}>
-              <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 10 }}>SPLIT SUMMARY</Text>
+              <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 2, fontFamily: "Manrope_400Regular" as any, marginBottom: 10 }}>SPLIT SUMMARY</Text>
               {members.filter(m => personTotals[m.id] > 0).map(m => (
                 <View key={m.id} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: c.border }}>
                   <Text style={{ color: m.id === user?.id ? (isDark ? "#9D7BFF" : "#6D28D9") : c.textPrimary, fontSize: 13 }}>
                     {m.id === user?.id ? "You" : m.name}
                   </Text>
-                  <Text style={{ fontFamily: "RobotoMono_700Bold" as any, fontSize: 14, color: m.id === paidBy ? c.positive : c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
+                  <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 14, color: m.id === paidBy ? c.positive : c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
                     {sym}{Math.round(personTotals[m.id] || 0).toLocaleString("en-IN")}
                     {m.id === paidBy ? " (paid)" : ""}
                   </Text>
@@ -273,7 +273,7 @@ export default function ItemSplitScreen() {
               ))}
               <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 10 }}>
                 <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>Total</Text>
-                <Text style={{ fontFamily: "RobotoMono_700Bold" as any, fontSize: 15, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
+                <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 15, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
                   {sym}{Math.round(grandTotal).toLocaleString("en-IN")}
                 </Text>
               </View>

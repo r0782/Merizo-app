@@ -74,27 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithToken = useCallback(async (token: string, userData?: User) => {
     try {
-      // Store token in AsyncStorage with correct key
       await setToken(token);
-
-      // Set user data if provided, otherwise set a placeholder that will be refreshed
-      if (userData) {
-        setUser(userData);
-      } else {
-        // Set a temporary user object - will be populated on next refresh
-        setUser({
-          id: "pending",
-          email: "pending",
-          name: "User",
-        });
-      }
-
+      // Always verify with server — avoids stale/placeholder user data
+      const r = await api.get("/auth/me");
+      setUser(r.data);
       setLoading(false);
     } catch (e) {
-      console.error("Token login failed:", e);
-      await setToken(null);
-      setUser(null);
-      throw e;
+      // If /auth/me fails but we have userData, use it as fallback
+      if (userData && userData.id !== "pending") {
+        setUser(userData);
+        setLoading(false);
+      } else {
+        await setToken(null);
+        setUser(null);
+        throw e;
+      }
     }
   }, []);
 

@@ -36,7 +36,7 @@ export default function CategoryScreen() {
           style={{
             color: c.textPrimary,
             fontSize: 30,
-            fontFamily: "Syne_700Bold",
+            fontFamily: "Manrope_700Bold",
             letterSpacing: -1,
             marginTop: 24,
             lineHeight: 36,
@@ -61,7 +61,7 @@ export default function CategoryScreen() {
                   style={[styles.card, { borderColor: c.border }]}
                 >
                   <Text style={{ fontSize: 30 }}>{it.emoji}</Text>
-                  <Text style={{ color: "#fff", fontFamily: "Syne_700Bold", fontSize: 14, marginTop: 10 }}>
+                  <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 14, marginTop: 10 }}>
                     {it.label}
                   </Text>
                   <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 4 }}>
@@ -71,7 +71,7 @@ export default function CategoryScreen() {
               ) : (
                 <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
                   <Text style={{ fontSize: 30 }}>{it.emoji}</Text>
-                  <Text style={{ color: c.textPrimary, fontFamily: "Syne_700Bold", fontSize: 14, marginTop: 10 }}>
+                  <Text style={{ color: c.textPrimary, fontFamily: "Manrope_700Bold", fontSize: 14, marginTop: 10 }}>
                     {it.label}
                   </Text>
                   <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 4 }}>

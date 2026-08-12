@@ -1,10 +1,19 @@
-import React, { useEffect, useRef } from "react";
+/**
+ * MERIZO Charts — B&W hand-drawn style chart primitives.
+ * All charts are monochrome ink on white paper.
+ * - SketchAreaChart: draws itself left-to-right via animated clip
+ * - SketchBudgetBar: wobbly ink fill bar, no color accent
+ * - SketchDonutLegend: grayscale donut segments
+ * - AIInsightCard: ledger row style insight
+ */
+import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing } from "react-native";
-import Svg, { Circle, Line, Path, Defs, LinearGradient, Stop } from "react-native-svg";
+import Svg, { Circle, Line, Path, Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { useTheme } from "../lib/theme";
+import { type } from "../lib/tokens";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GaugeDial — speedometer tick ring (unchanged)
+// GaugeDial — tick ring (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 export function GaugeDial({
   percent,
@@ -34,7 +43,7 @@ export function GaugeDial({
           const x2 = cx + r * Math.cos(angle);
           const y2 = cy + r * Math.sin(angle);
           const lit = i < filled;
-          const litColor = isDark ? c.indigo : "#0A0A0A";
+          const litColor = "#0A0A0A";
           const offColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
           return (
             <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
@@ -100,7 +109,7 @@ export function DonutRing({
   return (
     <View testID={testID} style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
       <Svg width={size} height={size}>
-        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={c.border} strokeWidth={thickness} />
+        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={c.borderLight} strokeWidth={thickness} />
         {renderedSegments}
       </Svg>
       <View style={{ position: "absolute", alignItems: "center", justifyContent: "center" }}>
@@ -111,7 +120,7 @@ export function DonutRing({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HybridBar — dotted hybrid bar (unchanged)
+// HybridBar (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 export function HybridBar({ percent, accent, muted, width = 120, height = 6 }: {
   percent: number; accent: string; muted: string; width?: number; height?: number;
@@ -132,12 +141,12 @@ export function HybridBar({ percent, accent, muted, width = 120, height = 6 }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SketchBudgetBar — hand-drawn progress bar with animated fill + sketch curve
+// SketchBudgetBar — B&W ink fill, wobbly track, no color accent
 // ─────────────────────────────────────────────────────────────────────────────
 export function SketchBudgetBar({
   spent,
   budget,
-  accent,
+  accent: _accent,  // kept for API compat; not used visually
   width,
   height = 10,
 }: {
@@ -147,11 +156,13 @@ export function SketchBudgetBar({
   width: number;
   height?: number;
 }) {
-  const { isDark } = useTheme();
+  const { c } = useTheme();
   const pct = Math.min(1, budget > 0 ? spent / budget : 0);
+  const isOver = pct >= 1;
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    anim.setValue(0);
     Animated.timing(anim, {
       toValue: pct,
       duration: 900,
@@ -168,11 +179,12 @@ export function SketchBudgetBar({
 
   const cx = (width - 8) / 2;
   const cy = height / 2;
-  const trackColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+  const trackColor = "rgba(0,0,0,0.08)";
+  const inkColor = c.ink;
 
   return (
     <View style={{ width, height: height + 6, justifyContent: "center" }}>
-      {/* Track */}
+      {/* Track — wobbly grey path */}
       <Svg width={width} height={height + 4} style={{ position: "absolute" }}>
         <Path
           d={`M 4,${cy + 1} Q ${cx},${cy - 1} ${width - 4},${cy + 1}`}
@@ -182,21 +194,16 @@ export function SketchBudgetBar({
           fill="none"
         />
       </Svg>
-      {/* Animated fill */}
+      {/* Ink fill — animated */}
       <Animated.View style={{ position: "absolute", left: 0, top: 2, overflow: "hidden", width: fillW }}>
         <Svg width={width} height={height + 2}>
-          <Defs>
-            <LinearGradient id="fillGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor={accent} stopOpacity={0.85} />
-              <Stop offset="100%" stopColor={accent} stopOpacity={1} />
-            </LinearGradient>
-          </Defs>
           <Path
             d={`M 4,${cy} Q ${cx},${cy - 1.5} ${width - 4},${cy}`}
-            stroke="url(#fillGrad)"
+            stroke={inkColor}
             strokeWidth={height}
             strokeLinecap="round"
             fill="none"
+            opacity={isOver ? 1 : 0.85}
           />
         </Svg>
       </Animated.View>
@@ -205,7 +212,7 @@ export function SketchBudgetBar({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SketchAreaChart — smooth bezier area chart with faint grid + animated opacity
+// SketchAreaChart — B&W ink line that draws itself left-to-right
 // ─────────────────────────────────────────────────────────────────────────────
 export function SketchAreaChart({
   data,
@@ -220,17 +227,20 @@ export function SketchAreaChart({
   color?: string;
   labels?: string[];
 }) {
-  const { c, isDark } = useTheme();
-  const lineColor = color || (isDark ? "#A78BFA" : "#6D5DFC");
-  const fadeIn = useRef(new Animated.Value(0)).current;
+  const { c } = useTheme();
+  const lineColor = color || c.ink;
+  const clipW = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(fadeIn, {
-      toValue: 1, duration: 700, delay: 150,
-      easing: Easing.out(Easing.quad),
+    clipW.setValue(0);
+    Animated.timing(clipW, {
+      toValue: chartWidth,
+      duration: 1400,
+      delay: 100,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, []);
+  }, [data, chartWidth]);
 
   if (!data.length) return null;
 
@@ -245,7 +255,6 @@ export function SketchAreaChart({
     y: padY + chartH - (v / max) * chartH,
   }));
 
-  // Smooth bezier curve through points (Catmull-Rom style via cubic beziers)
   const linePath = pts.reduce((acc, pt, i) => {
     if (i === 0) return `M ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
     const prev = pts[i - 1];
@@ -256,75 +265,79 @@ export function SketchAreaChart({
   const baselineY = padY + chartH;
   const areaPath = `${linePath} L ${pts[pts.length - 1].x.toFixed(1)},${baselineY} L ${pts[0].x.toFixed(1)},${baselineY} Z`;
 
-  // Faint horizontal guide lines at 25%, 50%, 75%
   const guides = [0.25, 0.5, 0.75];
 
   return (
-    <Animated.View style={{ opacity: fadeIn }}>
-      <Svg width={chartWidth} height={height}>
-        {/* Grid guides */}
-        {guides.map((f, i) => (
-          <Line key={i}
-            x1={padX} y1={padY + chartH * (1 - f)}
-            x2={chartWidth - padX} y2={padY + chartH * (1 - f)}
-            stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"}
-            strokeWidth={1}
-            strokeDasharray="3,5"
-          />
-        ))}
-        {/* Area fill — very subtle */}
-        <Path d={areaPath} fill={lineColor} fillOpacity={0.07} />
-        {/* Line — slightly wobbly feel from bezier curves */}
-        <Path d={linePath} stroke={lineColor} strokeWidth={2.5}
-          strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        {/* Data-point dots */}
-        {pts.map((pt, i) => (
-          <Circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill={lineColor} />
-        ))}
-        {/* Vertical tick at each data point, faint */}
-        {pts.map((pt, i) => (
-          <Line key={`t${i}`}
-            x1={pt.x} y1={baselineY}
-            x2={pt.x} y2={baselineY + 3}
-            stroke={isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"}
-            strokeWidth={1}
-          />
-        ))}
-      </Svg>
-      {/* Labels row */}
+    <View>
+      <Animated.View style={{ width: clipW, overflow: "hidden", height }}>
+        <Svg width={chartWidth} height={height}>
+          {/* Grid guides — very faint, inherit line color */}
+          {guides.map((f, i) => (
+            <Line key={i}
+              x1={padX} y1={padY + chartH * (1 - f)}
+              x2={chartWidth - padX} y2={padY + chartH * (1 - f)}
+              stroke={lineColor}
+              strokeOpacity={0.12}
+              strokeWidth={1}
+              strokeDasharray="3,6"
+            />
+          ))}
+          {/* Area fill — very subtle */}
+          <Path d={areaPath} fill={lineColor} fillOpacity={0.05} />
+          {/* Line */}
+          <Path d={linePath} stroke={lineColor} strokeWidth={2}
+            strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          {/* Data point dots */}
+          {pts.map((pt, i) => (
+            <Circle key={i} cx={pt.x} cy={pt.y} r={3} fill={lineColor} />
+          ))}
+          {/* Tick marks at baseline */}
+          {pts.map((pt, i) => (
+            <Line key={`t${i}`}
+              x1={pt.x} y1={baselineY}
+              x2={pt.x} y2={baselineY + 3}
+              stroke={lineColor}
+              strokeOpacity={0.25}
+              strokeWidth={1}
+            />
+          ))}
+        </Svg>
+      </Animated.View>
       {labels && (
-        <View style={{ flexDirection: "row", paddingHorizontal: padX - 4, marginTop: -4 }}>
+        <View style={{ flexDirection: "row", paddingHorizontal: padX - 4, marginTop: -2 }}>
           {labels.map((lbl, i) => (
             <Text key={i} style={{
-              flex: 1, textAlign: "center", fontSize: 10,
-              color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)",
+              flex: 1,
+              textAlign: "center",
+              fontSize: 9,
+              fontFamily: type.family.light,
+              color: c.textMuted,
+              letterSpacing: 0.5,
             }} numberOfLines={1}>
               {lbl}
             </Text>
           ))}
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SketchDonutLegend — DonutRing + colour-coded legend in one card
+// SketchDonutLegend — grayscale segments + ledger legend
 // ─────────────────────────────────────────────────────────────────────────────
-const SKETCH_COLORS: Record<string, string> = {
-  food: "#FF8B7B", travel: "#60A5FA", entertainment: "#A78BFA",
-  utilities: "#FBBF24", shopping: "#F472B6", health: "#34D399",
-  accommodation: "#E8B04E", trip: "#9D7BFF", other: "#9CA3AF",
+const GRAY_SHADES_LIGHT = ["#0A0A0A", "#3A3A38", "#6A6A67", "#9A9A97", "#C5C5C2"];
+const GRAY_SHADES_DARK  = ["#F5F4F1", "#C5C5C2", "#9A9A97", "#6A6A67", "#3A3A38"];
+
+const CAT_LABELS: Record<string, string> = {
+  food: "Food & Drinks", travel: "Travel", entertainment: "Entertainment",
+  utilities: "Bills & Utilities", shopping: "Shopping", health: "Health",
+  accommodation: "Accommodation", trip: "Trip", other: "Other",
 };
-const SKETCH_LABELS: Record<string, string> = {
+const CAT_SHORT: Record<string, string> = {
   food: "Food", travel: "Travel", entertainment: "Fun",
   utilities: "Bills", shopping: "Shopping", health: "Health",
   accommodation: "Stay", trip: "Trip", other: "Other",
-};
-const SKETCH_EMOJI: Record<string, string> = {
-  food: "🍽️", travel: "✈️", entertainment: "🎬",
-  utilities: "⚡", shopping: "🛍️", health: "💊",
-  accommodation: "🏨", trip: "🗺️", other: "📦",
 };
 
 export function SketchDonutLegend({
@@ -337,40 +350,42 @@ export function SketchDonutLegend({
   sym: string;
 }) {
   const { c, isDark } = useTheme();
+  const SHADES = isDark ? GRAY_SHADES_DARK : GRAY_SHADES_LIGHT;
   const top5 = categories.slice(0, 5);
-  const topCat = top5[0];
 
-  const segments = top5.map(cc => ({
-    color: SKETCH_COLORS[cc.category] || "#9CA3AF",
+  const segments = top5.map((cc, i) => ({
+    color: SHADES[i] || SHADES[SHADES.length - 1],
     value: cc.amount,
   }));
 
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-      {/* Donut */}
-      <DonutRing size={134} thickness={24} segments={segments}>
-        <Text style={{ fontSize: 10, color: c.textMuted, textAlign: "center" }}>
-          {SKETCH_EMOJI[topCat?.category] || "💸"}
+      {/* Grayscale donut */}
+      <DonutRing size={120} thickness={20} segments={segments}>
+        <Text style={{ fontFamily: type.family.light, fontSize: 9, color: c.textMuted, textAlign: "center" }}>
+          TOTAL
         </Text>
-        <Text style={{ fontSize: 9, color: c.textMuted, textAlign: "center", marginTop: 1 }}>
-          {sym}{Math.round(total).toLocaleString("en-IN")}
+        <Text style={{ fontFamily: type.family.bold, fontSize: 11, color: c.textPrimary, textAlign: "center", marginTop: 1 }}>
+          {sym}{Math.round(total / 1000) > 0 ? `${Math.round(total / 1000)}k` : Math.round(total)}
         </Text>
       </DonutRing>
 
-      {/* Legend */}
-      <View style={{ flex: 1, gap: 6 }}>
-        {top5.map((cc) => {
-          const color = SKETCH_COLORS[cc.category] || "#9CA3AF";
+      {/* Ledger legend */}
+      <View style={{ flex: 1, gap: 0 }}>
+        {top5.map((cc, i) => {
+          const shade = SHADES[i] || SHADES[SHADES.length - 1];
           return (
-            <View key={cc.category} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-              <View style={{
-                width: 8, height: 8, borderRadius: 2,
-                backgroundColor: color, flexShrink: 0,
-              }} />
-              <Text style={{ flex: 1, fontSize: 12, color: c.textSecondary }} numberOfLines={1}>
-                {SKETCH_EMOJI[cc.category]} {SKETCH_LABELS[cc.category] || cc.category}
+            <View key={cc.category} style={{
+              flexDirection: "row", alignItems: "center", gap: 8,
+              paddingVertical: 5,
+              borderBottomWidth: i < top5.length - 1 ? 1 : 0,
+              borderBottomColor: `${c.border}12`,
+            }}>
+              <View style={{ width: 6, height: 6, backgroundColor: shade, flexShrink: 0 }} />
+              <Text style={{ flex: 1, fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary }} numberOfLines={1}>
+                {CAT_SHORT[cc.category] || cc.category}
               </Text>
-              <Text style={{ fontSize: 12, fontWeight: "600", color: c.textPrimary }}>
+              <Text style={{ fontFamily: type.family.semibold, fontSize: 11, color: c.textPrimary, width: 30, textAlign: "right" }}>
                 {Math.round(cc.percent)}%
               </Text>
             </View>
@@ -382,7 +397,7 @@ export function SketchDonutLegend({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AIInsightCard — single animated AI insight row
+// AIInsightCard — ledger row style, no colored backgrounds
 // ─────────────────────────────────────────────────────────────────────────────
 export function AIInsightCard({
   emoji,
@@ -397,73 +412,45 @@ export function AIInsightCard({
   trendDir?: "up" | "down" | "neutral";
   index?: number;
 }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const fade = useRef(new Animated.Value(0)).current;
-  const slideY = useRef(new Animated.Value(12)).current;
+  const slideX = useRef(new Animated.Value(-8)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1, duration: 400,
-        delay: 80 + index * 90,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }),
-      Animated.timing(slideY, {
-        toValue: 0, duration: 380,
-        delay: 80 + index * 90,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }),
+      Animated.timing(fade,   { toValue: 1, duration: 360, delay: 60 + index * 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(slideX, { toValue: 0, duration: 340, delay: 60 + index * 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const trendBg = trendDir === "down"
-    ? (isDark ? "rgba(0,196,140,0.12)" : "rgba(0,196,140,0.10)")
-    : trendDir === "up"
-    ? (isDark ? "rgba(255,67,58,0.12)" : "rgba(255,67,58,0.10)")
-    : (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)");
-
-  const trendSymbol = trendDir === "down" ? "↓" : trendDir === "up" ? "↑" : "→";
-  const trendColor = trendDir === "down" ? "#00C48C" : trendDir === "up" ? "#FF453A" : c.textMuted;
+  const arrow = trendDir === "up" ? "↑" : trendDir === "down" ? "↓" : "→";
 
   return (
     <Animated.View style={{
       opacity: fade,
-      transform: [{ translateY: slideY }],
-      flexDirection: "row", alignItems: "center", gap: 12,
-      backgroundColor: c.surface, borderRadius: 16, padding: 14,
-      borderWidth: 1, borderColor: c.border,
+      transform: [{ translateX: slideX }],
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: `${c.border}18`,
     }}>
-      {/* Emoji icon badge */}
-      <View style={{
-        width: 42, height: 42, borderRadius: 12,
-        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F5F3EF",
-        alignItems: "center", justifyContent: "center", flexShrink: 0,
-      }}>
-        <Text style={{ fontSize: 20 }}>{emoji}</Text>
-      </View>
-
+      {/* Trend arrow */}
+      <Text style={{ fontFamily: type.family.light, fontSize: 14, color: c.textMuted, width: 16, marginTop: 1 }}>
+        {arrow}
+      </Text>
       {/* Text */}
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary, lineHeight: 19 }}>
+        <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary, lineHeight: 20 }}>
           {title}
         </Text>
         {sub && (
-          <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{sub}</Text>
+          <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 2 }}>
+            {sub}
+          </Text>
         )}
       </View>
-
-      {/* Trend chip */}
-      {trendDir && (
-        <View style={{
-          width: 28, height: 28, borderRadius: 8,
-          backgroundColor: trendBg,
-          alignItems: "center", justifyContent: "center",
-        }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: trendColor }}>{trendSymbol}</Text>
-        </View>
-      )}
     </Animated.View>
   );
 }

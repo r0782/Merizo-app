@@ -2,8 +2,17 @@ import os, json, httpx
 from groq import Groq
 from .prompts import SYSTEM_PROMPT, LANGUAGE_INSTRUCTIONS
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+_client = None
 BACKEND_URL = os.environ.get("BACKEND_URL", "https://merizo-app.onrender.com")
+
+def _get_client():
+    global _client
+    if _client is None:
+        key = os.environ.get("GROQ_API_KEY", "")
+        if not key:
+            raise RuntimeError("GROQ_API_KEY not configured")
+        _client = Groq(api_key=key)
+    return _client
 
 TOOLS = [
     {"type":"function","function":{"name":"create_group","description":"Create a new expense group","parameters":{"type":"object","properties":{"name":{"type":"string"},"members":{"type":"array","items":{"type":"string"}},"currency":{"type":"string","default":"INR"},"category":{"type":"string","default":"trip"}},"required":["name","members"]}}},
@@ -67,12 +76,13 @@ async def execute_tool(tool_name: str, args: dict, token: str) -> str:
             return json.dumps({"error":str(e)})
 
 async def get_chat_response(message: str, history: list, context: dict, token: str = "") -> str:
+    groq = _get_client()
     messages = [{"role":"system","content":build_system_prompt(context)}]
     for msg in history[-10:]:
         messages.append({"role":msg.get("role","user"),"content":msg.get("content","")})
     messages.append({"role":"user","content":message})
 
-    response = client.chat.completions.create(
+    response = groq.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=messages,
         tools=TOOLS,
@@ -82,14 +92,17 @@ async def get_chat_response(message: str, history: list, context: dict, token: s
     )
     msg = response.choices[0].message
     if msg.tool_calls:
-        messages.append({"role":"assistant","content":msg.content or "","tool_calls":[{"id":tc.id,"type":"function","function":{"name":tc.function.name,"arguments":tc.function.arguments}} for tc in msg.tool_calls]})
+        messages.append({"role":"assistant","content":msg.content or "","tool_calls":[
+            {"id":tc.id,"type":"function","function":{"name":tc.function.name,"arguments":tc.function.arguments}}
+            for tc in msg.tool_calls
+        ]})
         for tc in msg.tool_calls:
             args = json.loads(tc.function.arguments)
             if tc.function.name == "create_expense" and "group_id" not in args:
                 args["group_id"] = context.get("group_id","")
             result = await execute_tool(tc.function.name, args, token)
             messages.append({"role":"tool","tool_call_id":tc.id,"content":result})
-        final = client.chat.completions.create(
+        final = groq.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
             max_tokens=512,

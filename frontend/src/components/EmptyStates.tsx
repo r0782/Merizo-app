@@ -1,215 +1,248 @@
-/**
- * EmptyStates.tsx — AI-Powered Empty States
- * Merizo · Staff Designer Grade
- *
- * Never show: "No data found" or generic placeholders
- * Always show: Context-aware AI guidance with clear CTAs
- */
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, Animated, Easing } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  UsersThreeIcon, ReceiptIcon, CheckCircleIcon, ChartBarIcon,
+  MagnifyingGlassIcon, WifiSlashIcon, PlusIcon, CameraIcon,
+  CalculatorIcon, ArrowClockwiseIcon,
+} from "phosphor-react-native";
 import { useTheme } from "../lib/theme";
+import { spacing, radius, type } from "../lib/tokens";
 
 interface EmptyProps {
   onPrimary?:   () => void;
   onSecondary?: () => void;
 }
 
-// ─── Floating orb animation ───────────────────────────────────────────────────
-function FloatingOrb({ color, size = 80 }: { color: string; size?: number }) {
+// ── Hand-drawn style floating orb ─────────────────────────────────────────────
+function FloatingOrb({ size = 80, icon }: { size?: number; icon?: React.ReactNode }) {
+  const { c } = useTheme();
   const float = useRef(new Animated.Value(0)).current;
-  const glow  = useRef(new Animated.Value(0.4)).current;
+  const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(float, { toValue: -12, duration: 2000,
-            easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(float, { toValue: 0,   duration: 2000,
-            easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(float, { toValue: -10, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(float, { toValue: 0,   duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.timing(glow, { toValue: 0.8, duration: 2000, useNativeDriver: true }),
-          Animated.timing(glow, { toValue: 0.4, duration: 2000, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1.04, duration: 2400, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1,    duration: 2400, useNativeDriver: true }),
         ]),
       ])
     ).start();
   }, []);
 
   return (
-    <Animated.View style={{ transform: [{ translateY: float }], opacity: glow,
-      width: size, height: size, borderRadius: size / 2,
-      backgroundColor: color + "22", alignItems: "center", justifyContent: "center",
-      marginBottom: 24 }}>
-      <View style={{ width: size * 0.65, height: size * 0.65, borderRadius: size * 0.325,
-        backgroundColor: color + "35", alignItems: "center", justifyContent: "center" }}>
-        <View style={{ width: size * 0.4, height: size * 0.4, borderRadius: size * 0.2,
-          backgroundColor: color + "60" }} />
-      </View>
+    <Animated.View
+      style={{
+        transform: [{ translateY: float }, { scale }],
+        width: size, height: size, borderRadius: size / 2,
+        backgroundColor: c.surfaceAlt,
+        borderWidth: 1.5, borderColor: c.border,
+        alignItems: "center", justifyContent: "center",
+        marginBottom: spacing["6"],
+        // subtle drop shadow
+        shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+      }}
+      accessibilityElementsHidden
+    >
+      {icon}
     </Animated.View>
   );
 }
 
-// ─── No Groups ───────────────────────────────────────────────────────────────
+// ── Primary action button ─────────────────────────────────────────────────────
+function PrimaryBtn({ label, icon, onPress, c }: any) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <Animated.View style={{ transform: [{ scale }], alignSelf: "center" }}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start()}
+        onPressOut={() => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, speed: 40, bounciness: 5 }).start()}
+        activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={{
+          backgroundColor: c.textPrimary, borderRadius: radius.lg,
+          paddingVertical: 14, paddingHorizontal: 28,
+          flexDirection: "row", alignItems: "center", gap: 8,
+        }}
+      >
+        {icon}
+        <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>{label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function SecondaryBtn({ label, icon, onPress, c }: any) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 }}
+    >
+      {icon}
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Empty States ───────────────────────────────────────────────────────────────
+
 export function EmptyGroups({ onPrimary, onSecondary }: EmptyProps) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 24 }}>
-      <FloatingOrb color={isDark ? "#9D7BFF" : "#5B3FD4"} size={96} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
-        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
-          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
-      </View>
-      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
-        textAlign: "center", marginBottom: 10, letterSpacing: -0.3 }}>
+      <FloatingOrb size={88} icon={<UsersThreeIcon size={36} color={c.textMuted} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.textPrimary, textAlign: "center", marginBottom: 10, letterSpacing: type.tracking.tight }}>
         No groups yet
       </Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
-        lineHeight: 22, marginBottom: 28 }}>
-        Create a group for trips, roommates, or dinner — and I'll handle all the math for you.
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
+        Create a group for trips, roommates, or dinner — and we'll handle all the math.
       </Text>
-      <TouchableOpacity onPress={onPrimary}
-        style={{ backgroundColor: isDark ? "#9D7BFF" : "#1F1A17", borderRadius: 14,
-          paddingVertical: 14, paddingHorizontal: 28,
-          flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <Ionicons name="add" size={18} color="#fff" />
-        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Create a Group</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onSecondary}
-        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Ionicons name="calculator-outline" size={14} color={c.textMuted} />
-        <Text style={{ color: c.textMuted, fontSize: 13 }}>or try Quick Split — no group needed</Text>
-      </TouchableOpacity>
+      <PrimaryBtn
+        label="Create a Group" c={c}
+        onPress={onPrimary}
+        icon={<PlusIcon size={18} color={c.bg} weight="bold" />}
+      />
+      {onSecondary && (
+        <View style={{ marginTop: 12 }}>
+          <SecondaryBtn
+            label="or try Quick Split — no group needed" c={c}
+            onPress={onSecondary}
+            icon={<CalculatorIcon size={14} color={c.textMuted} />}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
-// ─── No Expenses in a group ───────────────────────────────────────────────────
 export function EmptyExpenses({ onPrimary, onSecondary }: EmptyProps) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
-      <FloatingOrb color={isDark ? "#E8B04E" : "#B8860B"} size={88} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
-        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
-          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
-      </View>
-      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
-        textAlign: "center", marginBottom: 10 }}>No expenses yet</Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
-        lineHeight: 22, marginBottom: 28 }}>
-        Add your first expense or upload a receipt — I'll extract the details and split it automatically.
+      <FloatingOrb size={88} icon={<ReceiptIcon size={36} color={c.textMuted} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.textPrimary, textAlign: "center", marginBottom: 10, letterSpacing: type.tracking.tight }}>
+        No expenses yet
       </Text>
-      <TouchableOpacity onPress={onPrimary}
-        style={{ backgroundColor: isDark ? "#E8B04E" : "#1F1A17", borderRadius: 14,
-          paddingVertical: 14, paddingHorizontal: 28,
-          flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <Ionicons name="add" size={18} color={isDark ? "#1F1A17" : "#fff"} />
-        <Text style={{ color: isDark ? "#1F1A17" : "#fff", fontSize: 15, fontWeight: "800" }}>
-          Add Expense
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onSecondary}
-        style={{ flexDirection: "row", alignItems: "center", gap: 8,
-          paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12,
-          borderWidth: 1, borderColor: c.border }}>
-        <Ionicons name="receipt-outline" size={16} color={c.textSecondary} />
-        <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: "600" }}>
-          Scan a receipt instead
-        </Text>
-      </TouchableOpacity>
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
+        Add your first expense or scan a receipt — we'll extract the details automatically.
+      </Text>
+      <PrimaryBtn
+        label="Add Expense" c={c}
+        onPress={onPrimary}
+        icon={<PlusIcon size={18} color={c.bg} weight="bold" />}
+      />
+      {onSecondary && (
+        <View style={{ marginTop: 12 }}>
+          <SecondaryBtn
+            label="Scan a receipt instead" c={c}
+            onPress={onSecondary}
+            icon={<CameraIcon size={15} color={c.textMuted} />}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
-// ─── All Settled ──────────────────────────────────────────────────────────────
 export function EmptySettled() {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
-      <FloatingOrb color={isDark ? "#7ED38B" : "#1A7A40"} size={88} />
-      <Text style={{ color: c.positive, fontSize: 22, fontWeight: "800",
-        textAlign: "center", marginBottom: 10 }}>
-        All settled! 🎉
+      <FloatingOrb size={80} icon={<CheckCircleIcon size={34} color={c.positive} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.positive, textAlign: "center", marginBottom: 10, letterSpacing: type.tracking.tight }}>
+        All settled!
       </Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
-        lineHeight: 22 }}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>
         Everyone in this group is square. No pending payments.
       </Text>
     </View>
   );
 }
 
-// ─── No Insights ──────────────────────────────────────────────────────────────
 export function EmptyInsights({ onPrimary }: EmptyProps) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
-      <FloatingOrb color={isDark ? "#60A5FA" : "#1D4ED8"} size={88} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <Ionicons name="sparkles" size={12} color={isDark ? "#9D7BFF" : "#5B3FD4"} />
-        <Text style={{ color: isDark ? "#9D7BFF" : "#5B3FD4", fontSize: 10,
-          fontWeight: "700", letterSpacing: 2 }}>MERIZO AI</Text>
-      </View>
-      <Text style={{ color: c.textPrimary, fontSize: 22, fontWeight: "800",
-        textAlign: "center", marginBottom: 10 }}>No insights yet</Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
-        lineHeight: 22, marginBottom: 28 }}>
-        Start adding expenses and I'll show you spending patterns, category breakdowns, and smart suggestions.
+      <FloatingOrb size={88} icon={<ChartBarIcon size={36} color={c.textMuted} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.textPrimary, textAlign: "center", marginBottom: 10, letterSpacing: type.tracking.tight }}>
+        No insights yet
       </Text>
-      <TouchableOpacity onPress={onPrimary}
-        style={{ backgroundColor: isDark ? "#60A5FA" : "#1D4ED8", borderRadius: 14,
-          paddingVertical: 14, paddingHorizontal: 28,
-          flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Ionicons name="add" size={18} color="#fff" />
-        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Add your first expense</Text>
-      </TouchableOpacity>
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
+        Start adding expenses and we'll show you spending patterns, category breakdowns, and smart suggestions.
+      </Text>
+      <PrimaryBtn
+        label="Add your first expense" c={c}
+        onPress={onPrimary}
+        icon={<PlusIcon size={18} color={c.bg} weight="bold" />}
+      />
     </View>
   );
 }
 
-// ─── No Search Results ────────────────────────────────────────────────────────
 export function EmptySearch({ query }: { query: string }) {
   const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
-      <Text style={{ fontSize: 48, marginBottom: 16 }}>🔍</Text>
-      <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "700",
-        textAlign: "center", marginBottom: 8 }}>
+      <FloatingOrb size={80} icon={<MagnifyingGlassIcon size={32} color={c.textMuted} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, textAlign: "center", marginBottom: 8, letterSpacing: type.tracking.tight }}>
         Nothing found for "{query}"
       </Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center", lineHeight: 22 }}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>
         Try a different search term or check the spelling.
       </Text>
     </View>
   );
 }
 
-// ─── Network Error ─────────────────────────────────────────────────────────────
 export function EmptyNetworkError({ onRetry }: { onRetry?: () => void }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
-      <Text style={{ fontSize: 48, marginBottom: 16 }}>📡</Text>
-      <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "700",
-        textAlign: "center", marginBottom: 8 }}>
+      <FloatingOrb size={80} icon={<WifiSlashIcon size={32} color={c.textMuted} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, textAlign: "center", marginBottom: 8, letterSpacing: type.tracking.tight }}>
         Can't connect right now
       </Text>
-      <Text style={{ color: c.textSecondary, fontSize: 14, textAlign: "center",
-        lineHeight: 22, marginBottom: 24 }}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 24 }}>
         Check your internet connection and try again.
       </Text>
       {onRetry && (
-        <TouchableOpacity onPress={onRetry}
-          style={{ backgroundColor: isDark ? "#9D7BFF" : "#1F1A17", borderRadius: 14,
-            paddingVertical: 12, paddingHorizontal: 24,
-            flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons name="refresh-outline" size={16} color="#fff" />
-          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Try again</Text>
-        </TouchableOpacity>
+        <PrimaryBtn
+          label="Try again" c={c}
+          onPress={onRetry}
+          icon={<ArrowClockwiseIcon size={16} color={c.bg} weight="bold" />}
+        />
+      )}
+    </View>
+  );
+}
+
+// ── Generic error state ────────────────────────────────────────────────────────
+export function EmptyError({ message = "Something went wrong", onRetry }: { message?: string; onRetry?: () => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
+      <FloatingOrb size={80} icon={<WifiSlashIcon size={32} color={c.negative} weight="thin" />} />
+      <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, textAlign: "center", marginBottom: 8, letterSpacing: type.tracking.tight }}>
+        {message}
+      </Text>
+      {onRetry && (
+        <View style={{ marginTop: 16 }}>
+          <PrimaryBtn
+            label="Retry" c={c}
+            onPress={onRetry}
+            icon={<ArrowClockwiseIcon size={16} color={c.bg} weight="bold" />}
+          />
+        </View>
       )}
     </View>
   );

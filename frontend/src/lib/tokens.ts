@@ -4,41 +4,49 @@
 //   massive whitespace · monochrome · editorial typography · thin borders
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Colour palette ────────────────────────────────────────────────────────────
+// ── Colour palette — Black ink on white paper ─────────────────────────────────
+// MERIZO: Premium financial notebook aesthetic.
+// Strict B&W with very subtle grayscale only.
 export const palette = {
   light: {
-    bg:           "#E8E4DB",
-    surface:      "#F4F1EA",
-    surfaceAlt:   "#DDD9D1",
-    surfaceHover: "#D4D0C8",
-    border:       "#E0DDD5",
-    borderActive: "#1C1A14",
-    textPrimary:  "#1C1A14",
-    textSecondary:"#6B6455",
-    textMuted:    "#B0A898",
-    positive:     "#1F8A50",
-    negative:     "#D64545",
-    indigo:       "#1C1A14",
-    gold:         "#C4A35A",
-    cardBg:       "#F4F1EA",
-    overlay:      "rgba(0,0,0,0.45)",
+    bg:           "#FFFFFF",   // pure white paper
+    surface:      "#F7F6F4",   // barely-off-white surface
+    surfaceAlt:   "#EFEFED",   // light grey for inputs/backgrounds
+    surfaceHover: "#E5E4E2",   // hover state
+    border:       "#0A0A0A",   // near-black ink border (the key change)
+    borderLight:  "#DDDCDA",   // light separator
+    borderActive: "#0A0A0A",
+    textPrimary:  "#0A0A0A",   // near-black ink
+    textSecondary:"#555552",   // secondary text
+    textMuted:    "#9A9A97",   // muted / placeholder
+    positive:     "#0A0A0A",   // NO color — use + sign instead
+    negative:     "#0A0A0A",   // NO color — use - sign instead
+    indigo:       "#0A0A0A",
+    gold:         "#0A0A0A",
+    cardBg:       "#FFFFFF",
+    overlay:      "rgba(0,0,0,0.50)",
+    ink:          "#0A0A0A",   // the drawing color
+    paper:        "#FAFAF8",   // notebook paper tint
   },
   dark: {
-    bg:           "#0C0C0C",
-    surface:      "#161616",
-    surfaceAlt:   "#1F1F1F",
-    surfaceHover: "#252525",
-    border:       "#2A2A2A",
-    borderActive: "#F0F0F0",
-    textPrimary:  "#F0F0F0",
-    textSecondary:"#8A8A8A",
-    textMuted:    "#4A4A4A",
-    positive:     "#27AE60",
-    negative:     "#E84040",
-    indigo:       "#F0F0F0",
-    gold:         "#C4A35A",
-    cardBg:       "#161616",
-    overlay:      "rgba(0,0,0,0.65)",
+    bg:           "#0A0A0A",   // black notebook cover
+    surface:      "#141414",
+    surfaceAlt:   "#1E1E1E",
+    surfaceHover: "#262626",
+    border:       "#F0F0EE",   // light ink on dark paper
+    borderLight:  "#2A2A2A",
+    borderActive: "#F0F0EE",
+    textPrimary:  "#F0F0EE",
+    textSecondary:"#AAAAAA",
+    textMuted:    "#555555",
+    positive:     "#F0F0EE",
+    negative:     "#F0F0EE",
+    indigo:       "#F0F0EE",
+    gold:         "#F0F0EE",
+    cardBg:       "#141414",
+    overlay:      "rgba(0,0,0,0.70)",
+    ink:          "#F0F0EE",
+    paper:        "#0F0F0F",
   },
 };
 
@@ -57,14 +65,16 @@ export const spacing = {
   "20": 80,
 } as const;
 
-// ── Border radius ─────────────────────────────────────────────────────────────
+// ── Border radius — restrained, notebook-like ─────────────────────────────────
 export const radius = {
-  sm:   8,
-  md:   12,
-  lg:   16,
-  xl:   20,
-  "2xl":24,
-  "3xl":32,
+  none: 0,
+  xs:   2,
+  sm:   4,
+  md:   6,
+  lg:   8,
+  xl:   10,
+  "2xl":12,
+  "3xl":16,
   full: 9999,
 } as const;
 

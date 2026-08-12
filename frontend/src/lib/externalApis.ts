@@ -11,6 +11,7 @@
 const IPSTACK_KEY = process.env.EXPO_PUBLIC_IPSTACK_KEY || "";
 const OER_KEY = process.env.EXPO_PUBLIC_OER_KEY || "";
 const MAILBOXLAYER_KEY = process.env.EXPO_PUBLIC_MAILBOXLAYER_KEY || "";
+const LANGUAGELAYER_KEY = process.env.EXPO_PUBLIC_LANGUAGELAYER_KEY || "";
 
 // ── 1. Frankfurter — Real-time currency exchange ───────────────────────────
 export async function getExchangeRates(base: string = "INR"): Promise<Record<string, number>> {
@@ -74,7 +75,7 @@ export async function detectUserLocation(): Promise<{
       // Fallback: assume India for now
       return { country_code: "IN", country_name: "India", currency: "INR", flag: "🇮🇳" };
     }
-    const r = await fetch(`http://api.ipstack.com/check?access_key=${IPSTACK_KEY}&fields=country_code,country_name,currency`);
+    const r = await fetch(`https://api.ipstack.com/check?access_key=${IPSTACK_KEY}&fields=country_code,country_name,currency`);
     const data = await r.json();
     return {
       country_code: data.country_code || "IN",
@@ -112,7 +113,7 @@ export async function validateEmail(email: string): Promise<{
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return { valid: re.test(email), format: re.test(email) };
     }
-    const r = await fetch(`http://apilayer.net/api/check?access_key=${MAILBOXLAYER_KEY}&email=${encodeURIComponent(email)}&format=1&smtp=1`);
+    const r = await fetch(`https://apilayer.net/api/check?access_key=${MAILBOXLAYER_KEY}&email=${encodeURIComponent(email)}&format=1&smtp=1`);
     const data = await r.json();
     return {
       valid: data.format_valid && !data.disposable,
@@ -138,7 +139,7 @@ export async function validatePhone(phone: string, country: string = "IN"): Prom
       const clean = phone.replace(/\D/g, "");
       return { valid: clean.length >= 10, formatted: clean };
     }
-    const r = await fetch(`http://apilayer.net/api/validate?access_key=${NUMVERIFY_KEY}&number=${encodeURIComponent(phone)}&country_code=${country}`);
+    const r = await fetch(`https://apilayer.net/api/validate?access_key=${NUMVERIFY_KEY}&number=${encodeURIComponent(phone)}&country_code=${country}`);
     const data = await r.json();
     return {
       valid: data.valid,
@@ -149,6 +150,20 @@ export async function validatePhone(phone: string, country: string = "IN"): Prom
     const clean = phone.replace(/\D/g, "");
     return { valid: clean.length >= 10 };
   }
+}
+
+// ── 7. Languagelayer — Text language detection ───────────────────────────
+export async function detectLanguage(text: string): Promise<string> {
+  try {
+    if (!LANGUAGELAYER_KEY || text.trim().length < 3) return "en";
+    const r = await fetch(
+      `https://api.languagelayer.com/detect?access_key=${LANGUAGELAYER_KEY}&query=${encodeURIComponent(text.slice(0, 200))}`
+    );
+    const data = await r.json();
+    const top = data.results?.[0];
+    if (top?.reliable_result) return top.language_code as string;
+    return "en";
+  } catch { return "en"; }
 }
 
 // ── Currency Conversion Helper ────────────────────────────────────────────

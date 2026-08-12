@@ -151,7 +151,7 @@ export default function LoginOTPScreen() {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingTop: 60, paddingBottom: 60 },
   backBtn: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 28, fontFamily: "Syne_700Bold", letterSpacing: -1 },
+  title: { fontSize: 28, fontFamily: "Manrope_700Bold", letterSpacing: -1 },
   subtitle: { fontSize: 14, marginTop: 8, lineHeight: 20 },
   form: { width: "100%", maxWidth: 420, alignSelf: "center" },
   phoneInput: {

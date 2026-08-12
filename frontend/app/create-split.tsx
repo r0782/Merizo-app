@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -344,7 +345,7 @@ function Heading({ children }: { children: React.ReactNode }) {
       style={{
         color: c.textPrimary,
         fontSize: 26,
-        fontFamily: "Syne_700Bold",
+        fontFamily: "Manrope_700Bold",
         letterSpacing: -0.5,
         marginTop: 28,
         marginBottom: 22,
@@ -366,11 +367,37 @@ function DateField({
   setValue: (s: string) => void;
   testID?: string;
 }) {
-  const { c } = useTheme();
-  const today = new Date();
-  const minDate = today.toISOString().slice(0, 10);
+  const { c, isDark } = useTheme();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Quick presets so it works without a heavy native picker
+  // Local edit state inside the modal
+  const [py, setPy] = useState("");
+  const [pm, setPm] = useState("");
+  const [pd, setPd] = useState("");
+
+  const openPicker = () => {
+    if (value) {
+      const [y, m, d] = value.split("-");
+      setPy(y || ""); setPm(m || ""); setPd(d || "");
+    } else {
+      const now = new Date();
+      setPy(String(now.getFullYear()));
+      setPm(String(now.getMonth() + 1).padStart(2, "0"));
+      setPd(String(now.getDate()).padStart(2, "0"));
+    }
+    setPickerOpen(true);
+  };
+
+  const confirmPicker = () => {
+    const y = py.trim().padStart(4, "0");
+    const m = pm.trim().padStart(2, "0");
+    const d = pd.trim().padStart(2, "0");
+    const month = Math.min(12, Math.max(1, parseInt(m) || 1));
+    const day   = Math.min(31, Math.max(1, parseInt(d) || 1));
+    setValue(`${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+    setPickerOpen(false);
+  };
+
   const presets = [
     { label: "Today", days: 0 },
     { label: "+1 wk", days: 7 },
@@ -407,51 +434,72 @@ function DateField({
           onChangeText={setValue}
           placeholder="YYYY-MM-DD"
           placeholderTextColor={c.textMuted}
-          // @ts-ignore — RNW honors the html input type for date pickers
-          dataDetectorTypes={"none" as any}
-          style={{
-            flex: 1,
-            color: c.textPrimary,
-            fontSize: 15,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-          }}
-          // @ts-ignore — pass through to RNW input
-          type={Platform.OS === "web" ? "date" : undefined}
-          // @ts-ignore — cap min on web to today
-          min={Platform.OS === "web" ? minDate : undefined}
+          style={{ flex: 1, color: c.textPrimary, fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 }}
+          keyboardType="numeric"
         />
         <TouchableOpacity
           testID={`${testID}-pick`}
-          onPress={() => {
-            // On web, focus the input to expose the native browser picker.
-            // On native we just bump to today as a quick default.
-            if (Platform.OS !== "web" && !value) setPreset(0);
-          }}
+          onPress={openPicker}
           style={{ paddingHorizontal: 12, paddingVertical: 12 }}
         >
-          <Ionicons name="calendar-outline" size={18} color={c.textPrimary} />
+          <Ionicons name="calendar-outline" size={18} color="#6D5DFC" />
         </TouchableOpacity>
       </View>
+
       <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
         {presets.map((p) => (
           <TouchableOpacity
             key={p.label}
             testID={`${testID}-preset-${p.days}`}
             onPress={() => setPreset(p.days)}
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 999,
-              backgroundColor: c.surface,
-              borderColor: c.border,
-              borderWidth: 1,
-            }}
+            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1 }}
           >
             <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700" }}>{p.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Date Picker Modal — pure RN, works on web + native */}
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: c.textPrimary, marginBottom: 20 }}>Select {label}</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
+              {[
+                { label: "YYYY", val: py, set: setPy, max: 4, hint: "Year" },
+                { label: "MM",   val: pm, set: setPm, max: 2, hint: "Month" },
+                { label: "DD",   val: pd, set: setPd, max: 2, hint: "Day" },
+              ].map((f) => (
+                <View key={f.label} style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: c.textSecondary, letterSpacing: 1, marginBottom: 6 }}>{f.hint}</Text>
+                  <TextInput
+                    value={f.val}
+                    onChangeText={f.set}
+                    placeholder={f.label}
+                    placeholderTextColor={c.textMuted}
+                    keyboardType="numeric"
+                    maxLength={f.max}
+                    style={{ backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 18, fontWeight: "700", color: c.textPrimary, textAlign: "center" }}
+                  />
+                </View>
+              ))}
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              {presets.map((p) => (
+                <TouchableOpacity key={p.label} onPress={() => { setPreset(p.days); setPickerOpen(false); }} style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center" }}>
+                  <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: "600" }}>{p.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity onPress={confirmPicker} style={{ backgroundColor: "#6D5DFC", borderRadius: 14, padding: 16, alignItems: "center", marginBottom: 10 }}>
+              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Confirm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPickerOpen(false)} style={{ alignItems: "center", padding: 8 }}>
+              <Text style={{ color: c.textSecondary, fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

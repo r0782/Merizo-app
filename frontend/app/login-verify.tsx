@@ -59,8 +59,6 @@ export default function LoginVerifyOTPScreen() {
 
       const { access_token, user } = response.data;
 
-      console.log("✅ OTP Verified, Token:", access_token ? "Found" : "Missing");
-
       if (!access_token) {
         setError("Failed to verify OTP. Please try again.");
         return;
@@ -69,10 +67,8 @@ export default function LoginVerifyOTPScreen() {
       try {
         await loginWithToken(access_token, user);
         await new Promise(resolve => setTimeout(resolve, 500));
-        console.log("✅ Token saved, redirecting...");
         router.replace("/(tabs)/home");
       } catch (err) {
-        console.error("❌ Login error:", err);
         setError("Failed to save login info. Please try again.");
       }
     } catch (e: any) {
@@ -220,7 +216,7 @@ export default function LoginVerifyOTPScreen() {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingTop: 60, paddingBottom: 60 },
   backBtn: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 28, fontFamily: "Syne_700Bold", letterSpacing: -1 },
+  title: { fontSize: 28, fontFamily: "Manrope_700Bold", letterSpacing: -1 },
   subtitle: { fontSize: 14, marginTop: 8, lineHeight: 20, textAlign: "center" },
   form: { width: "100%", maxWidth: 420, alignSelf: "center" },
   otpInput: {

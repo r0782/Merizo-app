@@ -7,7 +7,7 @@ import { api } from "../../src/lib/api";
 
 export default function AuthCallback() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { loginWithToken } = useAuth();
 
   useEffect(() => {
     const handle = async () => {
@@ -22,7 +22,7 @@ export default function AuthCallback() {
           email: session.user?.email || "",
           name: session.user?.user_metadata?.full_name || session.user?.email?.split("@")[0] || "User",
         });
-        await login(r.data.token, r.data.user);
+        await loginWithToken(r.data.token, r.data.user);
         router.replace("/(tabs)/home");
       } catch (e: any) {
         console.error("Auth callback error:", e);

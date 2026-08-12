@@ -156,7 +156,7 @@ export default function RemindersScreen() {
           >
             <Ionicons name="arrow-back" size={20} color={c.textPrimary} />
           </TouchableOpacity>
-          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>Reminders</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" }}>Reminders</Text>
           <TouchableOpacity
             testID="reminders-add"
             onPress={() => setShowAdd(true)}
@@ -316,7 +316,7 @@ function AddReminderSheet({ onClose, onAdded }: any) {
           <View style={[styles.handleBar, { backgroundColor: c.textMuted }]} />
         </View>
         <View style={{ paddingHorizontal: 20 }}>
-          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Syne_700Bold" }}>New reminder</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 22, fontFamily: "Manrope_700Bold" }}>New reminder</Text>
 
           <Text style={[styles.sheetLabel, { color: c.textSecondary }]}>WHAT</Text>
           <TextInput

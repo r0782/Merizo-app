@@ -19,5 +19,11 @@ services:
         value: Demo@123
       - key: DEMO_NAME
         value: Demo User
+      - key: GEMINI_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
       - key: PORT
         value: 8000

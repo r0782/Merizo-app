@@ -1,43 +1,81 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking, Modal, TextInput } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+/**
+ * MERIZO Profile — Notebook-style personal page
+ * White paper + black ink + minimal hand-drawn borders
+ */
+import { useState, useEffect } from "react";
+import {
+  View, Text, ScrollView, TouchableOpacity, Alert,
+  Platform, Linking, Modal, TextInput, Switch,
+} from "react-native";
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Svg, { Path, Circle, Line } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
-import { useEffect } from "react";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
-import { currencySymbol } from "../../src/lib/tokens";
-import { ProGate } from "../../src/components/ProGate";
+import { currencySymbol, type } from "../../src/lib/tokens";
+import { getLanguageMeta, getCurrentLanguage } from "../../src/lib/i18n";
 
-const CURRENCIES = ["INR","USD","EUR","GBP","AED","SGD","JPY","AUD","CAD","THB"];
-const LANGUAGES = ["English","Hindi","Telugu","Tamil","Kannada","Malayalam","Marathi","Bengali","Gujarati"];
+const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "JPY", "AUD", "CAD"];
 
-function Row({ icon, label, sub, onPress, right, danger=false, c, isDark }: any) {
+// ── Ink divider ───────────────────────────────────────────────────────────────
+function InkDivider({ c }: any) {
+  return <View style={{ height: 1, backgroundColor: c.border, opacity: 0.15, marginHorizontal: 20 }} />;
+}
+
+// ── Arrow icon (hand-drawn chevron) ──────────────────────────────────────────
+function ChevronRight({ c }: any) {
   return (
-    <TouchableOpacity onPress={onPress} style={{ flexDirection:"row", alignItems:"center", gap:12, paddingVertical:13, paddingHorizontal:16 }}>
-      <View style={{ width:34, height:34, borderRadius:10, backgroundColor:danger?"rgba(255,67,58,0.1)":"rgba(109,93,252,0.08)", alignItems:"center", justifyContent:"center" }}>
-        <Ionicons name={icon} size={17} color={danger?"#FF453A":"#6D5DFC"} />
+    <Svg width={16} height={16} viewBox="0 0 16 16">
+      <Path d="M 5 3 L 11 8 L 5 13" stroke={c.textMuted} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+// ── Settings row ──────────────────────────────────────────────────────────────
+function ProfileRow({ icon, label, sub, onPress, right, danger = false, c }: any) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.6}
+      style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 14 }}
+    >
+      <View style={{ width: 20, alignItems: "center", opacity: 0.7 }}>
+        {icon({ size: 18, color: danger ? c.textPrimary : c.textPrimary })}
       </View>
-      <View style={{ flex:1 }}>
-        <Text style={{ fontSize:14, fontWeight:"500", color:danger?"#FF453A":c.textPrimary }}>{label}</Text>
-        {sub && <Text style={{ fontSize:12, color:c.textSecondary, marginTop:1 }}>{sub}</Text>}
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: danger ? "#cc0000" : c.textPrimary }}>
+          {label}
+        </Text>
+        {sub && (
+          <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 1 }}>
+            {sub}
+          </Text>
+        )}
       </View>
-      {right !== undefined ? right : <Ionicons name="chevron-forward" size={16} color={c.textMuted} />}
+      {right !== undefined ? right : <ChevronRight c={c} />}
     </TouchableOpacity>
   );
 }
 
-function Divider({ c }: any) {
-  return <View style={{ height:0.5, backgroundColor:c.border, marginLeft:62 }} />;
-}
-
-function Section({ title, children, c, isDark }: any) {
+// ── SVG profile icon ──────────────────────────────────────────────────────────
+function ProfileSketchIcon({ size = 48, initial, c }: any) {
   return (
-    <View style={{ marginHorizontal:20, marginBottom:20 }}>
-      <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>{title}</Text>
-      <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
-        {children}
-      </View>
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <Svg width={size} height={size} viewBox="0 0 48 48">
+        {/* Slightly imperfect circle */}
+        <Path
+          d="M 24 4 Q 40 4 44 20 Q 44 38 24 44 Q 6 42 4 26 Q 2 8 24 4 Z"
+          stroke={c.textPrimary} strokeWidth={1.5} fill={c.surfaceAlt}
+        />
+        {/* Person sketch */}
+        <Circle cx={24} cy={19} r={6} stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
+        <Path d="M 10 40 Q 10 30 24 30 Q 38 30 38 40" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" />
+      </Svg>
+      {/* Initial overlay */}
+      <Text style={{ position: "absolute", fontFamily: type.family.bold, fontSize: size * 0.32, color: c.textPrimary, letterSpacing: -0.5 }}>
+        {initial}
+      </Text>
     </View>
   );
 }
@@ -46,263 +84,228 @@ export default function ProfileScreen() {
   const { c, isDark, toggle } = useTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState({ count:0, settled:0 });
-  const [showPro, setShowPro] = useState(false);
-  const [currency, setCurrency] = useState("INR");
-  const [language, setLanguage] = useState("English");
+
+  const [currency,    setCurrency]    = useState("INR");
   const [editProfile, setEditProfile] = useState(false);
-  const [editName, setEditName] = useState(user?.name || "");
+  const [editName,    setEditName]    = useState(user?.name || "");
   const [notifications, setNotifications] = useState(true);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
-  const [showLangPicker, setShowLangPicker] = useState(false);
+  const [totalGroups, setTotalGroups] = useState(0);
 
-  useFocusEffect(useCallback(() => {
-    api.get("/trips").then(r => {
-      const trips = r.data || [];
-      let settled = 0;
-      trips.forEach((t: any) => { settled += t.total_spent || 0; });
-      setStats({ count: trips.length, settled: Math.round(settled) });
-    }).catch(() => {});
-  }, []));
+  useEffect(() => {
+    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setCurrency(cur); }).catch(() => {});
+    api.get("/trips").then(r => setTotalGroups((r.data || []).length)).catch(() => {});
+  }, []);
 
-  const initial = (user?.name || "U").trim().charAt(0).toUpperCase();
-  const sym = currencySymbol("INR");
+  const initial  = (user?.name || "U").charAt(0).toUpperCase();
+  const sym      = currencySymbol(currency);
+  const langMeta = getLanguageMeta(getCurrentLanguage());
 
   const onSignOut = () => {
     Alert.alert("Sign out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } }
+      { text: "Sign out", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } },
     ]);
   };
 
   const onDeleteAccount = () => {
-    Alert.alert("Delete account", "This will permanently delete your account and all data.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } }
-    ]);
+    Alert.alert("Delete account",
+      "Email support@merizo.app to permanently delete your account.",
+      [{ text: "Cancel", style: "cancel" },
+       { text: "Email Support", onPress: () => Linking.openURL("mailto:support@merizo.app?subject=Delete%20my%20account") }]);
   };
 
-  const onClearData = () => {
-    Alert.alert("Clear all data", "This will delete all your groups and expenses.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Clear", style: "destructive", onPress: () => Alert.alert("Done", "All data cleared.") }
-    ]);
+  // Simple inline SVG icons
+  const icons = {
+    currency:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 10 2 Q 16 2 18 10 Q 16 18 10 18 Q 4 18 2 10 Q 4 2 10 2 Z" stroke={p.color} strokeWidth={1.3} fill="none" /><Text style={{ fontSize: 10, color: p.color, position: "absolute", left: 5, top: 4 }}>₹</Text></Svg>,
+    language:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={10} cy={10} r={7} stroke={p.color} strokeWidth={1.3} fill="none" /><Path d="M 3 10 L 17 10" stroke={p.color} strokeWidth={1} strokeLinecap="round" /><Path d="M 10 3 Q 7 10 10 17" stroke={p.color} strokeWidth={1} fill="none" /><Path d="M 10 3 Q 13 10 10 17" stroke={p.color} strokeWidth={1} fill="none" /></Svg>,
+    ai:        (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 3 5 Q 3 3 5 3 L 15 3 Q 17 3 17 5 L 17 12 Q 17 14 15 14 L 7 14 L 3 17 L 3 5 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /></Svg>,
+    bell:      (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 5 9 Q 5 4 10 4 Q 15 4 15 9 L 16 14 L 4 14 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /><Path d="M 8 14 Q 8 17 10 17 Q 12 17 12 14" stroke={p.color} strokeWidth={1.2} fill="none" /></Svg>,
+    chart:     (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Line x1={2} y1={17} x2={18} y2={17} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={5} y1={17} x2={5} y2={11} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={9} y1={17} x2={9} y2={7} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={13} y1={17} x2={13} y2={12} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={17} y1={17} x2={17} y2={4} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
+    repeat:    (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 4 6 Q 4 3 10 3 Q 16 3 16 8" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 13 1 L 16 3 L 13 5" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /><Path d="M 16 14 Q 16 17 10 17 Q 4 17 4 12" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 7 19 L 4 17 L 7 15" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /></Svg>,
+    question:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={10} cy={10} r={7} stroke={p.color} strokeWidth={1.3} fill="none" /><Path d="M 7 8 Q 7 5 10 5 Q 13 5 13 8 Q 13 10 10 11" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinecap="round" /><Circle cx={10} cy={14.5} r={0.8} fill={p.color} /></Svg>,
+    mail:      (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 2 5 L 10 11 L 18 5" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /><Path d="M 2 5 L 2 16 L 18 16 L 18 5 L 2 5 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /></Svg>,
+    download:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 10 3 L 10 13 M 6 10 L 10 14 L 14 10" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" /><Line x1={3} y1={17} x2={17} y2={17} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
+    trash:     (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 4 6 L 16 6 L 15 17 L 5 17 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /><Line x1={2} y1={6} x2={18} y2={6} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Path d="M 7 6 L 7 4 L 13 4 L 13 6" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /></Svg>,
+    logout:    (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 8 3 L 3 3 L 3 17 L 8 17" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" /><Path d="M 12 7 L 17 10 L 12 13" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" /><Line x1={8} y1={10} x2={17} y2={10} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
+    theme:     (p: any) => isDark
+      ? <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={10} cy={10} r={4} stroke={p.color} strokeWidth={1.3} fill="none" /><Line x1={10} y1={2} x2={10} y2={4} stroke={p.color} strokeWidth={1.2} strokeLinecap="round" /><Line x1={10} y1={16} x2={10} y2={18} stroke={p.color} strokeWidth={1.2} strokeLinecap="round" /><Line x1={2} y1={10} x2={4} y2={10} stroke={p.color} strokeWidth={1.2} strokeLinecap="round" /><Line x1={16} y1={10} x2={18} y2={10} stroke={p.color} strokeWidth={1.2} strokeLinecap="round" /></Svg>
+      : <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 10 3 Q 16 4 16 12 Q 16 18 8 18 Q 2 16 3 10 Q 5 3 10 3 Z" stroke={p.color} strokeWidth={1.3} fill="none" /></Svg>,
   };
+
+  // ── Section label ──────────────────────────────────────────────────────────
+  const SectionLabel = ({ label }: { label: string }) => (
+    <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 }}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+        {label}
+      </Text>
+    </View>
+  );
 
   return (
-    <View style={{ flex:1, backgroundColor:c.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop:Platform.OS==="ios"?56:40, paddingBottom:100 }} showsVerticalScrollIndicator={false}>
-
-        {/* Header */}
-        <View style={{ paddingHorizontal:20, marginBottom:20, flexDirection:"row", alignItems:"center", justifyContent:"space-between" }}>
-          <Text style={{ fontSize:28, fontWeight:"500", color:c.textPrimary, letterSpacing:-0.5 }}>Profile</Text>
-          <TouchableOpacity onPress={toggle} style={{ width:36, height:36, borderRadius:18, backgroundColor:isDark?"#2C2C2E":"#F0EDE8", alignItems:"center", justifyContent:"center" }}>
-            <Ionicons name={isDark?"sunny":"moon"} size={17} color={c.textPrimary} />
-          </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Page heading ── */}
+        <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+          <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
+            Account
+          </Text>
+          <Text style={{ fontFamily: type.family.bold, fontSize: 28, color: c.textPrimary, letterSpacing: -1 }}>
+            Profile
+          </Text>
         </View>
 
-        {/* User card */}
-        <View style={{ marginHorizontal:20, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:20, padding:20, marginBottom:20, borderWidth:0.5, borderColor:c.border, flexDirection:"row", alignItems:"center", gap:14 }}>
-          <View style={{ width:56, height:56, borderRadius:28, backgroundColor:"#111", alignItems:"center", justifyContent:"center" }}>
-            <Text style={{ fontSize:22, fontWeight:"500", color:"#fff" }}>{initial}</Text>
-          </View>
-          <View style={{ flex:1 }}>
-            <Text style={{ fontSize:18, fontWeight:"500", color:c.textPrimary, marginBottom:2 }}>{user?.name || "User"}</Text>
-            <Text style={{ fontSize:13, color:c.textSecondary }}>{user?.email || ""}</Text>
-          </View>
-        </View>
+        <View style={{ height: 1, backgroundColor: c.border, opacity: 0.3, marginHorizontal: 20 }} />
 
-        {/* Stats */}
-        <View style={{ flexDirection:"row", gap:10, paddingHorizontal:20, marginBottom:20 }}>
-          {[
-            { label:"GROUPS", value:String(stats.count) },
-            { label:"TOTAL SPENT", value:`${sym}${stats.settled.toLocaleString("en-IN")}` },
-            { label:"ACTIVE", value:String(stats.count) },
-          ].map((s,i) => (
-            <View key={i} style={{ flex:1, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:12, borderWidth:0.5, borderColor:c.border }}>
-              <Text style={{ fontSize:9, fontWeight:"600", color:c.textSecondary, letterSpacing:1, marginBottom:4 }}>{s.label}</Text>
-              <Text style={{ fontSize:i===1?13:18, fontWeight:"500", color:i===1?"#6D5DFC":c.textPrimary }} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Pro upgrade */}
-        <TouchableOpacity onPress={()=>setShowPro(true)} style={{ marginHorizontal:20, marginBottom:20, backgroundColor:"#111", borderRadius:18, padding:18 }}>
-          <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between" }}>
-            <View>
-              <View style={{ flexDirection:"row", alignItems:"center", gap:8, marginBottom:4 }}>
-                <View style={{ backgroundColor:"#6D5DFC", borderRadius:6, paddingHorizontal:6, paddingVertical:2 }}>
-                  <Text style={{ color:"#fff", fontSize:9, fontWeight:"700" }}>PRO</Text>
-                </View>
-                <Text style={{ color:"#fff", fontSize:14, fontWeight:"500" }}>Upgrade to Merizo Pro</Text>
-              </View>
-              <Text style={{ color:"rgba(255,255,255,0.4)", fontSize:12 }}>AI insights, graphs, exports · ₹299/mo</Text>
-            </View>
-            <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.4)" />
+        {/* ── User identity card ── */}
+        <TouchableOpacity
+          onPress={() => setEditProfile(true)}
+          activeOpacity={0.7}
+          style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 20, gap: 16 }}
+        >
+          <ProfileSketchIcon size={52} initial={initial} c={c} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, letterSpacing: -0.3 }}>
+              {user?.name || "User"}
+            </Text>
+            <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, marginTop: 2 }}>
+              {user?.email || ""}
+            </Text>
+            <Text style={{ fontFamily: type.family.light, fontSize: 11, color: c.textMuted, marginTop: 4 }}>
+              {totalGroups} group{totalGroups !== 1 ? "s" : ""} · tap to edit
+            </Text>
           </View>
+          <Svg width={16} height={16} viewBox="0 0 16 16">
+            <Path d="M 3 12 L 10 5 M 8 3 L 13 3 L 13 8" stroke={c.textMuted} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
         </TouchableOpacity>
 
-        {/* Appearance */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>Appearance</Text>
-          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, padding:16, borderWidth:0.5, borderColor:c.border }}>
-            <View style={{ flexDirection:"row", backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:12, padding:3, gap:2 }}>
-              <TouchableOpacity onPress={()=>isDark&&toggle()} style={{ flex:1, paddingVertical:9, alignItems:"center", borderRadius:9, backgroundColor:!isDark?"#fff":"transparent" }}>
-                <Text style={{ fontSize:13, fontWeight:!isDark?"500":"400", color:!isDark?"#6D5DFC":c.textSecondary }}>☀️ Light</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={()=>!isDark&&toggle()} style={{ flex:1, paddingVertical:9, alignItems:"center", borderRadius:9, backgroundColor:isDark?"#1C1C1E":"transparent" }}>
-                <Text style={{ fontSize:13, fontWeight:isDark?"500":"400", color:isDark?"#7B6FFF":c.textSecondary }}>🌙 Dark</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <View style={{ height: 1, backgroundColor: c.border, opacity: 0.3, marginHorizontal: 20 }} />
 
-        {/* Preferences */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>Preferences</Text>
-          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
-            <Row icon="card" label="Default Currency" sub={currency} onPress={()=>setShowCurrencyPicker(true)} c={c} isDark={isDark} />
-            <Divider c={c} />
-            <Row icon="globe" label="Language" sub={language} onPress={()=>setShowLangPicker(true)} c={c} isDark={isDark} />
-            <Divider c={c} />
-            <Row icon="notifications" label="Notifications" sub="Expense reminders" c={c} isDark={isDark}
-              right={<Switch value={notifications} onValueChange={setNotifications} trackColor={{false:"#ccc",true:"#6D5DFC"}} />} />
-          </View>
-        </View>
+        {/* ── Preferences ── */}
+        <SectionLabel label="Preferences" />
+        <ProfileRow icon={icons.currency} label="Currency" sub={`${sym} · ${currency}`} onPress={() => setShowCurrencyPicker(true)} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.language} label="Language" sub={langMeta.nativeName} onPress={() => router.push("/language-settings")} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.ai} label="AI Settings" sub="Voice, provider, TTS" onPress={() => router.push("/ai-settings")} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.theme}   label={isDark ? "Light Mode" : "Dark Mode"} onPress={toggle} c={c} right={null} />
+        <InkDivider c={c} />
+        <ProfileRow
+          icon={icons.bell}
+          label="Notifications"
+          onPress={() => {}}
+          c={c}
+          right={
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              trackColor={{ false: c.surfaceAlt, true: c.textPrimary }}
+              thumbColor={c.bg}
+              style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+            />
+          }
+        />
 
-        {/* Features */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>Features</Text>
-          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
-            <Row icon="bar-chart" label="Spending Analytics" sub="View charts and graphs" onPress={()=>setShowPro(true)} c={c} isDark={isDark} />
-            <Divider c={c} />
-            <Row icon="repeat" label="Recurring Expenses" sub="Smart subscriptions" onPress={()=>router.push("/recurring")} c={c} isDark={isDark} />
-          </View>
-        </View>
+        {/* ── Features ── */}
+        <SectionLabel label="Features" />
+        <ProfileRow icon={icons.chart}  label="Spending Analytics" sub="Charts & insights" onPress={() => router.push("/(tabs)/insights")} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.repeat} label="Recurring Expenses" sub="Subscriptions" onPress={() => router.push("/recurring")} c={c} />
 
-        {/* Support */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>Support</Text>
-          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
-            <Row icon="help-circle" label="Help & FAQ" sub="Common questions" onPress={()=>Linking.openURL("https://merizo-app.onrender.com")} c={c} isDark={isDark} />
-            <Divider c={c} />
-            <Row icon="chatbubble" label="Contact Us" sub="support@merizo.app" onPress={()=>Linking.openURL("mailto:support@merizo.app")} c={c} isDark={isDark} />
-          </View>
-        </View>
+        {/* ── Support ── */}
+        <SectionLabel label="Support" />
+        <ProfileRow icon={icons.question} label="Help & FAQ" onPress={() => Linking.openURL("https://merizo-app.onrender.com")} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.mail} label="Contact Us" sub="support@merizo.app" onPress={() => Linking.openURL("mailto:support@merizo.app")} c={c} />
 
-        {/* Data */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8, paddingHorizontal:4 }}>Data</Text>
-          <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:16, overflow:"hidden", borderWidth:0.5, borderColor:c.border }}>
-            <Row icon="download" label="Export Data" sub="Download expense history" onPress={()=>setShowPro(true)} c={c} isDark={isDark} />
-            <Divider c={c} />
-            <Row icon="trash" label="Clear All Data" sub="Delete all groups and expenses" onPress={onClearData} c={c} isDark={isDark} danger />
-          </View>
-        </View>
+        {/* ── Data ── */}
+        <SectionLabel label="Data" />
+        <ProfileRow icon={icons.download} label="Export Data" sub="Download expense history" onPress={() => Alert.alert("Export", "This feature is coming soon.")} c={c} />
 
-        {/* Included features */}
-        <View style={{ marginHorizontal:20, marginBottom:20 }}>
-          <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:10 }}>Included Features</Text>
-          <View style={{ flexDirection:"row", flexWrap:"wrap", gap:8 }}>
-            {["Unlimited Groups","Unlimited Expenses","100+ Currencies","7+ Languages","Offline Mode","Ad-Free","Split by %/Shares","Categories","Recurring Expenses"].map((f,i)=>(
-              <View key={i} style={{ flexDirection:"row", alignItems:"center", gap:5 }}>
-                <Ionicons name="checkmark" size={13} color="#00C48C" />
-                <Text style={{ fontSize:12, color:c.textSecondary }}>{f}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        {/* ── Account actions ── */}
+        <SectionLabel label="Account" />
+        <ProfileRow icon={icons.logout} label="Sign Out" onPress={onSignOut} c={c} danger />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.trash} label="Delete Account" onPress={onDeleteAccount} c={c} danger />
 
-        {/* Sign out / Delete */}
-        <View style={{ paddingHorizontal:20, gap:10, marginBottom:20 }}>
-          <TouchableOpacity onPress={onSignOut} style={{ borderRadius:14, padding:16, alignItems:"center", borderWidth:1.5, borderColor:"#FF453A" }}>
-            <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
-              <Ionicons name="log-out" size={18} color="#FF453A" />
-              <Text style={{ fontSize:15, fontWeight:"500", color:"#FF453A" }}>Sign Out</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onDeleteAccount} style={{ borderRadius:14, padding:16, alignItems:"center", borderWidth:1.5, borderColor:"#FF453A" }}>
-            <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
-              <Ionicons name="trash" size={18} color="#FF453A" />
-              <Text style={{ fontSize:15, fontWeight:"500", color:"#FF453A" }}>Delete Account</Text>
-            </View>
-          </TouchableOpacity>
+        {/* ── Footer ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 8 }}>
+          <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, textAlign: "center", letterSpacing: 1.5, textTransform: "uppercase", opacity: 0.4 }}>
+            MERIZO · v1.0.0
+          </Text>
         </View>
-
-        <Text style={{ textAlign:"center", color:c.textMuted, fontSize:12, marginBottom:20 }}>Merizo AI · Made with ❤️</Text>
       </ScrollView>
 
-      {/* Currency Picker Modal */}
-      <Modal visible={showCurrencyPicker} transparent animationType="slide" onRequestClose={()=>setShowCurrencyPicker(false)}>
-        <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end" }}>
-          <View style={{ backgroundColor:c.bg, borderTopLeftRadius:24, borderTopRightRadius:24, padding:20, paddingBottom:40 }}>
-            <Text style={{ fontSize:16, fontWeight:"500", color:c.textPrimary, marginBottom:16 }}>Select Currency</Text>
+      {/* ── Currency Picker ── */}
+      <Modal visible={showCurrencyPicker} transparent animationType="slide" onRequestClose={() => setShowCurrencyPicker(false)}>
+        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
+            <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 20, letterSpacing: -0.3 }}>
+              Select Currency
+            </Text>
             {CURRENCIES.map(cur => (
-              <TouchableOpacity key={cur} onPress={()=>{setCurrency(cur);setShowCurrencyPicker(false);}} style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:c.border }}>
-                <Text style={{ fontSize:15, color:c.textPrimary }}>{cur}</Text>
-                {currency===cur && <Ionicons name="checkmark" size={18} color="#6D5DFC" />}
+              <TouchableOpacity
+                key={cur}
+                onPress={() => { setCurrency(cur); AsyncStorage.setItem("merizo_currency", cur).catch(() => {}); setShowCurrencyPicker(false); }}
+                style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, opacity: currency === cur ? 1 : 0.7 }}
+              >
+                <Text style={{ fontFamily: currency === cur ? type.family.semibold : type.family.regular, fontSize: type.size.base, color: c.textPrimary }}>
+                  {cur}
+                </Text>
+                {currency === cur && (
+                  <Svg width={16} height={16} viewBox="0 0 16 16">
+                    <Path d="M 2 8 L 6 12 L 14 4" stroke={c.textPrimary} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                )}
               </TouchableOpacity>
             ))}
           </View>
         </View>
       </Modal>
 
-      {/* Language Picker Modal */}
-      <Modal visible={showLangPicker} transparent animationType="slide" onRequestClose={()=>setShowLangPicker(false)}>
-        <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end" }}>
-          <View style={{ backgroundColor:c.bg, borderTopLeftRadius:24, borderTopRightRadius:24, padding:20, paddingBottom:40 }}>
-            <Text style={{ fontSize:16, fontWeight:"500", color:c.textPrimary, marginBottom:16 }}>Select Language</Text>
-            {LANGUAGES.map(lang => (
-              <TouchableOpacity key={lang} onPress={()=>{ setLanguage(lang); setShowLangPicker(false); Alert.alert('Language updated', `App language set to ${lang}. Full translation coming soon.`); }} style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:c.border }}>
-                <Text style={{ fontSize:15, color:c.textPrimary }}>{lang}</Text>
-                {language===lang && <Ionicons name="checkmark" size={18} color="#6D5DFC" />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Edit Profile Modal */}
-      <Modal visible={editProfile} transparent animationType="slide" onRequestClose={()=>setEditProfile(false)}>
-        <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end" }}>
-          <View style={{ backgroundColor:c.bg, borderTopLeftRadius:28, borderTopRightRadius:28, padding:24, paddingBottom:40 }}>
-            <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-              <Text style={{ fontSize:18, fontWeight:"500", color:c.textPrimary }}>Edit Profile</Text>
-              <TouchableOpacity onPress={()=>setEditProfile(false)} style={{ width:32, height:32, borderRadius:16, backgroundColor:isDark?"#2C2C2E":"#F0EDE8", alignItems:"center", justifyContent:"center" }}>
-                <Ionicons name="close" size={16} color={c.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize:12, color:c.textSecondary, marginBottom:6 }}>Display Name</Text>
+      {/* ── Edit Profile Modal ── */}
+      <Modal visible={editProfile} transparent animationType="slide" onRequestClose={() => setEditProfile(false)}>
+        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
+            <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 20, letterSpacing: -0.3 }}>
+              Edit Profile
+            </Text>
+            <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+              Name
+            </Text>
             <TextInput
               value={editName}
               onChangeText={setEditName}
               placeholder="Your name"
               placeholderTextColor={c.textMuted}
-              style={{ backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:12, paddingHorizontal:14, paddingVertical:12, fontSize:15, color:c.textPrimary, marginBottom:16 }}
+              style={{
+                borderWidth: 1, borderColor: c.border,
+                paddingHorizontal: 14, paddingVertical: 12,
+                fontSize: type.size.base, color: c.textPrimary,
+                fontFamily: type.family.regular, marginBottom: 20,
+              } as any}
             />
-            <Text style={{ fontSize:12, color:c.textSecondary, marginBottom:6 }}>Email</Text>
-            <View style={{ backgroundColor:isDark?"#2C2C2E":"#F0EDE8", borderRadius:12, paddingHorizontal:14, paddingVertical:12, marginBottom:20, opacity:0.6 }}>
-              <Text style={{ fontSize:15, color:c.textSecondary }}>{user?.email}</Text>
-            </View>
             <TouchableOpacity
               onPress={async () => {
                 try {
                   await api.patch("/auth/profile", { name: editName });
                   setEditProfile(false);
-                  Alert.alert("✓ Updated", "Profile updated successfully!");
-                } catch {
-                  Alert.alert("Error", "Could not update profile. Please try again.");
-                }
+                } catch { Alert.alert("Error", "Could not update profile."); }
               }}
-              style={{ backgroundColor:"#6D5DFC", borderRadius:14, padding:16, alignItems:"center" }}>
-              <Text style={{ color:"#fff", fontSize:15, fontWeight:"500" }}>Save Changes</Text>
+              style={{ borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
+            >
+              <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>
+                Save
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
-
-      <ProGate visible={showPro} onClose={()=>setShowPro(false)} feature="Pro Features" />
     </View>
   );
 }

@@ -1,58 +1,60 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Dimensions,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { validateEmail as validateEmailAPI, detectUserLocation } from "../src/lib/externalApis";
+import { validateEmail as validateEmailAPI } from "../src/lib/externalApis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
-import { useAuth }  from "../src/lib/auth";
-import { api }      from "../src/lib/api";
+import { useAuth } from "../src/lib/auth";
+import { api } from "../src/lib/api";
 import { supabase } from "../src/lib/supabase";
 
-// STABLE InputRow — defined outside component to prevent re-render focus loss
-function StableInputRow({ icon, children, inp, border, sub }: any) {
+function InputField({ icon, children, c }: any) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inp,
-      borderRadius: 16, borderWidth: 1, borderColor: border,
+    <View style={{
+      flexDirection: "row", alignItems: "center",
+      backgroundColor: c.surface, borderRadius: 12,
+      borderWidth: 1, borderColor: c.border,
       paddingHorizontal: 16, gap: 12, marginBottom: 12,
-      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width:0,height:2 }, elevation:2 }}>
-      <Ionicons name={icon as any} size={18} color={sub} style={{ flexShrink:0 }}/>
+    }}>
+      <Ionicons name={icon} size={16} color={c.textMuted} style={{ flexShrink: 0 }} />
       {children}
     </View>
   );
 }
 
-const { width, height } = Dimensions.get("window");
-
 type Screen = "main" | "email_otp" | "phone_otp" | "verify_email" | "verify_phone";
 
 export default function LoginScreen() {
-  const { c, isDark } = useTheme();
-  const { login, loginWithToken } = useAuth();
-  const router        = useRouter();
+  const { c } = useTheme();
+  const { loginWithToken } = useAuth();
+  const router = useRouter();
 
-  const [screen,   setScreen]   = useState<Screen>("main");
-  const [email,    setEmail]    = useState("");
+  const [screen, setScreen] = useState<Screen>("main");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone,    setPhone]    = useState("");
-  const [otp,      setOtp]      = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const bg      = isDark ? "#0F0D0A" : "#F5F2ED";
-  const card    = isDark ? "#1C1814" : "#FFFFFF";
-  const inp     = isDark ? "#231F1A" : "#FFFFFF";
-  const border  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const blob1   = isDark ? "rgba(255,255,255,0.03)" : "rgba(210,195,175,0.55)";
-  const blob2   = isDark ? "rgba(255,255,255,0.02)" : "rgba(180,165,145,0.45)";
-  const txt     = isDark ? "#F4E6D0" : "#1A1208";
-  const sub     = isDark ? "#9A7B5E" : "#8C7A68";
-  const accent  = isDark ? "#F4E6D0" : "#1A1208";
+  const doForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert("Enter your email first", "Type your email above, then tap Forgot password.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/auth/forgot-password", { email: email.trim().toLowerCase() });
+      Alert.alert("Check your inbox", "If that email is registered you'll receive a reset link shortly.");
+    } catch {
+      Alert.alert("Check your inbox", "If that email is registered you'll receive a reset link shortly.");
+    } finally { setLoading(false); }
+  };
 
-  // ── Password login ───────────────────────────────────────────────────────
   const demoLogin = async () => {
     setLoading(true);
     try {
@@ -66,14 +68,11 @@ export default function LoginScreen() {
 
   const doLogin = async () => {
     if (!email.trim() || !password) { Alert.alert("Fill in all fields"); return; }
-    // Validate email format
     const emailCheck = await validateEmailAPI(email.trim());
     if (!emailCheck.format) { Alert.alert("Invalid email", "Please enter a valid email address."); return; }
     setLoading(true);
     try {
-      const r = await api.post("/auth/login", {
-        email: email.trim().toLowerCase(), password,
-      });
+      const r = await api.post("/auth/login", { email: email.trim().toLowerCase(), password });
       await loginWithToken(r.data.access_token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
@@ -81,7 +80,6 @@ export default function LoginScreen() {
     } finally { setLoading(false); }
   };
 
-  // ── Send OTP ─────────────────────────────────────────────────────────────
   const sendEmailOtp = async () => {
     if (!email.trim()) { Alert.alert("Enter your email"); return; }
     setLoading(true);
@@ -111,7 +109,6 @@ export default function LoginScreen() {
     } finally { setLoading(false); }
   };
 
-  // ── Verify OTP ───────────────────────────────────────────────────────────
   const verifyOtp = async (type: "email" | "phone") => {
     if (otp.length < 6) { Alert.alert("Enter the 6-digit code"); return; }
     setLoading(true);
@@ -124,7 +121,7 @@ export default function LoginScreen() {
         if (error) throw error;
         session = data.session;
       } else {
-        const num = "+91" + phone.replace(/\D/g,"").slice(-10);
+        const num = "+91" + phone.replace(/\D/g, "").slice(-10);
         const { data, error } = await supabase.auth.verifyOtp({
           phone: num, token: otp, type: "sms",
         });
@@ -135,18 +132,17 @@ export default function LoginScreen() {
         supabase_token: session?.access_token,
         email: session?.user?.email || email,
         phone: session?.user?.phone || phone,
-        name:  session?.user?.user_metadata?.full_name
-             || session?.user?.email?.split("@")[0]
-             || "User",
+        name: session?.user?.user_metadata?.full_name
+          || session?.user?.email?.split("@")[0]
+          || "User",
       });
-      await loginWithToken(r.data.access_token, r.data.user);
+      await loginWithToken(r.data.token, r.data.user);
       router.replace("/(tabs)/home");
     } catch (e: any) {
       Alert.alert("Invalid code", e?.message || "Try again");
     } finally { setLoading(false); }
   };
 
-  // ── Google OAuth ─────────────────────────────────────────────────────────
   const doGoogle = async () => {
     setLoading(true);
     try {
@@ -159,249 +155,264 @@ export default function LoginScreen() {
     } finally { setLoading(false); }
   };
 
-  // ── Shared input style ───────────────────────────────────────────────────
-  const InputRow = React.useCallback(({ icon, children }: { icon: string; children: React.ReactNode }) => (
-    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inp,
-      borderRadius: 16, borderWidth: 1, borderColor: border,
-      paddingHorizontal: 16, gap: 12, marginBottom: 12,
-      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width:0,height:2 }, elevation:2 }}>
-      <Ionicons name={icon as any} size={18} color={sub} style={{ flexShrink:0 }}/>
-      {children}
-    </View>
-  ), [inp, border, sub]);
-
-  const PrimaryBtn = ({ onPress, label }: { onPress:()=>void; label:string }) => (
-    <TouchableOpacity onPress={onPress} disabled={loading}
-      style={{ backgroundColor: accent, borderRadius: 16, padding: 18, flexDirection: "row",
-        alignItems: "center", justifyContent: "center", gap: 10, marginTop: 8,
-        shadowColor: accent, shadowOpacity: 0.25, shadowRadius: 16, shadowOffset:{width:0,height:6}, elevation:6 }}>
+  const PrimaryBtn = ({ onPress, label }: { onPress: () => void; label: string }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={loading}
+      activeOpacity={0.85}
+      style={{
+        backgroundColor: c.textPrimary, borderRadius: 12, padding: 16,
+        alignItems: "center", justifyContent: "center", marginTop: 8,
+        opacity: loading ? 0.6 : 1,
+      }}
+    >
       {loading
-        ? <ActivityIndicator color={isDark?"#1A1208":"#FFF"}/>
-        : <>
-            <Text style={{ color: isDark ? "#1A1208" : "#FFF", fontSize: 16, fontWeight: "800" }}>{label}</Text>
-            <Ionicons name="arrow-forward" size={18} color={isDark?"#1A1208":"#FFF"}/>
-          </>
+        ? <ActivityIndicator color={c.bg} />
+        : <Text style={{ color: c.bg, fontSize: 15, fontWeight: "600", letterSpacing: 0.2 }}>{label}</Text>
       }
     </TouchableOpacity>
   );
 
-  // ── OTP verify screen ─────────────────────────────────────────────────────
+  const BackBtn = ({ to }: { to: Screen }) => (
+    <TouchableOpacity
+      onPress={() => { setScreen(to); setOtp(""); }}
+      style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 40 }}
+    >
+      <Ionicons name="arrow-back" size={18} color={c.textSecondary} />
+      <Text style={{ color: c.textSecondary, fontSize: 14 }}>Back</Text>
+    </TouchableOpacity>
+  );
+
+  // ── OTP verify screen ──────────────────────────────────────────────────────
   if (screen === "verify_email" || screen === "verify_phone") {
     const isEmail = screen === "verify_email";
     return (
-      <View style={{ flex:1, backgroundColor:bg }}>
-        <Blob1 color={blob1}/><Blob2 color={blob2}/>
-        <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
-            <TouchableOpacity onPress={()=>{setScreen(isEmail?"email_otp":"phone_otp");setOtp("");}}
-              style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
-              <Ionicons name="arrow-back" size={20} color={sub}/>
-              <Text style={{color:sub,fontSize:14}}>Back</Text>
-            </TouchableOpacity>
-
-            <Logo card={card} txt={txt}/>
-            <Text style={{color:txt,fontSize:28,fontWeight:"800",marginTop:24,marginBottom:8}}>Enter the code</Text>
-            <Text style={{color:sub,fontSize:14,lineHeight:22,marginBottom:32}}>
-              {isEmail ? "We sent a 6-digit code to\n"+email : "We sent a 6-digit SMS to +91 "+phone}
-            </Text>
-
-            <TextInput
-              value={otp} onChangeText={v=>setOtp(v.replace(/\D/g,"").slice(0,6))}
-              placeholder="• • • • • •" placeholderTextColor={sub}
-              keyboardType="number-pad" maxLength={6}
-              style={{backgroundColor:inp,borderRadius:16,borderWidth:1,borderColor:border,
-                padding:20,fontSize:32,fontWeight:"800",color:txt,textAlign:"center",
-                letterSpacing:16,marginBottom:16} as any}
-            />
-
-            <PrimaryBtn onPress={()=>verifyOtp(isEmail?"email":"phone")} label="Verify Code"/>
-
-            <TouchableOpacity onPress={isEmail?sendEmailOtp:sendPhoneOtp}
-              style={{alignItems:"center",paddingVertical:16,marginTop:4}}>
-              <Text style={{color:sub,fontSize:14}}>Didn't get it? <Text style={{color:accent,fontWeight:"700"}}>Resend</Text></Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  // ── Email OTP screen ──────────────────────────────────────────────────────
-  if (screen === "email_otp") {
-    return (
-      <View style={{flex:1,backgroundColor:bg}}>
-        <Blob1 color={blob1}/><Blob2 color={blob2}/>
-        <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
-            <TouchableOpacity onPress={()=>setScreen("main")} style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
-              <Ionicons name="arrow-back" size={20} color={sub}/>
-              <Text style={{color:sub,fontSize:14}}>Back</Text>
-            </TouchableOpacity>
-            <Logo card={card} txt={txt}/>
-            <Text style={{color:txt,fontSize:28,fontWeight:"800",marginTop:24,marginBottom:8}}>Sign in with Email</Text>
-            <Text style={{color:sub,fontSize:14,marginBottom:32}}>We'll send a 6-digit code — no password needed</Text>
-            <StableInputRow icon="mail-outline" inp={inp} border={border} sub={sub}>
-              <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com"
-                placeholderTextColor={sub} keyboardType="email-address" autoCapitalize="none"
-                style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
-            </StableInputRow>
-            <PrimaryBtn onPress={sendEmailOtp} label="Send Code"/>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  // ── Phone OTP screen ──────────────────────────────────────────────────────
-  if (screen === "phone_otp") {
-    return (
-      <View style={{flex:1,backgroundColor:bg}}>
-        <Blob1 color={blob1}/><Blob2 color={blob2}/>
-        <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-          <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}} keyboardShouldPersistTaps="always">
-            <TouchableOpacity onPress={()=>setScreen("main")} style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:32}}>
-              <Ionicons name="arrow-back" size={20} color={sub}/>
-              <Text style={{color:sub,fontSize:14}}>Back</Text>
-            </TouchableOpacity>
-            <Logo card={card} txt={txt}/>
-            <Text style={{color:txt,fontSize:28,fontWeight:"800",marginTop:24,marginBottom:8}}>Sign in with Phone</Text>
-            <Text style={{color:sub,fontSize:14,marginBottom:32}}>We'll send a 6-digit SMS to your number</Text>
-            <View style={{flexDirection:"row",alignItems:"center",backgroundColor:inp,
-              borderRadius:16,borderWidth:1,borderColor:border,paddingHorizontal:16,gap:10,marginBottom:12}}>
-              <View style={{flexDirection:"row",alignItems:"center",gap:6,paddingVertical:18,
-                borderRightWidth:1,borderRightColor:border,paddingRight:12}}>
-                <Text style={{fontSize:18}}>🇮🇳</Text>
-                <Text style={{color:txt,fontSize:15,fontWeight:"700"}}>+91</Text>
-              </View>
-              <TextInput value={phone} onChangeText={v=>setPhone(v.replace(/\D/g,"").slice(0,10))}
-                placeholder="98765 43210" placeholderTextColor={sub}
-                keyboardType="phone-pad" maxLength={10}
-                style={{flex:1,fontSize:16,color:txt,paddingVertical:18} as any}/>
-            </View>
-            <PrimaryBtn onPress={sendPhoneOtp} label="Send OTP"/>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  // ── Main login screen ─────────────────────────────────────────────────────
-  return (
-    <View style={{flex:1,backgroundColor:bg}}>
-      <Blob1 color={blob1}/><Blob2 color={blob2}/>
-      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-        <ScrollView contentContainerStyle={{flexGrow:1,padding:28,justifyContent:"center"}}
-          keyboardShouldPersistTaps="always" showsVerticalScrollIndicator={false}>
-
-          <Logo card={card} txt={txt}/>
-
-          <Text style={{color:txt,fontSize:38,fontWeight:"900",marginTop:24,letterSpacing:-1}}>Merizo</Text>
-          <Text style={{color:sub,fontSize:15,marginTop:6,marginBottom:36}}>Split smarter. Settle faster.</Text>
-
-          {/* Email */}
-          <StableInputRow icon="mail-outline" inp={inp} border={border} sub={sub}>
-            <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com"
-              placeholderTextColor={sub} keyboardType="email-address" autoCapitalize="none"
-              autoCorrect={false} autoComplete="email" blurOnSubmit={false}
-              style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
-          </StableInputRow>
-
-          {/* Password */}
-          <StableInputRow icon="lock-closed-outline" inp={inp} border={border} sub={sub}>
-            <TextInput value={password} onChangeText={setPassword} placeholder="••••••••"
-              placeholderTextColor={sub} secureTextEntry={!showPw}
-              autoComplete="password" blurOnSubmit={false}
-              style={{flex:1,fontSize:15,color:txt,paddingVertical:18} as any}/>
-            <TouchableOpacity onPress={()=>setShowPw(s=>!s)}>
-              <Ionicons name={showPw?"eye-off-outline":"eye-outline"} size={18} color={sub}/>
-            </TouchableOpacity>
-          </StableInputRow>
-
-          {/* Forgot */}
-          <TouchableOpacity style={{alignSelf:"flex-end",marginBottom:4}}>
-            <Text style={{color:sub,fontSize:13}}>Forgot password?</Text>
-          </TouchableOpacity>
-
-          {/* Sign In */}
-          <PrimaryBtn onPress={doLogin} label="Sign In"/>
-
-          {/* Divider */}
-          <View style={{flexDirection:"row",alignItems:"center",gap:12,marginVertical:24}}>
-            <View style={{flex:1,height:1,backgroundColor:border}}/>
-            <Text style={{color:sub,fontSize:13}}>or continue with</Text>
-            <View style={{flex:1,height:1,backgroundColor:border}}/>
-          </View>
-
-          {/* Google */}
-          <TouchableOpacity onPress={doGoogle} disabled={loading}
-            style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
-              backgroundColor:card,borderRadius:16,padding:16,borderWidth:1,borderColor:border,
-              shadowColor:"#000",shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:2},elevation:2,marginBottom:12}}>
-            <GoogleIcon/>
-            <Text style={{color:txt,fontSize:15,fontWeight:"700"}}>Continue with Google</Text>
-          </TouchableOpacity>
-
-
-
-          {/* Demo login */}
-          <TouchableOpacity onPress={demoLogin}
-            style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
-              backgroundColor:"rgba(109,93,252,0.08)",borderRadius:16,padding:16,borderWidth:1,borderColor:"rgba(109,93,252,0.2)",marginBottom:12}}>
-            <Ionicons name="sparkles" size={20} color="#6D5DFC"/>
-            <Text style={{color:"#6D5DFC",fontSize:15,fontWeight:"600"}}>Try Demo Account</Text>
-          </TouchableOpacity>
-          {/* Phone OTP */}
-          <TouchableOpacity onPress={()=>setScreen("phone_otp")}
-            style={{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,
-              backgroundColor:card,borderRadius:16,padding:16,borderWidth:1,borderColor:border,
-              shadowColor:"#000",shadowOpacity:0.04,shadowRadius:6,shadowOffset:{width:0,height:1},elevation:1,marginBottom:24}}>
-            <Text style={{fontSize:20}}>🇮🇳</Text>
-            <Text style={{color:txt,fontSize:15,fontWeight:"600"}}>Continue with Phone OTP</Text>
-          </TouchableOpacity>
-
-          {/* Register */}
-          <TouchableOpacity onPress={()=>router.push("/register")} style={{alignItems:"center"}}>
-            <Text style={{color:sub,fontSize:14}}>
-              No account?{" "}
-              <Text style={{color:txt,fontWeight:"800",textDecorationLine:"underline"}}>Create one</Text>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
+          <BackBtn to={isEmail ? "email_otp" : "phone_otp"} />
+          <Wordmark c={c} />
+          <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
+            Enter the code
+          </Text>
+          <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 40 }}>
+            {isEmail ? `Sent to ${email}` : `Sent via SMS to +91 ${phone}`}
+          </Text>
+          <TextInput
+            value={otp}
+            onChangeText={v => setOtp(v.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            placeholderTextColor={c.textMuted}
+            keyboardType="number-pad"
+            maxLength={6}
+            style={{
+              backgroundColor: c.surface, borderRadius: 12,
+              borderWidth: 1, borderColor: c.border,
+              padding: 20, fontSize: 28, fontWeight: "700",
+              color: c.textPrimary, textAlign: "center",
+              letterSpacing: 12, marginBottom: 16,
+            } as any}
+          />
+          <PrimaryBtn onPress={() => verifyOtp(isEmail ? "email" : "phone")} label="Verify" />
+          <TouchableOpacity onPress={isEmail ? sendEmailOtp : sendPhoneOtp} style={{ alignItems: "center", paddingVertical: 20 }}>
+            <Text style={{ color: c.textSecondary, fontSize: 14 }}>
+              Didn't receive it?{" "}
+              <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Resend</Text>
             </Text>
           </TouchableOpacity>
-
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    );
+  }
+
+  // ── Email OTP screen ───────────────────────────────────────────────────────
+  if (screen === "email_otp") {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
+          <BackBtn to="main" />
+          <Wordmark c={c} />
+          <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
+            Sign in with email
+          </Text>
+          <Text style={{ color: c.textSecondary, fontSize: 14, marginBottom: 40 }}>
+            We'll send a 6-digit code — no password needed
+          </Text>
+          <InputField icon="mail-outline" c={c}>
+            <TextInput
+              value={email} onChangeText={setEmail}
+              placeholder="you@example.com" placeholderTextColor={c.textMuted}
+              keyboardType="email-address" autoCapitalize="none"
+              style={{ flex: 1, fontSize: 15, color: c.textPrimary, paddingVertical: 16 } as any}
+            />
+          </InputField>
+          <PrimaryBtn onPress={sendEmailOtp} label="Send code" />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Phone OTP screen ───────────────────────────────────────────────────────
+  if (screen === "phone_otp") {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
+          <BackBtn to="main" />
+          <Wordmark c={c} />
+          <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
+            Sign in with phone
+          </Text>
+          <Text style={{ color: c.textSecondary, fontSize: 14, marginBottom: 40 }}>
+            We'll send a 6-digit SMS code
+          </Text>
+          <View style={{
+            flexDirection: "row", alignItems: "center",
+            backgroundColor: c.surface, borderRadius: 12,
+            borderWidth: 1, borderColor: c.border,
+            paddingHorizontal: 16, gap: 10, marginBottom: 16,
+          }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 16, borderRightWidth: 1, borderRightColor: c.border, paddingRight: 16 }}>
+              <Text style={{ fontSize: 16 }}>🇮🇳</Text>
+              <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "600" }}>+91</Text>
+            </View>
+            <TextInput
+              value={phone}
+              onChangeText={v => setPhone(v.replace(/\D/g, "").slice(0, 10))}
+              placeholder="98765 43210"
+              placeholderTextColor={c.textMuted}
+              keyboardType="phone-pad"
+              maxLength={10}
+              style={{ flex: 1, fontSize: 16, color: c.textPrimary, paddingVertical: 16 } as any}
+            />
+          </View>
+          <PrimaryBtn onPress={sendPhoneOtp} label="Send OTP" />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Main login screen ──────────────────────────────────────────────────────
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 32, paddingTop: Platform.OS === "ios" ? 80 : 60, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="always"
+        showsVerticalScrollIndicator={false}
+      >
+        <Wordmark c={c} />
+
+        <Text style={{ color: c.textPrimary, fontSize: 32, fontWeight: "700", marginTop: 40, marginBottom: 6, letterSpacing: -1 }}>
+          Welcome back.
+        </Text>
+        <Text style={{ color: c.textSecondary, fontSize: 15, marginBottom: 40, lineHeight: 22 }}>
+          Split smarter. Settle faster.
+        </Text>
+
+        {/* Email */}
+        <InputField icon="mail-outline" c={c}>
+          <TextInput
+            value={email} onChangeText={setEmail}
+            placeholder="Email address"
+            placeholderTextColor={c.textMuted}
+            keyboardType="email-address" autoCapitalize="none"
+            autoCorrect={false} autoComplete="email"
+            style={{ flex: 1, fontSize: 15, color: c.textPrimary, paddingVertical: 16 } as any}
+          />
+        </InputField>
+
+        {/* Password */}
+        <InputField icon="lock-closed-outline" c={c}>
+          <TextInput
+            value={password} onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={c.textMuted}
+            secureTextEntry={!showPw}
+            autoComplete="password"
+            style={{ flex: 1, fontSize: 15, color: c.textPrimary, paddingVertical: 16 } as any}
+          />
+          <TouchableOpacity onPress={() => setShowPw(s => !s)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={16} color={c.textMuted} />
+          </TouchableOpacity>
+        </InputField>
+
+        <TouchableOpacity onPress={doForgotPassword} style={{ alignSelf: "flex-end", marginBottom: 24 }}>
+          <Text style={{ color: c.textSecondary, fontSize: 13 }}>Forgot password?</Text>
+        </TouchableOpacity>
+
+        <PrimaryBtn onPress={doLogin} label="Sign in" />
+
+        {/* Divider */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 28 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+          <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>OR</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+        </View>
+
+        {/* Google */}
+        <TouchableOpacity
+          onPress={doGoogle}
+          disabled={loading}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+            backgroundColor: c.surface, borderRadius: 12, padding: 15,
+            borderWidth: 1, borderColor: c.border, marginBottom: 10,
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>G</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        {/* Phone OTP */}
+        <TouchableOpacity
+          onPress={() => setScreen("phone_otp")}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+            backgroundColor: c.surface, borderRadius: 12, padding: 15,
+            borderWidth: 1, borderColor: c.border, marginBottom: 10,
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>🇮🇳</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>Continue with Phone OTP</Text>
+        </TouchableOpacity>
+
+        {/* Demo */}
+        <TouchableOpacity
+          onPress={demoLogin}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+            borderRadius: 12, padding: 15, marginBottom: 32,
+            borderWidth: 1, borderColor: c.border,
+          }}
+        >
+          <Text style={{ color: c.textSecondary, fontSize: 15, fontWeight: "500" }}>Try demo account</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push("/register")} style={{ alignItems: "center" }}>
+          <Text style={{ color: c.textSecondary, fontSize: 14 }}>
+            New here?{" "}
+            <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Create account</Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-// ── Shared sub-components ──────────────────────────────────────────────────────
-function Logo({ card, txt }: { card: string; txt: string }) {
+function Wordmark({ c }: { c: any }) {
   return (
-    <View style={{width:72,height:72,borderRadius:20,backgroundColor:card,
-      alignItems:"center",justifyContent:"center",
-      shadowColor:"#000",shadowOpacity:0.1,shadowRadius:20,shadowOffset:{width:0,height:8},elevation:8}}>
-      <Text style={{color:txt,fontSize:32,fontWeight:"900"}}>M</Text>
-    </View>
-  );
-}
-
-function Blob1({ color }: { color: string }) {
-  return (
-    <View pointerEvents="none" style={{position:"absolute",top:-80,right:-60,
-      width:260,height:260,borderRadius:130,backgroundColor:color,transform:[{rotate:"20deg"}]}}/>
-  );
-}
-
-function Blob2({ color }: { color: string }) {
-  return (
-    <View pointerEvents="none" style={{position:"absolute",bottom:-40,left:-80,
-      width:300,height:240,borderRadius:120,backgroundColor:color,transform:[{rotate:"-15deg"}]}}/>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <View style={{width:20,height:20}}>
-      <Text style={{fontSize:18,lineHeight:20}}>G</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View style={{
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: c.textPrimary,
+        alignItems: "center", justifyContent: "center",
+      }}>
+        <Text style={{ color: c.bg, fontSize: 18, fontWeight: "800" }}>M</Text>
+      </View>
+      <Text style={{ color: c.textPrimary, fontSize: 20, fontWeight: "700", letterSpacing: -0.5 }}>
+        Merizo
+      </Text>
     </View>
   );
 }

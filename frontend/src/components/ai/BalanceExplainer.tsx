@@ -1,31 +1,42 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Modal, ScrollView, Platform } from "react-native";
-import Svg, { Path, Circle, Line, G } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../../lib/theme";
 import { currencySymbol } from "../../lib/tokens";
 
-// ── Sketch-style arrow between two people ─────────────────────────────────────
+function IcoSparkles({ color, size = 16 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+function IcoClose({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M18 6L6 18M6 6l12 12" stroke={color} strokeWidth={1.8} strokeLinecap="round"/>
+    </Svg>
+  );
+}
 
-function SketchArrow({ width, color }: { width: number; color: string }) {
+function SketchArrow({ width }: { width: number }) {
+  const { c } = useTheme();
   const mid = width / 2;
   const y = 22;
   const headLen = 10;
   return (
     <Svg width={width} height={44} style={{ overflow: "visible" }}>
-      {/* Main line — slightly wavy for sketch feel */}
       <Path
         d={`M 8 ${y} Q ${mid} ${y - 4} ${width - 14} ${y}`}
-        stroke={color}
-        strokeWidth={2.5}
+        stroke={c.textMuted}
+        strokeWidth={2}
         strokeLinecap="round"
         fill="none"
       />
-      {/* Arrowhead */}
       <Path
         d={`M ${width - 14} ${y} L ${width - 14 - headLen} ${y - 6} M ${width - 14} ${y} L ${width - 14 - headLen} ${y + 6}`}
-        stroke={color}
-        strokeWidth={2.5}
+        stroke={c.textMuted}
+        strokeWidth={2}
         strokeLinecap="round"
         fill="none"
       />
@@ -33,89 +44,48 @@ function SketchArrow({ width, color }: { width: number; color: string }) {
   );
 }
 
-// ── Person avatar (sketch circle with initial) ────────────────────────────────
-
-function PersonNode({
-  name,
-  amount,
-  isSource,
-  sym,
-}: {
-  name: string;
-  amount?: number;
-  isSource: boolean;
-  sym: string;
-}) {
-  const { c, isDark } = useTheme();
-  const bg = isSource
-    ? (isDark ? "rgba(255,67,58,0.12)" : "#FFF0EF")
-    : (isDark ? "rgba(0,196,140,0.12)" : "#EDFFF8");
-  const borderColor = isSource ? "#FF453A" : "#00C48C";
-  const textColor = isSource ? "#FF453A" : "#00C48C";
-
+function PersonNode({ name, isSource, sym }: { name: string; isSource: boolean; sym: string }) {
+  const { c } = useTheme();
   return (
     <View style={{ alignItems: "center", gap: 5, minWidth: 64 }}>
-      {/* Sketch circle */}
       <View style={{
-        width: 52, height: 52, borderRadius: 26,
-        backgroundColor: bg,
-        borderWidth: 2, borderColor,
+        width: 48, height: 48,
+        backgroundColor: isSource ? c.textPrimary : c.surface,
+        borderWidth: 1, borderColor: c.border,
         alignItems: "center", justifyContent: "center",
       }}>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: textColor }}>
+        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: isSource ? c.bg : c.textPrimary }}>
           {(name || "?")[0].toUpperCase()}
         </Text>
       </View>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: c.textPrimary, textAlign: "center" }} numberOfLines={1}>
+      <Text style={{ fontSize: 11, fontFamily: "Manrope_600SemiBold", color: c.textPrimary, textAlign: "center" }} numberOfLines={1}>
         {name}
       </Text>
-      {amount !== undefined && (
-        <Text style={{ fontSize: 10, color: textColor, fontWeight: "500" }}>
-          {isSource ? "owes" : "receives"}
-        </Text>
-      )}
+      <Text style={{ fontSize: 10, color: c.textMuted }}>
+        {isSource ? "owes" : "receives"}
+      </Text>
     </View>
   );
 }
 
-// ── Single settlement row ─────────────────────────────────────────────────────
-
 function SettlementFlow({
-  from,
-  to,
-  amount,
-  sym,
-  paid,
-  perPerson,
+  from, to, amount, sym, paid, perPerson,
 }: {
-  from: string;
-  to: string;
-  amount: number;
-  sym: string;
-  paid: number;
-  perPerson: number;
+  from: string; to: string; amount: number; sym: string; paid: number; perPerson: number;
 }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{
-      backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#FAFAF8",
-      borderRadius: 16,
-      borderWidth: 1.5,
-      borderColor: isDark ? "rgba(255,255,255,0.08)" : "#EAE6E0",
-      padding: 16,
-      marginBottom: 10,
+      borderWidth: 1, borderColor: c.border,
+      backgroundColor: c.surface,
+      padding: 16, marginBottom: 10,
     }}>
-      {/* Flow diagram */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <PersonNode name={from} isSource sym={sym} />
         <View style={{ flex: 1, alignItems: "center", gap: 3 }}>
-          <SketchArrow width={80} color="#FF453A" />
-          <View style={{
-            backgroundColor: isDark ? "rgba(255,67,58,0.15)" : "#FFF0EF",
-            borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
-            borderWidth: 1, borderColor: isDark ? "rgba(255,67,58,0.3)" : "#FFCCC9",
-          }}>
-            <Text style={{ color: "#FF453A", fontSize: 13, fontWeight: "700" }}>
+          <SketchArrow width={80} />
+          <View style={{ borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ color: c.textPrimary, fontSize: 13, fontFamily: "Manrope_700Bold" }}>
               {sym}{Math.round(amount).toLocaleString("en-IN")}
             </Text>
           </View>
@@ -123,15 +93,10 @@ function SettlementFlow({
         <PersonNode name={to} isSource={false} sym={sym} />
       </View>
 
-      {/* Why breakdown */}
-      <View style={{
-        marginTop: 12, padding: 10,
-        backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F5F3EF",
-        borderRadius: 10, gap: 4,
-      }}>
-        <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.2, fontWeight: "700" }}>WHY THIS PAYMENT</Text>
+      <View style={{ marginTop: 12, padding: 10, backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, gap: 4 }}>
+        <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.2, fontFamily: "Manrope_700Bold" }}>WHY THIS PAYMENT</Text>
         <Text style={{ fontSize: 12, color: c.textSecondary, lineHeight: 18, marginTop: 4 }}>
-          <Text style={{ fontWeight: "600", color: c.textPrimary }}>{from}</Text>
+          <Text style={{ fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{from}</Text>
           {` paid ${sym}${Math.round(paid).toLocaleString("en-IN")} but fair share is ${sym}${Math.round(perPerson).toLocaleString("en-IN")} — shortfall of ${sym}${Math.round(amount).toLocaleString("en-IN")}.`}
         </Text>
       </View>
@@ -139,24 +104,20 @@ function SettlementFlow({
   );
 }
 
-// ── Category flow bar ─────────────────────────────────────────────────────────
-
-const CATEGORY_META: Record<string, { emoji: string; label: string; color: string }> = {
-  food:          { emoji: "🍽️", label: "Food",    color: "#FF8B7B" },
-  travel:        { emoji: "✈️", label: "Travel",  color: "#60A5FA" },
-  entertainment: { emoji: "🎬", label: "Fun",     color: "#A78BFA" },
-  utilities:     { emoji: "⚡", label: "Bills",   color: "#FBBF24" },
-  shopping:      { emoji: "🛍️", label: "Shop",    color: "#F472B6" },
-  health:        { emoji: "💊", label: "Health",  color: "#34D399" },
-  accommodation: { emoji: "🏨", label: "Stay",    color: "#E8B04E" },
-  trip:          { emoji: "🗺️", label: "Trip",    color: "#9D7BFF" },
-  other:         { emoji: "📦", label: "Other",   color: "#9CA3AF" },
+const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
+  food:          { emoji: "🍽️", label: "Food" },
+  travel:        { emoji: "✈️", label: "Travel" },
+  entertainment: { emoji: "🎬", label: "Fun" },
+  utilities:     { emoji: "⚡", label: "Bills" },
+  shopping:      { emoji: "🛍️", label: "Shop" },
+  health:        { emoji: "💊", label: "Health" },
+  accommodation: { emoji: "🏨", label: "Stay" },
+  trip:          { emoji: "🗺️", label: "Trip" },
+  other:         { emoji: "📦", label: "Other" },
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const [visible, setVisible] = useState(false);
 
   const sym = currencySymbol(trip.currency || "INR");
@@ -176,22 +137,21 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
         onPress={() => setVisible(true)}
         style={{
           flexDirection: "row", alignItems: "center", justifyContent: "center",
-          gap: 8, padding: 14, borderRadius: 14, marginHorizontal: 16, marginTop: 4,
-          backgroundColor: isDark ? "rgba(157,123,255,0.12)" : "#F0EDF8",
-          borderWidth: 1, borderColor: isDark ? "rgba(157,123,255,0.3)" : "#DDD6FE",
+          gap: 8, padding: 14, marginHorizontal: 16, marginTop: 4,
+          backgroundColor: c.surface,
+          borderWidth: 1, borderColor: c.border,
         }}
       >
-        <Ionicons name="sparkles" size={16} color={isDark ? "#9D7BFF" : "#6D28D9"} />
-        <Text style={{ color: isDark ? "#9D7BFF" : "#6D28D9", fontSize: 14, fontWeight: "700" }}>
+        <IcoSparkles color={c.textPrimary} size={16} />
+        <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "Manrope_700Bold" }}>
           Explain Every Rupee
         </Text>
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" }}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" }}>
           <View style={{
             backgroundColor: c.bg,
-            borderTopLeftRadius: 28, borderTopRightRadius: 28,
             padding: 24,
             paddingBottom: Platform.OS === "ios" ? 44 : 28,
             maxHeight: "88%",
@@ -199,48 +159,47 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
           }}>
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <View style={{
-                  width: 32, height: 32, borderRadius: 10,
-                  backgroundColor: isDark ? "rgba(157,123,255,0.2)" : "#EDE9FE",
+                  width: 32, height: 32,
+                  backgroundColor: c.textPrimary,
                   alignItems: "center", justifyContent: "center",
                 }}>
-                  <Ionicons name="sparkles" size={16} color={isDark ? "#9D7BFF" : "#6D28D9"} />
+                  <IcoSparkles color={c.bg} size={15} />
                 </View>
                 <View>
-                  <Text style={{ color: c.textPrimary, fontSize: 18, fontWeight: "800" }}>Money Flow</Text>
+                  <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold" }}>Money Flow</Text>
                   <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 1 }}>Who owes whom and why</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setVisible(false)}>
-                <Ionicons name="close" size={22} color={c.textMuted} />
+              <TouchableOpacity onPress={() => setVisible(false)}
+                style={{ width: 32, height: 32, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+                <IcoClose color={c.textMuted} size={18} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
 
-              {/* ── No settlements needed ── */}
+              {/* No settlements needed */}
               {txns.length === 0 && (
                 <View style={{
                   alignItems: "center", padding: 32, gap: 12,
-                  backgroundColor: isDark ? "rgba(0,196,140,0.08)" : "#EDFFF8",
-                  borderRadius: 20, borderWidth: 1,
-                  borderColor: isDark ? "rgba(0,196,140,0.2)" : "#A7F3D0",
-                  marginBottom: 16,
+                  borderWidth: 1, borderColor: c.border,
+                  backgroundColor: c.surface, marginBottom: 16,
                 }}>
                   <Text style={{ fontSize: 40 }}>🎉</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#00C48C" }}>All Settled!</Text>
+                  <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>All Settled!</Text>
                   <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 20 }}>
                     Everyone has paid their fair share. No payments needed right now.
                   </Text>
                 </View>
               )}
 
-              {/* ── Settlement flows ── */}
+              {/* Settlement flows */}
               {txns.length > 0 && (
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={{ fontSize: 11, color: c.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 }}>
-                    {txns.length === 1 ? "1 PAYMENT NEEDED" : `${txns.length} PAYMENTS NEEDED`}
+                  <Text style={{ fontSize: 10, color: c.textMuted, fontFamily: "Manrope_700Bold", letterSpacing: 1.5, marginBottom: 12, textTransform: "uppercase" }}>
+                    {txns.length === 1 ? "1 payment needed" : `${txns.length} payments needed`}
                   </Text>
                   {txns.map((t: any, i: number) => {
                     const fromBal = bals.find((b: any) => b.id === t.from_id || b.member_id === t.from_id);
@@ -259,19 +218,11 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                 </View>
               )}
 
-              {/* ── Balance bars ── */}
+              {/* Balance sheet */}
               {bals.length > 0 && (
-                <View style={{
-                  backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
-                  borderRadius: 20, overflow: "hidden",
-                  borderWidth: 1, borderColor: c.border,
-                  marginBottom: 16,
-                }}>
-                  <View style={{
-                    padding: 14, borderBottomWidth: 1, borderBottomColor: c.border,
-                    flexDirection: "row", alignItems: "center", gap: 8,
-                  }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: c.textPrimary }}>Balance Sheet</Text>
+                <View style={{ borderWidth: 1, borderColor: c.border, marginBottom: 16 }}>
+                  <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>Balance Sheet</Text>
                     <Text style={{ fontSize: 11, color: c.textMuted }}>
                       fair share {sym}{Math.round(perPerson).toLocaleString("en-IN")} each
                     </Text>
@@ -288,22 +239,18 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                         borderBottomColor: c.border,
                       }}>
                         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>
-                              {isMe ? `${b.name} (You)` : b.name}
-                            </Text>
-                          </View>
-                          <Text style={{ fontSize: 13, fontWeight: "700", color: isPos ? "#00C48C" : "#FF453A" }}>
+                          <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>
+                            {isMe ? `${b.name} (You)` : b.name}
+                          </Text>
+                          <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
                             {isPos ? "+" : "-"}{sym}{Math.abs(Math.round(b.net || 0)).toLocaleString("en-IN")}
                           </Text>
                         </View>
-                        {/* Sketch-style bar */}
-                        <View style={{ height: 7, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8", borderRadius: 4, overflow: "hidden" }}>
+                        <View style={{ height: 5, backgroundColor: c.border }}>
                           <View style={{
                             width: `${Math.round(pct * 100)}%` as any,
-                            height: 7,
-                            backgroundColor: isPos ? "#00C48C" : "#FF453A",
-                            borderRadius: 4,
+                            height: 5,
+                            backgroundColor: isPos ? c.textPrimary : c.textMuted,
                           }} />
                         </View>
                         <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 4 }}>
@@ -317,16 +264,11 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                 </View>
               )}
 
-              {/* ── Where money went ── */}
+              {/* Where money went */}
               {topCategories.length > 0 && total > 0 && (
-                <View style={{
-                  backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
-                  borderRadius: 20, overflow: "hidden",
-                  borderWidth: 1, borderColor: c.border,
-                  marginBottom: 16,
-                }}>
+                <View style={{ borderWidth: 1, borderColor: c.border, marginBottom: 16 }}>
                   <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: c.textPrimary }}>Where Money Went</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>Where Money Went</Text>
                   </View>
                   {topCategories.map(([cat, amt], i) => {
                     const meta = CATEGORY_META[cat] || CATEGORY_META.other;
@@ -341,14 +283,14 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                         <Text style={{ fontSize: 20 }}>{meta.emoji}</Text>
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
-                            <Text style={{ fontSize: 13, fontWeight: "500", color: c.textPrimary }}>{meta.label}</Text>
-                            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>
+                            <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{meta.label}</Text>
+                            <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
                               {sym}{Math.round(amt).toLocaleString("en-IN")}
-                              <Text style={{ fontSize: 11, color: c.textMuted }}> · {Math.round(pct)}%</Text>
+                              <Text style={{ fontSize: 11, color: c.textMuted, fontFamily: "Manrope_400Regular" }}> · {Math.round(pct)}%</Text>
                             </Text>
                           </View>
-                          <View style={{ height: 6, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8", borderRadius: 3, overflow: "hidden" }}>
-                            <View style={{ width: `${Math.round(pct)}%` as any, height: 6, backgroundColor: meta.color, borderRadius: 3 }} />
+                          <View style={{ height: 4, backgroundColor: c.border }}>
+                            <View style={{ width: `${Math.round(pct)}%` as any, height: 4, backgroundColor: c.textPrimary }} />
                           </View>
                         </View>
                       </View>

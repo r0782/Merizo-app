@@ -34,10 +34,10 @@ export default function CurrencyOnboarding() {
       >
         {/* Header */}
         <View style={{ marginBottom: 32 }}>
-          <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 3, fontFamily: "RobotoMono_400Regular" as any, marginBottom: 10 }}>
+          <Text style={{ color: c.textMuted, fontSize: 9, letterSpacing: 3, fontFamily: "Manrope_400Regular" as any, marginBottom: 10 }}>
             WELCOME TO MERIZO
           </Text>
-          <Text style={{ color: c.textPrimary, fontSize: 28, fontFamily: "Syne_800ExtraBold" as any, letterSpacing: -0.5, marginBottom: 8 }}>
+          <Text style={{ color: c.textPrimary, fontSize: 28, fontFamily: "Manrope_800ExtraBold" as any, letterSpacing: -0.5, marginBottom: 8 }}>
             Choose your currency
           </Text>
           <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 22 }}>

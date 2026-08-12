@@ -1,617 +1,679 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Animated, {
-  useSharedValue, withSpring, withTiming, useAnimatedStyle,
-  interpolate, Extrapolation, runOnJS, withDelay,
-} from "react-native-reanimated";
+/**
+ * MERIZO Home — Financial Ledger
+ * Looks like a premium black-ink notebook page.
+ */
+import { useCallback, useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  Platform, StatusBar, Modal, Pressable, Dimensions, FlatList,
+  Platform, Modal,
 } from "react-native";
+import Animated, {
+  useSharedValue, withSpring, withTiming, withDelay,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Svg, { Path, Line, Circle } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
-import { currencySymbol } from "../../src/lib/tokens";
+import { currencySymbol, type } from "../../src/lib/tokens";
+import { BalanceSplit } from "../../src/components/merizo/LedgerRow";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadRecurring, type Subscription } from "../recurring";
 
-const { width: SW } = Dimensions.get("window");
-const SH = Dimensions.get("window").height || 800;
+// ── Thin ink separator ────────────────────────────────────────────────────────
+function InkLine({ opacity = 0.2 }: { opacity?: number }) {
+  const { c } = useTheme();
+  return <View style={{ height: 1, backgroundColor: c.border, opacity, marginHorizontal: 20, marginVertical: 4 }} />;
+}
 
-
-
-// ── Recurring Section ────────────────────────────────────────────────────────
-const RECURRING_ITEMS = [
-  { emoji:"📺", name:"Netflix", amount:"₹649", period:"Monthly", color:"#E50914" },
-  { emoji:"🎵", name:"Spotify", amount:"₹119", period:"Monthly", color:"#1DB954" },
-  { emoji:"🏠", name:"Rent", amount:"₹0", period:"Monthly", color:"#6D5DFC" },
-  { emoji:"💡", name:"Electricity", amount:"₹0", period:"Monthly", color:"#FF9F0A" },
-  { emoji:"📦", name:"Prime", amount:"₹299", period:"Monthly", color:"#FF9900" },
-];
-
-function RecurringSection({ c, isDark, router }: any) {
+// ── Dotted notebook-style separator ──────────────────────────────────────────
+function DottedLine({ c }: { c: any }) {
   return (
-    <View style={{ marginBottom:16 }}>
-      <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:20, marginBottom:12 }}>
-        <Text style={{ fontSize:11, fontWeight:"500", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase" }}>Recurring</Text>
-        <TouchableOpacity onPress={()=>router.push("/recurring")}>
-          <Text style={{ fontSize:12, color:isDark?"#7B6FFF":"#6D5DFC" }}>Manage</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:20, gap:10 }}>
-        {RECURRING_ITEMS.map((item,i) => (
-          <TouchableOpacity key={i} onPress={()=>router.push("/recurring")} style={{ width:110, backgroundColor:isDark?"#1C1C1E":"#FFFFFF", borderRadius:16, padding:14, borderWidth:0.5, borderColor:isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)", alignItems:"center", gap:6 }}>
-            <View style={{ width:40, height:40, borderRadius:12, backgroundColor:item.color+"15", alignItems:"center", justifyContent:"center" }}>
-              <Text style={{ fontSize:20 }}>{item.emoji}</Text>
-            </View>
-            <Text style={{ fontSize:12, fontWeight:"500", color:c.textPrimary, textAlign:"center" }}>{item.name}</Text>
-            <Text style={{ fontSize:11, color:"#6D5DFC", fontWeight:"500" }}>{item.amount}</Text>
-            <Text style={{ fontSize:10, color:c.textSecondary }}>{item.period}</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity onPress={()=>router.push("/recurring")} style={{ width:110, backgroundColor:isDark?"#1C1C1E":"#FFFFFF", borderRadius:16, padding:14, borderWidth:0.5, borderColor:isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)", alignItems:"center", justifyContent:"center", gap:6 }}>
-          <View style={{ width:40, height:40, borderRadius:12, backgroundColor:"rgba(109,93,252,0.1)", alignItems:"center", justifyContent:"center" }}>
-            <Ionicons name="add" size={20} color="#6D5DFC" />
-          </View>
-          <Text style={{ fontSize:11, color:"#6D5DFC", fontWeight:"500", textAlign:"center" }}>Add more</Text>
-        </TouchableOpacity>
-      </ScrollView>
+    <View style={{ paddingHorizontal: 20 }}>
+      <Svg width="100%" height={6} viewBox="0 0 300 6" preserveAspectRatio="none">
+        <Path
+          d="M 0 3 L 300 3"
+          stroke={c.border}
+          strokeWidth={1}
+          strokeDasharray="3 5"
+          fill="none"
+          opacity={0.2}
+        />
+      </Svg>
     </View>
   );
 }
 
-// ── AI Smart Tips ────────────────────────────────────────────────────────────
-const TIPS = [
-  { emoji: "💡", title: "Split smarter", body: "Add expenses right after paying — your memory fades faster than you think.", color: "#6D5DFC" },
-  { emoji: "⚡", title: "Settle weekly", body: "Groups settled weekly have 3x fewer disputes. Set a day and stick to it.", color: "#FF9F0A" },
-  { emoji: "📸", title: "Scan receipts", body: "Tap the + → Scan Receipt to extract amounts automatically from any bill.", color: "#00C48C" },
-  { emoji: "🤖", title: "Ask AI anything", body: "Try: \"Who owes the most in Goa trip?\" — AI knows your full history.", color: "#6D5DFC" },
-  { emoji: "🎯", title: "Equal isn't always fair", body: "Use Custom Split when people had different items or joined mid-trip.", color: "#FF453A" },
-];
-
-function SmartTips({ c, isDark }: any) {
-  return (
-    <View style={{ paddingHorizontal: 20, marginTop: 24, marginBottom: 8 }}>
-      <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
-        Merizo tips
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {TIPS.map((tip, i) => (
-          <View key={i} style={{ width: 200, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 20 }}>{tip.emoji}</Text>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: tip.color, flex: 1 }}>{tip.title}</Text>
-            </View>
-            <Text style={{ fontSize: 12, color: c.textSecondary, lineHeight: 18 }}>{tip.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-// ── Debt Gravity Stack ──────────────────────────────────────────────────────
-function DebtGravityStack({ trips, router, c, isDark, sym }: any) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const CARD_H = 72;
-  const PEEK = 10;
-
-  // Sort by absolute amount descending — largest debt on top
-  const sorted = [...trips].sort((a, b) => Math.abs(b.my_net || 0) - Math.abs(a.my_net || 0));
-  const total = sorted.length;
-  const containerH = CARD_H + (Math.min(total - 1, 3) * PEEK) + 24;
-
-  const emoji = (cat: string) =>
-    cat === "food" ? "🍕" : cat === "travel" ? "✈️" : cat === "home" ? "🏠" : cat === "entertainment" ? "🎬" : cat === "friends" ? "🎉" : cat === "shopping" ? "🛍️" : "📁";
-
-  return (
-    <View>
-      <View style={{ height: containerH, position: "relative" }}>
-        {sorted.map((trip: any, i: number) => {
-          const net = trip.my_net || 0;
-          const isOwed = net > 0;
-          const isActive = i === activeIndex;
-          const isVisible = i >= activeIndex && i < activeIndex + 4;
-          if (!isVisible) return null;
-
-          const layerPos = i - activeIndex;
-          const top = layerPos * PEEK;
-          const scale = 1 - layerPos * 0.03;
-          const opacity = 1 - layerPos * 0.18;
-          const zIndex = total - i;
-
-          return (
-            <TouchableOpacity
-              key={trip.id}
-              onPress={() => {
-                if (layerPos > 0) {
-                  setActiveIndex(i);
-                } else {
-                  router.push({ pathname: "/split/[id]", params: { id: trip.id } });
-                }
-              }}
-              activeOpacity={layerPos === 0 ? 0.9 : 0.7}
-              style={{
-                position: "absolute", left: 0, right: 0, top,
-                zIndex, opacity,
-                transform: [{ scaleX: scale }],
-              }}
-            >
-              <View style={{
-                backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
-                borderRadius: 18, height: CARD_H,
-                flexDirection: "row", alignItems: "center",
-                paddingHorizontal: 16, gap: 12,
-                borderWidth: 0.5,
-                borderColor: isActive && layerPos === 0
-                  ? isDark ? "rgba(109,93,252,0.4)" : "rgba(109,93,252,0.25)"
-                  : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                shadowColor: "#000",
-                shadowOpacity: layerPos === 0 ? 0.08 : 0,
-                shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-                elevation: layerPos === 0 ? 4 : 0,
-              }}>
-                <View style={{
-                  width: 42, height: 42, borderRadius: 13,
-                  backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8",
-                  alignItems: "center", justifyContent: "center", flexShrink: 0
-                }}>
-                  <Text style={{ fontSize: 19 }}>{emoji(trip.category || "other")}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }} numberOfLines={1}>
-                    {trip.name}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: c.textSecondary }}>
-                    {trip.member_count || 0} members · {trip.expense_count || 0} expenses
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  {net === 0 ? (
-                    <View style={{ backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <Text style={{ fontSize: 11, color: c.textSecondary }}>Settled ✓</Text>
-                    </View>
-                  ) : (
-                    <>
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: isOwed ? "#00C48C" : "#FF453A" }}>
-                        {isOwed ? "+" : "-"}{sym}{Math.abs(Math.round(net)).toLocaleString("en-IN")}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>
-                        {isOwed ? "owed to you" : "you owe"}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                {layerPos > 0 && (
-                  <View style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}>
-                    <Ionicons name="chevron-down" size={14} color={c.textMuted} />
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Pagination dots */}
-      {total > 1 && (
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 4, marginTop: 14 }}>
-          {sorted.map((_: any, i: number) => (
-            <TouchableOpacity key={i} onPress={() => setActiveIndex(i)}>
-              <View style={{
-                width: i === activeIndex ? 18 : 5,
-                height: 5, borderRadius: 3,
-                backgroundColor: i === activeIndex
-                  ? isDark ? "#7B6FFF" : "#6D5DFC"
-                  : isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
-              }} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ── Balance Dashboard Modal ──────────────────────────────────────────────────
-function BalanceDashboard({ visible, onClose, trips, totalOwed, totalOwing, netBalance, sym, c, isDark }: any) {
-  const screenH = Dimensions.get("window").height || 800;
-  const slideY = useSharedValue(screenH);
+// ── Page header ───────────────────────────────────────────────────────────────
+function NotebookHeader({ greeting, date, c }: any) {
+  const opacity    = useSharedValue(0);
+  const translateY = useSharedValue(-12);
 
   useEffect(() => {
-    if (visible) slideY.value = withSpring(0, { damping: 20, stiffness: 200 });
-    else slideY.value = withTiming(screenH, { duration: 300 });
-  }, [visible]);
-
-  const slideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: slideY.value }],
-  }));
-
-  const txns = trips.flatMap((t: any) => t.settlement_transactions || []);
-  const topDebtors = trips.filter((t: any) => (t.my_net || 0) < -1).sort((a: any, b: any) => (a.my_net||0) - (b.my_net||0)).slice(0, 3);
-  const topCreditors = trips.filter((t: any) => (t.my_net || 0) > 1).sort((a: any, b: any) => (b.my_net||0) - (a.my_net||0)).slice(0, 3);
-
-  const statusText = netBalance > 100
-    ? "Excellent! You're overall net positive this month."
-    : netBalance < -100
-    ? "You owe more than you're owed. Settle soon to stay balanced."
-    : "You're nearly balanced. Great job!";
-
-  const statusColor = netBalance > 0 ? "#00C48C" : netBalance < 0 ? "#FF453A" : "#FF9F0A";
-
-  // Chart data
-  const chartW = SW - 80;
-  const chartH = 80;
-  const chartData = Array.from({ length: 7 }, (_, i) => ({
-    val: netBalance + (Math.random() - 0.5) * Math.abs(netBalance) * 0.3,
-    label: ["May 1","May 8","May 15","May 22","May 29","Jun 1","Today"][i],
-  }));
-  const vals = chartData.map(d => d.val);
-  const minV = Math.min(...vals);
-  const maxV = Math.max(...vals) || 1;
-  const range = maxV - minV || 1;
-  const pts = vals.map((v, i) => `${(i / (vals.length-1)) * chartW},${chartH - ((v-minV)/range) * chartH}`).join(" ");
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex:1, backgroundColor:"rgba(0,0,0,0.55)" }}>
-        <Pressable style={{ flex:1 }} onPress={onClose} />
-        <Animated.View style={[{ backgroundColor:c.bg, borderTopLeftRadius:28, borderTopRightRadius:28, maxHeight:screenH*0.9, overflow:"hidden" }, slideStyle]}>
-          {/* Handle */}
-          <View style={{ alignItems:"center", paddingTop:12, paddingBottom:4 }}>
-            <View style={{ width:36, height:4, backgroundColor:isDark?"rgba(255,255,255,0.15)":"rgba(0,0,0,0.15)", borderRadius:2 }} />
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding:20, paddingBottom:40 }}>
-
-            {/* Net position card */}
-            <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:18, padding:18, marginBottom:14, borderWidth:0.5, borderColor:c.border }}>
-              <Text style={{ fontSize:10, fontWeight:"600", color:c.textSecondary, letterSpacing:1.5, textTransform:"uppercase", marginBottom:8 }}>Your net position</Text>
-              <View style={{ flexDirection:"row", alignItems:"center", gap:8, marginBottom:6 }}>
-                <Ionicons name={netBalance >= 0 ? "trending-up" : "trending-down"} size={22} color={statusColor} />
-                <Text style={{ fontSize:36, fontWeight:"500", color:statusColor, letterSpacing:-1 }}>
-                  {netBalance >= 0 ? "+" : ""}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
-                </Text>
-              </View>
-              <Text style={{ fontSize:14, color:statusColor, lineHeight:20 }}>{statusText}</Text>
-            </View>
-
-            {/* AI Smart Shortcut */}
-            {(topDebtors.length > 0 || topCreditors.length > 0) && (
-              <View style={{ backgroundColor:isDark?"rgba(109,93,252,0.12)":"#F5F3FF", borderRadius:18, padding:16, marginBottom:14, borderWidth:0.5, borderColor:isDark?"rgba(109,93,252,0.25)":"#DDD6FE" }}>
-                <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:8 }}>
-                  <Text style={{ fontSize:12 }}>✨</Text>
-                  <Text style={{ fontSize:11, fontWeight:"600", color:"#6D5DFC", letterSpacing:1 }}>MERIZO AI SMART SHORTCUT</Text>
-                </View>
-                <Text style={{ fontSize:14, color:c.textPrimary, lineHeight:22, marginBottom:12 }}>
-                  {netBalance > 0
-                    ? `You're owed ${sym}${Math.round(totalOwed).toLocaleString("en-IN")} across ${topCreditors.length || trips.length} group${trips.length !== 1 ? "s" : ""}. Sending reminders is the fastest way to collect.`
-                    : `You owe ${sym}${Math.round(totalOwing).toLocaleString("en-IN")} across ${topDebtors.length || trips.length} group${trips.length !== 1 ? "s" : ""}. Settling now avoids interest in trust.`
-                  }
-                </Text>
-                <TouchableOpacity onPress={onClose} style={{ borderRadius:10, borderWidth:1, borderColor:isDark?"rgba(109,93,252,0.4)":"#A78BFA", paddingVertical:10, alignItems:"center" }}>
-                  <Text style={{ fontSize:13, color:"#6D5DFC", fontWeight:"500" }}>
-                    {netBalance > 0 ? "⚡ Send Quick Reminders" : "⚡ View Settlement Plan"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Balance trend chart */}
-            <View style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:18, padding:16, marginBottom:14, borderWidth:0.5, borderColor:c.border }}>
-              <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:12 }}>
-                <Text style={{ fontSize:14 }}>📈</Text>
-                <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary, letterSpacing:0.3 }}>BALANCE TREND (LAST 30 DAYS)</Text>
-              </View>
-              <View style={{ height:chartH+36 }}>
-                <svg width={chartW} height={chartH} style={{ overflow:"visible" } as any}>
-                  <defs>
-                    <linearGradient id="bdash" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6D5DFC" stopOpacity="0.35" />
-                      <stop offset="100%" stopColor="#6D5DFC" stopOpacity="0.02" />
-                    </linearGradient>
-                  </defs>
-                  {/* Zero line */}
-                  <line x1="0" y1={chartH*0.6} x2={chartW} y2={chartH*0.6} stroke="rgba(109,93,252,0.2)" strokeWidth="1" strokeDasharray="4,3" />
-                  <text x="0" y={chartH*0.6-3} fontSize="8" fill={isDark?"rgba(255,255,255,0.3)":"rgba(0,0,0,0.3)"}>₹0 (Settled)</text>
-                  <polyline points={`0,${chartH} ${pts} ${chartW},${chartH}`} fill="url(#bdash)" stroke="none" />
-                  <polyline points={pts} fill="none" stroke="#6D5DFC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {/* Peak dot */}
-                  {(() => {
-                    const maxIdx = vals.indexOf(Math.max(...vals));
-                    const px = (maxIdx/(vals.length-1))*chartW;
-                    const py = chartH - ((vals[maxIdx]-minV)/range)*chartH;
-                    return <>
-                      <circle cx={px} cy={py} r="4" fill="#6D5DFC" />
-                      <text x={Math.min(px+6, chartW-60)} y={py-6} fontSize="9" fill={isDark?"rgba(255,255,255,0.7)":"rgba(0,0,0,0.6)"}>Peak: {sym}{Math.round(Math.max(...vals)).toLocaleString("en-IN")}</text>
-                    </>;
-                  })()}
-                </svg>
-                <View style={{ flexDirection:"row", justifyContent:"space-between", marginTop:4 }}>
-                  {["May 1","May 15","May 29","Jun 1"].map((l,i) => (
-                    <Text key={i} style={{ fontSize:9, color:c.textMuted }}>{l}</Text>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* Immediate actions */}
-            {trips.length > 0 && (
-              <View style={{ marginBottom:8 }}>
-                <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:12 }}>
-                  <Text style={{ fontSize:14 }}>🚨</Text>
-                  <Text style={{ fontSize:13, fontWeight:"600", color:c.textPrimary, letterSpacing:0.5 }}>IMMEDIATE ACTIONS</Text>
-                </View>
-                {trips.slice(0,4).map((trip: any, i: number) => {
-                  const net = trip.my_net || 0;
-                  const isOwed = net > 0.5;
-                  const isOwing = net < -0.5;
-                  if (!isOwed && !isOwing) return null;
-                  return (
-                    <View key={i} style={{ backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, flexDirection:"row", alignItems:"center", gap:12, marginBottom:10, borderWidth:0.5, borderColor:c.border }}>
-                      <View style={{ width:40, height:40, borderRadius:20, backgroundColor:isOwed?"rgba(0,196,140,0.1)":"rgba(255,67,58,0.1)", alignItems:"center", justifyContent:"center" }}>
-                        <Text style={{ fontSize:16 }}>{isOwed?"💰":"💳"}</Text>
-                      </View>
-                      <View style={{ flex:1 }}>
-                        <Text style={{ fontSize:13, fontWeight:"500", color:c.textPrimary }}>{trip.name}</Text>
-                        <Text style={{ fontSize:12, color:isOwed?"#00C48C":"#FF453A", marginTop:2 }}>
-                          {isOwed ? `Others owe you ${sym}${Math.round(net).toLocaleString("en-IN")}` : `You owe ${sym}${Math.round(Math.abs(net)).toLocaleString("en-IN")}`}
-                        </Text>
-                      </View>
-                      <TouchableOpacity onPress={onClose} style={{ backgroundColor:isOwed?"rgba(0,196,140,0.1)":"rgba(109,93,252,0.1)", borderRadius:10, paddingHorizontal:12, paddingVertical:7, borderWidth:0.5, borderColor:isOwed?"rgba(0,196,140,0.3)":"rgba(109,93,252,0.3)" }}>
-                        <Text style={{ fontSize:12, fontWeight:"500", color:isOwed?"#00C48C":"#6D5DFC" }}>
-                          {isOwed ? "Ping" : "Settle"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Owed/Owing summary */}
-            <View style={{ flexDirection:"row", gap:10 }}>
-              <View style={{ flex:1, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, borderWidth:0.5, borderColor:c.border }}>
-                <Text style={{ fontSize:10, color:c.textSecondary, marginBottom:6 }}>Owed to you</Text>
-                <Text style={{ fontSize:18, fontWeight:"500", color:"#00C48C" }}>+{sym}{Math.round(totalOwed).toLocaleString("en-IN")}</Text>
-              </View>
-              <View style={{ flex:1, backgroundColor:isDark?"#1C1C1E":"#fff", borderRadius:14, padding:14, borderWidth:0.5, borderColor:c.border }}>
-                <Text style={{ fontSize:10, color:c.textSecondary, marginBottom:6 }}>You owe</Text>
-                <Text style={{ fontSize:18, fontWeight:"500", color:"#FF453A" }}>-{sym}{Math.round(totalOwing).toLocaleString("en-IN")}</Text>
-              </View>
-            </View>
-
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-}
-
-// ── FAB// ── FAB ──────────────────────────────────────────────────────────────────────
-function FAB({ router, isDark, c }: any) {
-  const [open, setOpen] = useState(false);
-  const rot = useSharedValue(0);
-  const y1  = useSharedValue(0);
-  const y2  = useSharedValue(0);
-  const op  = useSharedValue(0);
-
-  const openMenu = () => {
-    setOpen(true);
-    rot.value = withTiming(1, { duration: 250 });
-    op.value  = withTiming(1, { duration: 200 });
-    y1.value  = withSpring(-56,  { damping: 18, stiffness: 260 });
-    y2.value  = withSpring(-112, { damping: 18, stiffness: 240 });
-  };
-
-  const closeMenu = (cb?: () => void) => {
-    rot.value = withTiming(0, { duration: 200 });
-    op.value  = withTiming(0, { duration: 150 });
-    y1.value  = withTiming(0, { duration: 180 });
-    y2.value  = withTiming(0, { duration: 180 });
-    setTimeout(() => { setOpen(false); cb && cb(); }, 200);
-  };
-
-  const rotStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${interpolate(rot.value, [0,1], [0,45])}deg` }]
-  }));
-  const item1Style = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ translateY: y1.value }],
-    pointerEvents: open ? "auto" : "none",
-  }));
-  const item2Style = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ translateY: y2.value }],
-    pointerEvents: open ? "auto" : "none",
-  }));
-
-  return (
-    <View style={{ position: "absolute", bottom: 28, right: 20, alignItems: "flex-end" }}>
-      {/* Backdrop */}
-      {open && <Pressable onPress={() => closeMenu()} style={{ position: "absolute", top: -2000, left: -2000, right: -20, bottom: -28, zIndex: 0 }} />}
-
-      {/* Item 1 — Quick split */}
-      <Animated.View style={[{ position: "absolute", bottom: 0, right: 0, zIndex: 2 }, item1Style]}>
-        <TouchableOpacity
-          onPress={() => closeMenu(() => router.push("/simple-split"))}
-          style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
-        >
-          <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
-            <Ionicons name="flash" size={15} color="#6D5DFC" />
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Quick split</Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Item 2 — Create group */}
-      <Animated.View style={[{ position: "absolute", bottom: 0, right: 0, zIndex: 2 }, item2Style]}>
-        <TouchableOpacity
-          onPress={() => closeMenu(() => router.push("/category"))}
-          style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
-        >
-          <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
-            <Ionicons name="people" size={15} color="#6D5DFC" />
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary }}>Create group</Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Main FAB button */}
-      <TouchableOpacity
-        onPress={() => open ? closeMenu() : openMenu()}
-        style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", alignItems: "center", justifyContent: "center", shadowColor: "#6D5DFC", shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 3 }}
-      >
-        <Animated.View style={rotStyle}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </Animated.View>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// ── Main Screen ──────────────────────────────────────────────────────────────
-export default function HomeScreen() {
-  const { c, isDark } = useTheme();
-  const { user } = useAuth();
-  const router = useRouter();
-  const [trips, setTrips] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
-
-  const load = useCallback(async () => {
-    try { const r = await api.get("/trips"); setTrips(r.data || []); } catch {}
+    opacity.value    = withTiming(1, { duration: 500 });
+    translateY.value = withSpring(0, { damping: 20 });
   }, []);
 
+  const as = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: translateY.value }] }));
+
+  return (
+    <Animated.View style={[as, { paddingHorizontal: 20, paddingBottom: 16 }]}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <View>
+          <Text style={{ fontFamily: type.family.light, fontSize: type.size.xs, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 2 }}>
+            {date}
+          </Text>
+          <Text style={{ fontFamily: type.family.bold, fontSize: 32, color: c.textPrimary, letterSpacing: -1.5, lineHeight: 36 }}>
+            MERIZO
+          </Text>
+          <Text style={{ fontFamily: type.family.light, fontSize: type.size.sm, color: c.textSecondary, marginTop: 2, letterSpacing: 0.5 }}>
+            {greeting}
+          </Text>
+        </View>
+        <Svg width={40} height={40} viewBox="0 0 40 40" style={{ opacity: 0.15 }}>
+          <Path d="M 38 2 L 38 38 L 2 38" stroke={c.textPrimary} strokeWidth={1} fill="none" strokeLinecap="round" />
+          <Path d="M 32 2 L 38 2 L 38 8" stroke={c.textPrimary} strokeWidth={1} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ── Total balance ─────────────────────────────────────────────────────────────
+function TotalBalance({ amount, sym, c }: any) {
+  const scale   = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
+
   useEffect(() => {
-    (async () => { setLoading(true); await load(); setLoading(false); })();
-  }, [load]);
+    scale.value   = withDelay(200, withSpring(1, { damping: 16 }));
+    opacity.value = withDelay(200, withTiming(1, { duration: 400 }));
+  }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const as = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: opacity.value }));
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  return (
+    <Animated.View style={[as, { paddingHorizontal: 20, paddingVertical: 20 }]}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 8 }}>
+        Total Balance
+      </Text>
+      <Text style={{ fontFamily: type.family.bold, fontSize: 48, color: c.textPrimary, letterSpacing: -2.5, lineHeight: 52 }}>
+        {sym}{Math.abs(amount).toLocaleString("en-IN")}
+      </Text>
+    </Animated.View>
+  );
+}
 
-  const totalOwed  = useMemo(() => trips.reduce((s, t) => s + Math.max(0, t.my_net || 0), 0), [trips]);
-  const totalOwing = useMemo(() => Math.abs(trips.reduce((s, t) => s + Math.min(0, t.my_net || 0), 0)), [trips]);
-  const netBalance = totalOwed - totalOwing;
-  const sym = currencySymbol(trips[0]?.currency || "INR");
-  const initial = (user?.name || "U").trim().charAt(0).toUpperCase();
+// ── Quick action button — individual bordered box ─────────────────────────────
+function QuickAction({ label, icon, onPress, c }: any) {
+  const scale = useSharedValue(1);
+  const as = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Good evening";
-  };
+  return (
+    <Animated.View style={[as, { flex: 1 }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.93, { damping: 15 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 200 }); }}
+        activeOpacity={1}
+        style={{
+          borderWidth: 1,
+          borderColor: c.border,
+          paddingVertical: 14,
+          paddingHorizontal: 4,
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <Svg width={22} height={22} viewBox="0 0 24 24">{icon}</Svg>
+        <Text style={{
+          fontFamily: type.family.medium,
+          fontSize: 9,
+          color: c.textPrimary,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
+          textAlign: "center",
+          lineHeight: 13,
+        }}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ── Contextual doodle icons for groups ────────────────────────────────────────
+function TVIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Path d="M 4 8 Q 4 6 6 6 L 22 6 Q 24 6 24 8 L 24 19 Q 24 21 22 21 L 6 21 Q 4 21 4 19 Z"
+        stroke={color} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1={10} y1={24} x2={18} y2={24} stroke={color} strokeWidth={1.2} strokeLinecap="round" />
+      <Line x1={14} y1={21} x2={14} y2={24} stroke={color} strokeWidth={1.2} strokeLinecap="round" />
+      {/* Play triangle */}
+      <Path d="M 11 11 L 11 17 L 18 14 Z" stroke={color} strokeWidth={1.1} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function ChampagneIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      {/* Left glass */}
+      <Path d="M 8 4 L 6 12 Q 6 16 10 16 L 10 22 L 8 22"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Right glass */}
+      <Path d="M 20 4 L 22 12 Q 22 16 18 16 L 18 22 L 20 22"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Bubbles */}
+      <Circle cx={10} cy={9} r={1} stroke={color} strokeWidth={1} fill="none" />
+      <Circle cx={18} cy={8} r={1} stroke={color} strokeWidth={1} fill="none" />
+      {/* Clink lines */}
+      <Line x1={12} y1={6} x2={16} y2={6} stroke={color} strokeWidth={1.1} strokeLinecap="round" opacity={0.5} />
+    </Svg>
+  );
+}
+
+function PlaneIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Path d="M 4 14 L 20 6 L 18 14 L 20 22 Z"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M 10 11 L 6 18" stroke={color} strokeWidth={1.1} fill="none" strokeLinecap="round" />
+      <Path d="M 14 13 L 11 21" stroke={color} strokeWidth={1} fill="none" strokeLinecap="round" opacity={0.6} />
+    </Svg>
+  );
+}
+
+function HouseIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Path d="M 4 14 L 14 5 L 24 14" stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M 6 12 L 6 23 L 11 23 L 11 17 L 17 17 L 17 23 L 22 23 L 22 12"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function GroupIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Circle cx={10} cy={10} r={4} stroke={color} strokeWidth={1.2} fill="none" />
+      <Path d="M 3 23 Q 3 18 10 18 Q 17 18 17 23" stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+      <Circle cx={19} cy={9} r={3} stroke={color} strokeWidth={1.1} fill="none" />
+      <Path d="M 16 22 Q 16 18 19 18 Q 25 18 25 22" stroke={color} strokeWidth={1.1} fill="none" strokeLinecap="round" opacity={0.7} />
+    </Svg>
+  );
+}
+
+function ShoppingIcon({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Path d="M 7 10 L 5 23 L 23 23 L 21 10 Z"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M 10 10 Q 10 5 14 5 Q 18 5 18 10"
+        stroke={color} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function getGroupIconType(trip: any): string {
+  const name = (trip.name || "").toLowerCase();
+  const cat  = (trip.split_category || trip.category || trip.group_type || "").toLowerCase();
+  if (cat === "home"   || name.includes("flat") || name.includes("home") || name.includes("house") || name.includes("rent"))
+    return "house";
+  if (cat === "travel" || cat === "trip" || name.includes("trip") || name.includes("goa") || name.includes("bali") || name.includes("travel") || name.includes("flight"))
+    return "plane";
+  if (cat === "food"   || name.includes("dinner") || name.includes("lunch") || name.includes("food") || name.includes("cafe") || name.includes("restaurant") || name.includes("party"))
+    return "champagne";
+  if (cat === "entertainment" || name.includes("netflix") || name.includes("prime") || name.includes("bill") || name.includes("hulu") || name.includes("subscription"))
+    return "tv";
+  if (cat === "shopping" || name.includes("shopping") || name.includes("mall"))
+    return "shopping";
+  return "group";
+}
+
+function GroupDoodleIcon({ trip, color, size = 28 }: { trip: any; color: string; size?: number }) {
+  const iconType = getGroupIconType(trip);
+  switch (iconType) {
+    case "house":     return <HouseIcon     color={color} size={size} />;
+    case "plane":     return <PlaneIcon     color={color} size={size} />;
+    case "champagne": return <ChampagneIcon color={color} size={size} />;
+    case "tv":        return <TVIcon        color={color} size={size} />;
+    case "shopping":  return <ShoppingIcon  color={color} size={size} />;
+    default:          return <GroupIcon     color={color} size={size} />;
+  }
+}
+
+// ── Compact group row ─────────────────────────────────────────────────────────
+function GroupRow({ trip, sym, onPress, c }: any) {
+  const net      = trip.my_net || 0;
+  const absNet   = Math.abs(net);
+  const hint     = net > 0 ? "you are owed" : net < 0 ? "you owe" : "settled";
+  const amtStr   = net === 0
+    ? "—"
+    : `${net > 0 ? "+" : "-"}${sym}${absNet.toLocaleString("en-IN")}`;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.65}
+      style={{ flexDirection: "row", alignItems: "center", paddingVertical: 13, paddingHorizontal: 20, gap: 12 }}
+    >
+      {/* Doodle icon */}
+      <View style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <GroupDoodleIcon trip={trip} color={c.textPrimary} size={30} />
+      </View>
+
+      {/* Name + members */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }} numberOfLines={1}>
+          {trip.name}
+        </Text>
+        <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 1 }}>
+          {trip.member_count || trip.members?.length || 0} members
+        </Text>
+      </View>
+
+      {/* Amount + hint */}
+      <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+        <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, letterSpacing: -0.3 }}>
+          {amtStr}
+        </Text>
+        <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, marginTop: 1 }}>
+          {hint}
+        </Text>
+      </View>
+
+      {/* Chevron */}
+      <Svg width={12} height={12} viewBox="0 0 12 12" style={{ flexShrink: 0, marginLeft: 2 }}>
+        <Path d="M 4 2 L 8 6 L 4 10" stroke={c.textMuted} strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </TouchableOpacity>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+export default function HomeScreen() {
+  const { c } = useTheme();
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const [trips,          setTrips]          = useState<any[]>([]);
+  const [recentExp,      setRecentExp]      = useState<any[]>([]);
+  const [totalOwed,      setTotalOwed]      = useState(0);
+  const [totalOwing,     setTotalOwing]     = useState(0);
+  const [totalSpent,     setTotalSpent]     = useState(0);
+  const [sym,            setSym]            = useState("₹");
+  const [refreshing,     setRefreshing]     = useState(false);
+  const [loading,        setLoading]        = useState(true);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [showNewGroup,   setShowNewGroup]   = useState(false);
+  const [recurring,      setRecurring]      = useState<Subscription[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
+  }, []);
+
+  const load = useCallback(async () => {
+    try {
+      const tripsR    = await api.get("/trips");
+      const trips: any[] = tripsR.data || [];
+      setTrips(trips);
+
+      let owed = 0, owing = 0, spent = 0;
+      const allExp: any[] = [];
+
+      await Promise.all(trips.slice(0, 5).map(async (t: any) => {
+        try {
+          const expR = await api.get(`/expenses/${t.id}`);
+          const exps = (expR.data || []).map((e: any) => ({ ...e, tripName: t.name, tripId: t.id }));
+          allExp.push(...exps);
+          const net = t.my_net || 0;
+          if (net > 0) owed  += net;
+          if (net < 0) owing += Math.abs(net);
+          exps.forEach((e: any) => { spent += e.amount || 0; });
+        } catch {}
+      }));
+
+      allExp.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setRecentExp(allExp.slice(0, 5));
+      setTotalOwed(Math.round(owed));
+      setTotalOwing(Math.round(owing));
+      setTotalSpent(Math.round(spent));
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(useCallback(() => { setLoading(true); load(); }, [load]));
+  useFocusEffect(useCallback(() => { loadRecurring().then(setRecurring); }, []));
+  const onRefresh = async () => { setRefreshing(true); await load(); loadRecurring().then(setRecurring); setRefreshing(false); };
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const name  = user?.name?.split(" ")[0] || "";
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textSecondary} />}
+        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textMuted} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 20 }}>
-          <View>
-            <Text style={{ fontSize: 13, color: c.textSecondary, marginBottom: 2 }}>{greeting()}</Text>
-            <Text style={{ fontSize: 22, fontWeight: "500", color: c.textPrimary, letterSpacing: -0.5 }}>{user?.name?.split(" ")[0] || "Welcome"}</Text>
+        {/* ── Header ── */}
+        <NotebookHeader greeting={`${greeting}${name ? ", " + name : ""}.`} date={today} c={c} />
+        <InkLine opacity={0.3} />
+
+        {/* ── Total Balance ── */}
+        <TotalBalance amount={totalSpent} sym={sym} c={c} />
+
+        {/* ── Balance split ── */}
+        {(totalOwed > 0 || totalOwing > 0) && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+            <BalanceSplit
+              leftLabel="You Owe"      leftAmount={totalOwing}
+              rightLabel="Owed to You" rightAmount={totalOwed}
+              sym={sym}
+            />
           </View>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/profile")} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDark ? "#2C2C2E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontSize: 15, fontWeight: "500", color: isDark ? "#7B6FFF" : "#6D5DFC" }}>{initial}</Text>
-          </TouchableOpacity>
+        )}
+
+        <InkLine opacity={0.2} />
+
+        {/* ── Quick Actions — 4 equal-width separate boxes ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 }}>
+          <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 12 }}>
+            Quick Actions
+          </Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <QuickAction
+              label={"Add\nExpense"}
+              onPress={() => setShowAddExpense(true)}
+              c={c}
+              icon={<>
+                <Path d="M 12 5 L 12 19" stroke={c.textPrimary} strokeWidth={1.6} strokeLinecap="round" />
+                <Path d="M 5 12 L 19 12" stroke={c.textPrimary} strokeWidth={1.6} strokeLinecap="round" />
+              </>}
+            />
+            <QuickAction
+              label={"Scan\nBill"}
+              onPress={() => router.push("/scan")}
+              c={c}
+              icon={<>
+                <Path d="M 4 8 L 4 5 L 8 5"  stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M 20 5 L 16 5 L 16 8" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M 4 16 L 4 19 L 8 19" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M 20 19 L 16 19 L 16 16" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Line x1={4} y1={12} x2={20} y2={12} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.4} />
+              </>}
+            />
+            <QuickAction
+              label={"New\nGroup"}
+              onPress={() => setShowNewGroup(true)}
+              c={c}
+              icon={<>
+                <Circle cx={10} cy={9} r={3.5} stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
+                <Path d="M 4 20 Q 4 16 10 16 Q 16 16 16 20" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" />
+                <Path d="M 19 8 L 19 13 M 16.5 10.5 L 21.5 10.5" stroke={c.textPrimary} strokeWidth={1.3} strokeLinecap="round" />
+              </>}
+            />
+            <QuickAction
+              label={"AI\nAdvisor"}
+              onPress={() => router.push("/(tabs)/chat")}
+              c={c}
+              icon={<>
+                <Path d="M 4 6 Q 4 4 6 4 L 18 4 Q 20 4 20 6 L 20 13 Q 20 15 18 15 L 9 15 L 4 19 L 4 6 Z"
+                  stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Line x1={8} y1={9} x2={16} y2={9} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.5} />
+                <Line x1={8} y1={12} x2={13} y2={12} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.5} />
+              </>}
+            />
+          </View>
         </View>
 
-        {/* Hero Balance Card — tap to expand */}
-        <TouchableOpacity onPress={() => setShowDashboard(true)} activeOpacity={0.92} style={{ marginHorizontal: 20, marginBottom: 16 }}>
-          <View style={{ backgroundColor: "#111111", borderRadius: 24, padding: 22 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1.5, textTransform: "uppercase" }}>Net balance</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Tap for details</Text>
-                <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.3)" />
-              </View>
-            </View>
-            <Text style={{ fontSize: 38, fontWeight: "500", color: "#FFFFFF", letterSpacing: -1.5, marginBottom: 4 }}>
-              {netBalance >= 0 ? "+" : "-"}{sym}{Math.abs(Math.round(netBalance)).toLocaleString("en-IN")}
-            </Text>
-            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 18 }}>
-              {netBalance >= 0 ? "Others owe you this amount" : "You owe this amount total"}
-            </Text>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 14, padding: 14 }}>
-                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Owed to you</Text>
-                <Text style={{ fontSize: 16, fontWeight: "500", color: "#00C48C" }}>+{sym}{Math.round(totalOwed).toLocaleString("en-IN")}</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 14, padding: 14 }}>
-                <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>You owe</Text>
-                <Text style={{ fontSize: 16, fontWeight: "500", color: "#FF453A" }}>-{sym}{Math.round(totalOwing).toLocaleString("en-IN")}</Text>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
+        <InkLine opacity={0.2} />
 
-        {/* AI Insight Card */}
-        <TouchableOpacity onPress={() => router.push("/(tabs)/chat")} style={{ marginHorizontal: 20, marginBottom: 24, backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 16, borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#6D5DFC" }} />
-            <Text style={{ fontSize: 10, color: "#6D5DFC", fontWeight: "500", letterSpacing: 0.5 }}>AI INSIGHT</Text>
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, lineHeight: 20, marginBottom: 4 }}>
-            {trips.length > 0 ? `You have ${trips.length} active group${trips.length > 1 ? "s" : ""}. Ask AI anything about your expenses.` : "Ask AI to create your first group or split an expense."}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
-            <Text style={{ fontSize: 12, color: "#6D5DFC" }}>Chat with Merizo AI</Text>
-            <Ionicons name="arrow-forward" size={12} color="#6D5DFC" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Groups */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase" }}>Active groups</Text>
-          </View>
-          {loading ? (
-            <View style={{ gap: 10 }}>
-              {[1,2,3].map(i => <View key={i} style={{ height: 72, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 18 }} />)}
-            </View>
-          ) : trips.length === 0 ? (
-            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF", borderRadius: 18, padding: 28, alignItems: "center", borderWidth: 0.5, borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-              <Text style={{ fontSize: 28, marginBottom: 10 }}>👋</Text>
-              <Text style={{ fontSize: 15, fontWeight: "500", color: c.textPrimary, marginBottom: 6 }}>No groups yet</Text>
-              <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: "center", marginBottom: 16, lineHeight: 20 }}>Create your first group or ask AI to help split an expense</Text>
-              <TouchableOpacity onPress={() => router.push("/category")} style={{ backgroundColor: isDark ? "#7B6FFF" : "#6D5DFC", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}>
-                <Text style={{ fontSize: 13, fontWeight: "500", color: "#fff" }}>Create first group</Text>
+        {/* ── Recurring Bills ── */}
+        {recurring.length > 0 && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+                Recurring Bills
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/recurring")}>
+                <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                  Manage →
+                </Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <DebtGravityStack trips={trips} router={router} c={c} isDark={isDark} sym={sym} />
-          )}
+            <View style={{ borderTopWidth: 1, borderColor: c.border, opacity: 0.25 }} />
+            {recurring.slice(0, 4).map((bill) => (
+              <TouchableOpacity
+                key={bill.name}
+                onPress={() => router.push("/recurring")}
+                activeOpacity={0.65}
+                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: `${c.border}25` }}
+              >
+                <Text style={{ fontSize: 18, marginRight: 10 }}>{bill.emoji}</Text>
+                <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textPrimary, flex: 1 }}>
+                  {bill.name}
+                </Text>
+                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, marginRight: 4 }}>
+                  {sym}{bill.amount > 0 ? bill.amount.toLocaleString("en-IN") : "—"}
+                </Text>
+                <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted }}>
+                  /{bill.period === "monthly" ? "mo" : "yr"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {recurring.length > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 10 }}>
+                <Text style={{ fontFamily: type.family.light, fontSize: 11, color: c.textMuted }}>
+                  {recurring.length} bill{recurring.length !== 1 ? "s" : ""}
+                </Text>
+                <Text style={{ fontFamily: type.family.semibold, fontSize: 12, color: c.textPrimary }}>
+                  {sym}{recurring.reduce((s, b) => s + (b.amount || 0), 0).toLocaleString("en-IN")}/mo
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {recurring.length === 0 && !loading && (
+          <TouchableOpacity
+            onPress={() => router.push("/recurring")}
+            style={{ marginHorizontal: 20, paddingVertical: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: `${c.border}50`, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}
+          >
+            <View>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 2 }}>Recurring Bills</Text>
+              <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textSecondary }}>
+                Track subscriptions & fixed expenses
+              </Text>
+            </View>
+            <Text style={{ fontFamily: type.family.light, fontSize: 16, color: c.textMuted }}>+</Text>
+          </TouchableOpacity>
+        )}
+
+        <InkLine opacity={0.2} />
+
+        {/* ── Groups — compact notebook rows ── */}
+        {trips.length > 0 && (
+          <View style={{ paddingTop: 16, marginBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 4 }}>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+                Groups
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/create-split")}>
+                <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                  + New
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {/* Top border */}
+            <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20, marginBottom: 0 }} />
+            {trips.slice(0, 5).map((trip, i) => (
+              <View key={trip.id}>
+                <GroupRow
+                  trip={trip}
+                  sym={sym}
+                  c={c}
+                  onPress={() => router.push({ pathname: "/split/[id]", params: { id: trip.id } })}
+                />
+                {i < Math.min(trips.length, 5) - 1 && <DottedLine c={c} />}
+              </View>
+            ))}
+            {/* Bottom border */}
+            <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20, marginTop: 0 }} />
+          </View>
+        )}
+
+        {trips.length === 0 && !loading && (
+          <View style={{ paddingHorizontal: 20, paddingVertical: 24, alignItems: "flex-start" }}>
+            <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textMuted, lineHeight: 22 }}>
+              No groups yet. Create one to start splitting expenses with friends.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/create-split")}
+              style={{ marginTop: 16, borderWidth: 1, borderColor: c.border, paddingVertical: 12, paddingHorizontal: 20 }}
+            >
+              <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }}>
+                + Create a Group
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <InkLine opacity={0.2} />
+
+        {/* ── Recent activity ── */}
+        {recentExp.length > 0 && (
+          <View style={{ paddingTop: 16, marginBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 8 }}>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+                Recent Activity
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(tabs)/activity")}>
+                <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                  See all →
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20 }} />
+            {recentExp.map((exp, i) => (
+              <View key={exp.id || i}>
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: "/split/[id]", params: { id: exp.tripId } })}
+                  activeOpacity={0.65}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 20, gap: 12 }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }} numberOfLines={1}>
+                      {exp.name || "Expense"}
+                    </Text>
+                    <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 1 }}>
+                      {exp.tripName}
+                    </Text>
+                  </View>
+                  <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, letterSpacing: -0.3 }}>
+                    {sym}{Math.round(exp.amount || 0).toLocaleString("en-IN")}
+                  </Text>
+                </TouchableOpacity>
+                {i < recentExp.length - 1 && <DottedLine c={c} />}
+              </View>
+            ))}
+            <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20 }} />
+          </View>
+        )}
+
+        {/* ── Footer ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 }}>
+          <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", textAlign: "center", opacity: 0.5 }}>
+            MERIZO · Financial Notebook
+          </Text>
         </View>
-
-        {/* Recurring */}
-        <RecurringSection c={c} isDark={isDark} router={router} />
-
-        {/* AI Smart Tips */}
-        <SmartTips c={c} isDark={isDark} />
       </ScrollView>
 
-      {/* FAB */}
-      <FAB router={router} isDark={isDark} c={c} />
+      {/* ── Add Expense modal ── */}
+      <Modal visible={showAddExpense} transparent animationType="slide" onRequestClose={() => setShowAddExpense(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setShowAddExpense(false)}
+        >
+          <View style={{ backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
+            <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>
+              Add Expense
+            </Text>
+            <Text style={{ fontFamily: type.family.bold, fontSize: 20, color: c.textPrimary, marginBottom: 20 }}>
+              How would you like to add?
+            </Text>
+            <TouchableOpacity
+              onPress={() => { setShowAddExpense(false); router.push("/simple-split"); }}
+              style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 16, paddingHorizontal: 16, marginBottom: 10 }}
+            >
+              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.textPrimary }}>Quick Split</Text>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 12, color: c.textMuted, marginTop: 2 }}>
+                Split a one-off expense between friends
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setShowAddExpense(false); router.push("/create-split"); }}
+              style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.textPrimary, paddingVertical: 16, paddingHorizontal: 16 }}
+            >
+              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.bg }}>Create Group</Text>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 12, color: `${c.bg}99`, marginTop: 2 }}>
+                Start a group for ongoing shared expenses
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
-      {/* Balance Dashboard Modal */}
-      <BalanceDashboard
-        visible={showDashboard}
-        onClose={() => setShowDashboard(false)}
-        trips={trips}
-        totalOwed={totalOwed}
-        totalOwing={totalOwing}
-        netBalance={netBalance}
-        sym={sym}
-        c={c}
-        isDark={isDark}
-      />
+      {/* ── New Group category modal ── */}
+      <Modal visible={showNewGroup} transparent animationType="slide" onRequestClose={() => setShowNewGroup(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setShowNewGroup(false)}
+        >
+          <View style={{ backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
+            <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>
+              New Group
+            </Text>
+            <Text style={{ fontFamily: type.family.bold, fontSize: 20, color: c.textPrimary, marginBottom: 20 }}>
+              What's the group for?
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {([
+                { label: "Travel",        category: "travel",        icon: "✈️" },
+                { label: "Food",          category: "food",          icon: "🍽️" },
+                { label: "Home",          category: "home",          icon: "🏠" },
+                { label: "Shopping",      category: "shopping",      icon: "🛍️" },
+                { label: "Entertainment", category: "entertainment",  icon: "🎬" },
+                { label: "Other",         category: "other",         icon: "📦" },
+              ] as const).map(({ label, category, icon }) => (
+                <TouchableOpacity
+                  key={category}
+                  onPress={() => {
+                    setShowNewGroup(false);
+                    router.push({ pathname: "/create-split", params: { category } });
+                  }}
+                  style={{
+                    borderWidth: 1, borderColor: c.border,
+                    paddingVertical: 14, paddingHorizontal: 12,
+                    alignItems: "center", gap: 6,
+                    width: "30%",
+                  }}
+                >
+                  <Text style={{ fontSize: 22 }}>{icon}</Text>
+                  <Text style={{ fontFamily: type.family.medium, fontSize: 11, color: c.textPrimary, textAlign: "center" }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

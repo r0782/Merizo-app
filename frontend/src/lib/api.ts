@@ -28,10 +28,10 @@ api.interceptors.response.use(
   async (err) => {
     const status = err?.response?.status;
     
-    // Retry on timeout errors
-    if (err.code === 'ECONNABORTED') {
-      console.warn('Request timeout, retrying...');
+    // Retry on timeout — once only to avoid infinite loops
+    if (err.code === 'ECONNABORTED' && !err.config?._retried) {
       if (err.config) {
+        err.config._retried = true;
         err.config.timeout = 120000;
         try {
           return await api.request(err.config);
@@ -58,34 +58,14 @@ export async function setToken(t: string | null) {
 export async function getToken() {
   return AsyncStorage.getItem(TOKEN_KEY);
 }
-export async function createGroup(data: any) {
-  try {
-    // Limit members to 50
-    if (data.member_ids && data.member_ids.length > 50) {
-      throw new Error('Maximum 50 members allowed per group');
-    }
-
-    const response = await api.post('/groups', data);
-    return response.data;
-  } catch (error: any) {
-    if (error.code === 'ECONNABORTED') {
-      throw new Error('Group creation took too long. Try with fewer members.');
-    }
-    throw error;
-  }
-}
-export async function removeMemberFromGroup(
-  groupId: string,
-  memberId: string
-) {
-  return api.delete(`/groups/${groupId}/members/${memberId}`);
-}
 // ── Keep Render warm — ping every 14 min to prevent cold start ───────────────
+// Pings the root health check (/, not /api/) to avoid 404s
+const BASE_ROOT = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 let _pingTimer: any = null;
 export function startKeepAlive() {
   if (_pingTimer) return;
   const ping = () => {
-    api.get("/").catch(() => {}); // silent — just wake the server
+    fetch(`${BASE_ROOT}/`).catch(() => {}); // silent — just wake the server
   };
   ping(); // immediate ping on app start
   _pingTimer = setInterval(ping, 14 * 60 * 1000); // every 14 minutes

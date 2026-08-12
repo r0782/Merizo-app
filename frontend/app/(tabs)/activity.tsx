@@ -1,37 +1,143 @@
-import React, { useCallback, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Platform } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+/**
+ * MERIZO Activity — Chronological Financial Journal
+ * Looks like a dated ledger / notebook diary.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View, Text, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated, Easing,
+} from "react-native";
+import { useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
-import { currencySymbol, categoryMeta } from "../../src/lib/tokens";
+import { currencySymbol, categoryMeta, type } from "../../src/lib/tokens";
+import { FullWidthDivider } from "../../src/components/merizo/HandDrawnDivider";
 
+// ── Row entrance animation ────────────────────────────────────────────────────
+function AnimRow({ children, index }: { children: React.ReactNode; index: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity,     { toValue: 1, duration: 280, delay: 30 + index * 40, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(translateX,  { toValue: 0, duration: 260, delay: 30 + index * 40, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+  }, [index]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateX }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ── Journal date heading ──────────────────────────────────────────────────────
+function DateHeading({ label, c }: { label: string; c: any }) {
+  return (
+    <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
+      <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+        {label}
+      </Text>
+      <View style={{ height: 1, backgroundColor: c.border, opacity: 0.15, marginTop: 6 }} />
+    </View>
+  );
+}
+
+// ── Journal expense row ───────────────────────────────────────────────────────
+function JournalRow({ item, sym, onPress, c }: any) {
+  const isSettlement = item._type === "settlement";
+  const meta = categoryMeta[item.category || "other"] || categoryMeta.other;
+  const time = new Date(item.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.65}
+      style={{ paddingHorizontal: 20, paddingVertical: 12 }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14 }}>
+        {/* Time column */}
+        <View style={{ width: 44, alignItems: "flex-end", paddingTop: 1 }}>
+          <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 0.3 }}>
+            {time}
+          </Text>
+        </View>
+        {/* Vertical timeline line */}
+        <View style={{ width: 1, backgroundColor: c.border, opacity: 0.15, alignSelf: "stretch", marginHorizontal: 0 }} />
+        {/* Content */}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }}>
+                {isSettlement ? "Settlement" : (item.name || "Expense")}
+              </Text>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 2 }}>
+                {isSettlement ? item.tripName : `${meta.label} · ${item.tripName}`}
+              </Text>
+            </View>
+            <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, letterSpacing: -0.3 }}>
+              {isSettlement ? "+" : ""}{sym}{Math.round(item.amount || 0).toLocaleString("en-IN")}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Group items by date ───────────────────────────────────────────────────────
+function groupByDate(items: any[]) {
+  const groups: { label: string; items: any[] }[] = [];
+  const map: Record<string, any[]> = {};
+
+  items.forEach(item => {
+    const date = new Date(item.created_at);
+    const diff = Date.now() - date.getTime();
+    let label: string;
+    if (diff < 86400000)  label = "Today";
+    else if (diff < 172800000) label = "Yesterday";
+    else label = date.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+
+    if (!map[label]) { map[label] = []; groups.push({ label, items: map[label] }); }
+    map[label].push(item);
+  });
+
+  return groups;
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ActivityScreen() {
-  const { c, isDark } = useTheme();
-  const router = useRouter();
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const { c } = useTheme();
+  const [expenses,    setExpenses]    = useState<any[]>([]);
   const [settlements, setSettlements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const sym = currencySymbol("INR");
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [sym, setSym] = useState("₹");
+
+  useEffect(() => {
+    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const trips = await api.get("/trips");
-      const allExpenses: any[] = [];
-      const allSettlements: any[] = [];
-      for (const trip of (trips.data || []).slice(0, 5)) {
+      const topTrips: any[] = (trips.data || []).slice(0, 5);
+      const results = await Promise.all(topTrips.map(async (trip: any) => {
         try {
-          const exps = await api.get(`/expenses/${trip.id}`);
-          (exps.data || []).forEach((e: any) => allExpenses.push({ ...e, tripName: trip.name, tripId: trip.id }));
-          const setts = await api.get(`/settlements/${trip.id}`);
-          (setts.data || []).forEach((s: any) => allSettlements.push({ ...s, tripName: trip.name }));
-        } catch {}
-      }
-      allExpenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      allSettlements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setExpenses(allExpenses);
-      setSettlements(allSettlements);
+          const [exps, setts] = await Promise.all([api.get(`/expenses/${trip.id}`), api.get(`/settlements/${trip.id}`)]);
+          return {
+            expenses:    (exps.data  || []).map((e: any) => ({ ...e, tripName: trip.name, tripId: trip.id })),
+            settlements: (setts.data || []).map((s: any) => ({ ...s, tripName: trip.name })),
+          };
+        } catch { return { expenses: [], settlements: [] }; }
+      }));
+      const allExp  = results.flatMap(r => r.expenses);
+      const allSett = results.flatMap(r => r.settlements);
+      allExp.sort( (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      allSett.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setExpenses(allExp);
+      setSettlements(allSett);
     } catch {}
     setLoading(false);
   }, []);
@@ -39,116 +145,82 @@ export default function ActivityScreen() {
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, [load]));
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  const formatDate = (d: string) => {
-    const date = new Date(d);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    if (diff < 86400000) return "Today";
-    if (diff < 172800000) return "Yesterday";
-    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  };
-
-  // Merge and sort all activity
   const allActivity = [
-    ...expenses.map(e => ({ ...e, type: "expense" })),
-    ...settlements.map(s => ({ ...s, type: "settlement" })),
+    ...expenses.map(e    => ({ ...e, _type: "expense" })),
+    ...settlements.map(s => ({ ...s, _type: "settlement" })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const groups = groupByDate(allActivity);
+  const totalSpent = expenses.reduce((s, e) => s + (e.amount || 0), 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 56 : 40, paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textSecondary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textMuted} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 28, fontWeight: "500", color: c.textPrimary, letterSpacing: -0.5 }}>Activity</Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="options" size={17} color={c.textPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="search" size={17} color={c.textPrimary} />
-            </TouchableOpacity>
+        {/* ── Header ── */}
+        <View style={{ paddingHorizontal: 20, paddingBottom: 16, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <View>
+            <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
+              Journal
+            </Text>
+            <Text style={{ fontFamily: type.family.bold, fontSize: 28, color: c.textPrimary, letterSpacing: -1 }}>
+              Activity
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 1 }}>
+              {allActivity.length} entries
+            </Text>
+            <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary, marginTop: 2 }}>
+              {sym}{totalSpent.toLocaleString("en-IN")}
+            </Text>
           </View>
         </View>
 
-        {/* Summary cards */}
-        <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, marginBottom: 24 }}>
-          <View style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
-            <Text style={{ fontSize: 10, color: c.textSecondary, marginBottom: 4 }}>Total</Text>
-            <Text style={{ fontSize: 16, fontWeight: "500", color: c.textPrimary }}>{allActivity.length} activities</Text>
-          </View>
-          <View style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
-            <Text style={{ fontSize: 10, color: c.textSecondary, marginBottom: 4 }}>Expenses</Text>
-            <Text style={{ fontSize: 16, fontWeight: "500", color: c.textPrimary }}>{expenses.length}</Text>
-          </View>
-          <View style={{ flex: 1, backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: c.border }}>
-            <Text style={{ fontSize: 10, color: c.textSecondary, marginBottom: 4 }}>Settled</Text>
-            <Text style={{ fontSize: 16, fontWeight: "500", color: "#00C48C" }}>{settlements.length}</Text>
-          </View>
-        </View>
+        <View style={{ height: 1, backgroundColor: c.border, opacity: 0.3, marginHorizontal: 20 }} />
 
-        {/* Activity list */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <Text style={{ fontSize: 11, fontWeight: "500", color: c.textSecondary, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
-            Recent activity
+        {/* ── Loading state — skeleton lines ── */}
+        {loading && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 18 }}>
+            {[90, 70, 85, 60, 75].map((w, i) => (
+              <View key={i} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View style={{ width: `${w}%` as any, height: 13, backgroundColor: c.surfaceAlt, opacity: 0.6 + (i % 2) * 0.2 }} />
+                <View style={{ width: 48, height: 13, backgroundColor: c.surfaceAlt, opacity: 0.5 }} />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Journal entries by date ── */}
+        {!loading && groups.length === 0 && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 40, alignItems: "center" }}>
+            <Text style={{ fontFamily: type.family.light, fontSize: type.size.sm, color: c.textMuted, textAlign: "center", lineHeight: 22 }}>
+              No entries yet.{"\n"}Add an expense to start your financial journal.
+            </Text>
+          </View>
+        )}
+
+        {!loading && groups.map((group, gi) => (
+          <View key={group.label}>
+            <DateHeading label={group.label} c={c} />
+            {group.items.map((item, i) => (
+              <AnimRow key={item.id || i} index={gi * 10 + i}>
+                <JournalRow item={item} sym={sym} c={c} onPress={() => {}} />
+                {i < group.items.length - 1 && (
+                  <View style={{ height: 1, backgroundColor: c.border, opacity: 0.08, marginHorizontal: 78 }} />
+                )}
+              </AnimRow>
+            ))}
+          </View>
+        ))}
+
+        <View style={{ paddingHorizontal: 20, paddingTop: 32 }}>
+          <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textAlign: "center", opacity: 0.4, textTransform: "uppercase" }}>
+            End of journal
           </Text>
-
-          {loading ? (
-            <View style={{ gap: 10 }}>
-              {[1,2,3,4].map(i => <View key={i} style={{ height: 68, backgroundColor: isDark ? "#1C1C1E" : "#F0EDE8", borderRadius: 16 }} />)}
-            </View>
-          ) : allActivity.length === 0 ? (
-            <View style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 18, padding: 32, alignItems: "center", borderWidth: 0.5, borderColor: c.border }}>
-              <Text style={{ fontSize: 28, marginBottom: 10 }}>📋</Text>
-              <Text style={{ fontSize: 15, fontWeight: "500", color: c.textPrimary, marginBottom: 6 }}>No activity yet</Text>
-              <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: "center" }}>Add expenses or settle payments to see your activity here.</Text>
-            </View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {allActivity.map((item, i) => {
-                if (item.type === "expense") {
-                  const meta = categoryMeta[item.category || "other"] || categoryMeta.other;
-                  return (
-                    <TouchableOpacity key={item.id || i}
-                      onPress={() => item.tripId && router.push({ pathname: "/split/[id]", params: { id: item.tripId } })}
-                      style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: c.border }}
-                    >
-                      <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: meta.tint + "22", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Text style={{ fontSize: 18 }}>{meta.emoji}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }}>{item.name || "Expense"}</Text>
-                        <Text style={{ fontSize: 12, color: c.textSecondary }}>{item.tripName} · {formatDate(item.created_at)}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={{ fontSize: 15, fontWeight: "500", color: "#00C48C" }}>+{sym}{Math.round(item.amount || 0).toLocaleString("en-IN")}</Text>
-                        <Text style={{ fontSize: 10, color: c.textMuted, marginTop: 1 }}>expense</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                } else {
-                  return (
-                    <View key={item.id || i} style={{ backgroundColor: isDark ? "#1C1C1E" : "#fff", borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 0.5, borderColor: c.border }}>
-                      <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: "rgba(0,196,140,0.1)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Ionicons name="checkmark-circle" size={22} color="#00C48C" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "500", color: c.textPrimary, marginBottom: 2 }}>Settlement</Text>
-                        <Text style={{ fontSize: 12, color: c.textSecondary }}>{item.tripName} · {formatDate(item.created_at)}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={{ fontSize: 15, fontWeight: "500", color: "#FF453A" }}>{sym}{Math.round(item.amount || 0).toLocaleString("en-IN")}</Text>
-                        <Text style={{ fontSize: 10, color: c.textMuted, marginTop: 1 }}>settled</Text>
-                      </View>
-                    </View>
-                  );
-                }
-              })}
-            </View>
-          )}
         </View>
       </ScrollView>
     </View>

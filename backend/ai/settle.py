@@ -2,7 +2,16 @@ import os
 from groq import Groq
 from .prompts import SETTLEMENT_EXPLAIN_PROMPT, EXPLAIN_BALANCE_PROMPT
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        key = os.environ.get("GROQ_API_KEY", "")
+        if not key:
+            raise RuntimeError("GROQ_API_KEY not configured")
+        _client = Groq(api_key=key)
+    return _client
 
 def minimize_transactions(balances: dict) -> list:
     debtors   = sorted([(amt, name) for name, amt in balances.items() if amt < -0.01])
@@ -21,18 +30,24 @@ def minimize_transactions(balances: dict) -> list:
     return transactions
 
 async def explain_settlement(transactions: list, currency: str, language: str = "en") -> str:
-    tx_text = "\n".join([f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions])
-    response = client.chat.completions.create(
+    tx_text = "\n".join(
+        [f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions]
+    )
+    response = _get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": SETTLEMENT_EXPLAIN_PROMPT.format(currency=currency, transactions=tx_text, language=language)}],
+        messages=[{"role": "user", "content": SETTLEMENT_EXPLAIN_PROMPT.format(
+            currency=currency, transactions=tx_text, language=language
+        )}],
         max_tokens=256,
     )
     return response.choices[0].message.content
 
 async def explain_balances(balances: dict, currency: str, language: str = "en") -> str:
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": EXPLAIN_BALANCE_PROMPT.format(currency=currency, balances=str(balances), language=language)}],
+        messages=[{"role": "user", "content": EXPLAIN_BALANCE_PROMPT.format(
+            currency=currency, balances=str(balances), language=language
+        )}],
         max_tokens=256,
     )
     return response.choices[0].message.content
