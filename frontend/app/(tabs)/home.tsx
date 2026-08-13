@@ -47,6 +47,7 @@ function DottedLine({ c }: { c: any }) {
 
 // ── Page header ───────────────────────────────────────────────────────────────
 function NotebookHeader({ greeting, date, c }: any) {
+  const { toggle, isDark } = useTheme();
   const opacity    = useSharedValue(0);
   const translateY = useSharedValue(-12);
 
@@ -71,10 +72,33 @@ function NotebookHeader({ greeting, date, c }: any) {
             {greeting}
           </Text>
         </View>
-        <Svg width={40} height={40} viewBox="0 0 40 40" style={{ opacity: 0.15 }}>
-          <Path d="M 38 2 L 38 38 L 2 38" stroke={c.textPrimary} strokeWidth={1} fill="none" strokeLinecap="round" />
-          <Path d="M 32 2 L 38 2 L 38 8" stroke={c.textPrimary} strokeWidth={1} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
+        {/* Theme toggle — sun/moon sketch icon */}
+        <TouchableOpacity
+          onPress={toggle}
+          activeOpacity={0.6}
+          style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${c.border}40` }}
+        >
+          {isDark ? (
+            /* Sun icon */
+            <Svg width={20} height={20} viewBox="0 0 20 20">
+              <Circle cx={10} cy={10} r={4} stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
+              <Line x1={10} y1={1} x2={10} y2={3.5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={10} y1={16.5} x2={10} y2={19} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={1} y1={10} x2={3.5} y2={10} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={16.5} y1={10} x2={19} y2={10} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={3.2} y1={3.2} x2={5} y2={5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={15} y1={15} x2={16.8} y2={16.8} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={16.8} y1={3.2} x2={15} y2={5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+              <Line x1={5} y1={15} x2={3.2} y2={16.8} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
+            </Svg>
+          ) : (
+            /* Moon icon */
+            <Svg width={20} height={20} viewBox="0 0 20 20">
+              <Path d="M 10 2 Q 15 3 16 9 Q 17 16 10 18 Q 4 17 3 11 Q 4 4 10 2 Z" stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
+              <Path d="M 10 2 Q 6 5 6 10 Q 6 14 10 18" stroke={c.textPrimary} strokeWidth={0.8} fill="none" opacity={0.4} />
+            </Svg>
+          )}
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -307,9 +331,10 @@ export default function HomeScreen() {
   const [sym,            setSym]            = useState("₹");
   const [refreshing,     setRefreshing]     = useState(false);
   const [loading,        setLoading]        = useState(true);
-  const [showAddExpense, setShowAddExpense] = useState(false);
-  const [showNewGroup,   setShowNewGroup]   = useState(false);
-  const [recurring,      setRecurring]      = useState<Subscription[]>([]);
+  const [showAddExpense,  setShowAddExpense]  = useState(false);
+  const [showNewGroup,    setShowNewGroup]    = useState(false);
+  const [recurring,       setRecurring]       = useState<Subscription[]>([]);
+  const [showAllGroups,   setShowAllGroups]   = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
@@ -504,25 +529,37 @@ export default function HomeScreen() {
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
                 Groups
               </Text>
-              <TouchableOpacity onPress={() => router.push("/create-split")}>
-                <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                  + New
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                {trips.length > 5 && (
+                  <TouchableOpacity onPress={() => setShowAllGroups(v => !v)}>
+                    <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                      {showAllGroups ? "Show less" : `See all (${trips.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setShowNewGroup(true)}>
+                  <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                    + New
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
             {/* Top border */}
             <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20, marginBottom: 0 }} />
-            {trips.slice(0, 5).map((trip, i) => (
-              <View key={trip.id}>
-                <GroupRow
-                  trip={trip}
-                  sym={sym}
-                  c={c}
-                  onPress={() => router.push({ pathname: "/split/[id]", params: { id: trip.id } })}
-                />
-                {i < Math.min(trips.length, 5) - 1 && <DottedLine c={c} />}
-              </View>
-            ))}
+            {(showAllGroups ? trips : trips.slice(0, 5)).map((trip, i) => {
+              const visibleTrips = showAllGroups ? trips : trips.slice(0, 5);
+              return (
+                <View key={trip.id}>
+                  <GroupRow
+                    trip={trip}
+                    sym={sym}
+                    c={c}
+                    onPress={() => router.push({ pathname: "/split/[id]", params: { id: trip.id } })}
+                  />
+                  {i < visibleTrips.length - 1 && <DottedLine c={c} />}
+                </View>
+              );
+            })}
             {/* Bottom border */}
             <View style={{ height: 1, backgroundColor: c.border, opacity: 0.25, marginHorizontal: 20, marginTop: 0 }} />
           </View>

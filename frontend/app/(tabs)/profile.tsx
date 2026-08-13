@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  Platform, Linking, Modal, TextInput, Switch,
+  Platform, Linking, Modal, TextInput, Switch, Share,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -55,6 +55,42 @@ function ProfileRow({ icon, label, sub, onPress, right, danger = false, c }: any
       </View>
       {right !== undefined ? right : <ChevronRight c={c} />}
     </TouchableOpacity>
+  );
+}
+
+// ── Deterministic QR-like SVG from user id ────────────────────────────────────
+function SketchQR({ userId, size = 120, c }: { userId: string; size?: number; c: any }) {
+  const cells = 11;
+  const cell = size / cells;
+  // Deterministic hash from userId string
+  const hash = (s: string) => {
+    let h = 0x9e3779b9;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x9e3779b9);
+    return h >>> 0;
+  };
+  const bits: boolean[][] = Array.from({ length: cells }, (_, r) =>
+    Array.from({ length: cells }, (_, col) => {
+      // Always fill corners (3×3 finder patterns)
+      if ((r < 3 && col < 3) || (r < 3 && col >= cells - 3) || (r >= cells - 3 && col < 3)) return true;
+      // Mirror left half to right for symmetry
+      const c2 = col < Math.ceil(cells / 2) ? col : cells - 1 - col;
+      return !!(hash(userId + r + c2) & 1);
+    })
+  );
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {bits.map((row, r) =>
+        row.map((on, col) =>
+          on ? (
+            <Path
+              key={`${r}-${col}`}
+              d={`M ${col * cell + 1} ${r * cell + 1} h ${cell - 2} v ${cell - 2} h -${cell - 2} Z`}
+              fill={c.textPrimary}
+            />
+          ) : null
+        )
+      )}
+    </Svg>
   );
 }
 
@@ -216,6 +252,53 @@ export default function ProfileScreen() {
         <ProfileRow icon={icons.chart}  label="Spending Analytics" sub="Charts & insights" onPress={() => router.push("/(tabs)/insights")} c={c} />
         <InkDivider c={c} />
         <ProfileRow icon={icons.repeat} label="Recurring Expenses" sub="Subscriptions" onPress={() => router.push("/recurring")} c={c} />
+
+        {/* ── QR & Profile Link ── */}
+        <SectionLabel label="My QR Code" />
+        <View style={{ paddingHorizontal: 20, paddingBottom: 24, alignItems: "center", gap: 16 }}>
+          {/* QR visual */}
+          <View style={{ borderWidth: 1, borderColor: c.border, padding: 12, backgroundColor: c.bg }}>
+            <SketchQR userId={user?.id || user?.email || "merizo"} size={130} c={c} />
+          </View>
+          {/* Profile link */}
+          <View style={{ alignItems: "center", gap: 4 }}>
+            <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase" }}>
+              Profile Link
+            </Text>
+            <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textSecondary, letterSpacing: 0.3 }}>
+              merizo.app/u/{(user?.id || "").slice(0, 8) || "you"}
+            </Text>
+          </View>
+          {/* Action buttons */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => Share.share({
+                message: `Add me on Merizo! merizo.app/u/${(user?.id || "").slice(0, 8)}`,
+                title: "Merizo Profile",
+              })}
+              style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Svg width={14} height={14} viewBox="0 0 14 14">
+                <Path d="M 2 7 L 7 2 L 12 7 M 7 2 L 7 12" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Share Link</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/scan")}
+              style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Svg width={14} height={14} viewBox="0 0 14 14">
+                <Path d="M 2 4 L 2 2 L 4 2" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                <Path d="M 10 2 L 12 2 L 12 4" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                <Path d="M 2 10 L 2 12 L 4 12" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                <Path d="M 10 12 L 12 12 L 12 10" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                <Line x1={2} y1={7} x2={12} y2={7} stroke={c.textPrimary} strokeWidth={0.8} opacity={0.4} />
+              </Svg>
+              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Scan Friend</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={{ height: 1, backgroundColor: c.border, opacity: 0.15, marginHorizontal: 20, marginBottom: 8 }} />
 
         {/* ── Support ── */}
         <SectionLabel label="Support" />

@@ -7,7 +7,7 @@
  * - AIInsightCard: ledger row style insight
  */
 import { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing } from "react-native";
+import { View, Text, Animated, Easing, TouchableOpacity } from "react-native";
 import Svg, { Circle, Line, Path, Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 import { type } from "../lib/tokens";
@@ -405,12 +405,14 @@ export function AIInsightCard({
   sub,
   trendDir,
   index = 0,
+  onPress,
 }: {
   emoji: string;
   title: string;
   sub?: string;
   trendDir?: "up" | "down" | "neutral";
   index?: number;
+  onPress?: () => void;
 }) {
   const { c } = useTheme();
   const fade = useRef(new Animated.Value(0)).current;
@@ -425,17 +427,8 @@ export function AIInsightCard({
 
   const arrow = trendDir === "up" ? "↑" : trendDir === "down" ? "↓" : "→";
 
-  return (
-    <Animated.View style={{
-      opacity: fade,
-      transform: [{ translateX: slideX }],
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 10,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: `${c.border}18`,
-    }}>
+  const inner = (
+    <>
       {/* Trend arrow */}
       <Text style={{ fontFamily: type.family.light, fontSize: 14, color: c.textMuted, width: 16, marginTop: 1 }}>
         {arrow}
@@ -451,6 +444,41 @@ export function AIInsightCard({
           </Text>
         )}
       </View>
+      {onPress && (
+        <Text style={{ fontFamily: type.family.light, fontSize: 14, color: c.textMuted, marginTop: 1 }}>›</Text>
+      )}
+    </>
+  );
+
+  return (
+    <Animated.View style={{ opacity: fade, transform: [{ translateX: slideX }] }}>
+      {onPress ? (
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.6}
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 10,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: `${c.border}18`,
+          }}
+        >
+          {inner}
+        </TouchableOpacity>
+      ) : (
+        <View style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 10,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: `${c.border}18`,
+        }}>
+          {inner}
+        </View>
+      )}
     </Animated.View>
   );
 }

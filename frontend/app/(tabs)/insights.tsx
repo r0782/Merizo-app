@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Svg, { Path, Line } from "react-native-svg";
+import Svg, { Path, Line, Circle } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { categoryMeta, currencySymbol, type } from "../../src/lib/tokens";
@@ -116,15 +116,84 @@ function CategoryRow({ cc, sym, barWidth, index }: { cc: any; sym: string; barWi
   );
 }
 
+// ── Animated circular progress ring ─────────────────────────────────────────
+function CircularProgress({ spent, budget, label, sym, size = 96 }: { spent: number; budget: number; label: string; sym: string; size?: number }) {
+  const { c } = useTheme();
+  const targetPct = budget > 0 ? Math.min(spent / budget, 1) : 0;
+  const over = spent > budget;
+  const r = (size - 14) / 2;
+  const circumference = 2 * Math.PI * r;
+
+  // Animate pct via state updated from Animated listener
+  const [displayPct, setDisplayPct] = useState(0);
+  const animVal = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const id = animVal.addListener(({ value }) => setDisplayPct(value));
+    Animated.timing(animVal, { toValue: targetPct, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+    return () => animVal.removeListener(id);
+  }, [targetPct]);
+
+  const offset = circumference * (1 - displayPct);
+
+  return (
+    <View style={{ alignItems: "center", width: size + 16 }}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {/* Track ring */}
+          <Circle cx={size / 2} cy={size / 2} r={r} stroke={`${c.border}30`} strokeWidth={6} fill="none" />
+          {/* Progress arc */}
+          <Circle
+            cx={size / 2} cy={size / 2} r={r}
+            stroke={c.textPrimary}
+            strokeWidth={over ? 6 : 5}
+            fill="none"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={`${offset}`}
+            strokeLinecap="round"
+            rotation={-90}
+            origin={`${size / 2},${size / 2}`}
+            opacity={over ? 1 : 0.88}
+          />
+        </Svg>
+        {/* Center label */}
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontFamily: type.family.bold, fontSize: 14, color: c.textPrimary, letterSpacing: -0.5 }}>
+            {Math.round(displayPct * 100)}%
+          </Text>
+          {over && (
+            <Text style={{ fontFamily: type.family.regular, fontSize: 7, color: c.textMuted, letterSpacing: 0.8, marginTop: 1 }}>OVER</Text>
+          )}
+        </View>
+      </View>
+      <Text style={{ fontFamily: type.family.medium, fontSize: 10, color: c.textSecondary, marginTop: 6, textAlign: "center" }}>{label}</Text>
+      <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, marginTop: 1 }}>
+        {sym}{Math.round(spent).toLocaleString("en-IN")} / {sym}{(budget || 0).toLocaleString("en-IN")}
+      </Text>
+    </View>
+  );
+}
+
 // ── Derive AI insights ────────────────────────────────────────────────────────
-function deriveInsights(data: any, sym: string) {
+type Insight = {
+  emoji: string;
+  title: string;
+  sub?: string;
+  trendDir?: "up" | "down" | "neutral";
+  why: string;
+  where: string;
+  when: string;
+  howMuch: string;
+};
+
+function deriveInsights(data: any, sym: string): Insight[] {
   if (!data) return [];
   const cats: any[] = data.by_category || [];
   const total: number = data.total || 0;
   const owed: number = data.owed_to_you || 0;
   const owing: number = data.you_owe || 0;
   const trend: any[] = data.monthly_trend || [];
-  const insights: Array<{ emoji: string; title: string; sub?: string; trendDir?: "up" | "down" | "neutral" }> = [];
+  const insights: Insight[] = [];
 
   if (cats.length > 0) {
     const top = cats[0];
@@ -134,6 +203,10 @@ function deriveInsights(data: any, sym: string) {
       title: `${meta.label} is your top spend — ${sym}${Math.round(top.amount).toLocaleString("en-IN")}`,
       sub: `${top.percent.toFixed(0)}% of your total spending this period`,
       trendDir: "neutral",
+      why: `${meta.label} accounts for ${top.percent.toFixed(0)}% of all your tracked expenses, making it the single largest spending category in this period.`,
+      where: `This spending occurred across your shared groups in the ${meta.label.toLowerCase()} category.`,
+      when: trend.length > 0 ? `Observed during ${trend[trend.length - 1]?.month || "this period"}.` : "Observed over your tracked period.",
+      howMuch: `${sym}${Math.round(top.amount).toLocaleString("en-IN")} total, which is ${top.percent.toFixed(0)}% of ${sym}${Math.round(total).toLocaleString("en-IN")} overall spending.`,
     });
   }
 
@@ -149,6 +222,10 @@ function deriveInsights(data: any, sym: string) {
           : `Spending down ${Math.abs(changePct)}% vs last month`,
         sub: `${trend[trend.length - 1]?.month} vs ${trend[trend.length - 2]?.month}`,
         trendDir: changePct > 0 ? "up" : "down",
+        why: `Your total spending ${changePct > 0 ? "increased" : "decreased"} by ${Math.abs(changePct)}% compared to the previous month. This trend is calculated from your recorded group expenses.`,
+        where: "Aggregated across all your shared expense groups.",
+        when: `${trend[trend.length - 2]?.month} → ${trend[trend.length - 1]?.month}`,
+        howMuch: `${sym}${Math.round(prev).toLocaleString("en-IN")} → ${sym}${Math.round(last).toLocaleString("en-IN")} (${changePct > 0 ? "+" : ""}${changePct}%)`,
       });
     }
   }
@@ -159,6 +236,10 @@ function deriveInsights(data: any, sym: string) {
       title: `+${sym}${Math.round(owed).toLocaleString("en-IN")} owed to you`,
       sub: "You're in a great position — others owe you",
       trendDir: "down",
+      why: "You have paid more than your share in shared expenses, resulting in others owing you money.",
+      where: "Across your active expense groups based on your settlement balances.",
+      when: "Current as of your last sync.",
+      howMuch: `${sym}${Math.round(owed).toLocaleString("en-IN")} net owed to you. No outstanding debts.`,
     });
   } else if (owing > 0) {
     insights.push({
@@ -166,6 +247,10 @@ function deriveInsights(data: any, sym: string) {
       title: `-${sym}${Math.round(owing).toLocaleString("en-IN")} you owe across groups`,
       sub: "Settle up to keep balances clean",
       trendDir: "up",
+      why: "Others have covered expenses on your behalf. Your net balance across groups is negative.",
+      where: "Distributed across your active shared expense groups.",
+      when: "Current as of your last sync.",
+      howMuch: `You owe ${sym}${Math.round(owing).toLocaleString("en-IN")} in total across your groups.`,
     });
   }
 
@@ -177,6 +262,10 @@ function deriveInsights(data: any, sym: string) {
       title: `${names.join(" & ")} make up ${Math.round(topTwo)}% of spending`,
       sub: "Consider diversifying your budget tracking",
       trendDir: "neutral",
+      why: `Your top two spending categories — ${names.join(" and ")} — dominate your expenses, accounting for ${Math.round(topTwo)}% of total spending. This level of concentration may indicate an opportunity to review your budget allocation.`,
+      where: "Observed in your category breakdown for the selected period.",
+      when: trend.length > 0 ? `During ${trend[trend.length - 1]?.month || "this period"}.` : "This period.",
+      howMuch: `${Math.round(topTwo)}% of ${sym}${Math.round(total).toLocaleString("en-IN")} is in just two categories.`,
     });
   } else if (total > 0) {
     insights.push({
@@ -184,6 +273,10 @@ function deriveInsights(data: any, sym: string) {
       title: `Total: ${sym}${Math.round(total).toLocaleString("en-IN")} across ${cats.length} categories`,
       sub: "Your spending is well distributed",
       trendDir: "neutral",
+      why: "Your expenses are spread across multiple categories without any single one dominating, which indicates balanced spending habits.",
+      where: `Across ${cats.length} expense categories in your groups.`,
+      when: trend.length > 0 ? `During ${trend[trend.length - 1]?.month || "this period"}.` : "This period.",
+      howMuch: `${sym}${Math.round(total).toLocaleString("en-IN")} total across ${cats.length} categories — well balanced.`,
     });
   }
 
@@ -282,6 +375,7 @@ export default function InsightsScreen() {
   const [proFeature] = useState("Pro Feature");
   const [showBudget, setShowBudget] = useState(false);
   const [budgets, setBudgets] = useState<Record<string, number>>(DEFAULT_BUDGETS);
+  const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
 
   const px = 20;
   const budgetBarW = screenW - px * 2 - 32;
@@ -459,7 +553,7 @@ export default function InsightsScreen() {
           )}
         </View>
 
-        {/* ── Budget tracker ── */}
+        {/* ── Budget tracker — animated circular rings ── */}
         <View style={{ paddingHorizontal: px, marginBottom: 24 }}>
           <SectionLabel right={
             <TouchableOpacity onPress={() => setShowBudget(true)}>
@@ -468,36 +562,20 @@ export default function InsightsScreen() {
           }>
             Monthly budget
           </SectionLabel>
-          <View style={{ borderTopWidth: 1, borderTopColor: `${c.border}30` }}>
-            {([
-              { key: "food",          label: "Food & Dining"  },
-              { key: "travel",        label: "Travel"         },
-              { key: "entertainment", label: "Entertainment"  },
-            ] as { key: string; label: string }[]).map((b, i) => {
-              const spent  = cats.find((x: any) => x.category === b.key)?.amount || 0;
-              const budget = budgets[b.key] || 5000;
-              const over   = spent > budget;
-              return (
-                <View key={b.key} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: `${c.border}18` }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }}>
-                        {b.label}
-                      </Text>
-                      {over && (
-                        <View style={{ borderWidth: 1, borderColor: `${c.border}40`, paddingHorizontal: 5, paddingVertical: 1 }}>
-                          <Text style={{ fontFamily: type.family.semibold, fontSize: 9, color: c.textPrimary, letterSpacing: 0.8 }}>OVER</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary }}>
-                      {sym}{Math.round(spent).toLocaleString("en-IN")} / {sym}{budget.toLocaleString("en-IN")}
-                    </Text>
-                  </View>
-                  <SketchBudgetBar spent={spent} budget={budget} accent="#0A0A0A" width={budgetBarW} height={8} />
-                </View>
-              );
-            })}
+          <View style={{ borderTopWidth: 1, borderTopColor: `${c.border}30`, paddingTop: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-around", flexWrap: "wrap", gap: 12 }}>
+              {([
+                { key: "food",          label: "Food"          },
+                { key: "travel",        label: "Travel"        },
+                { key: "entertainment", label: "Fun"           },
+              ] as { key: string; label: string }[]).map((b) => {
+                const spent  = cats.find((x: any) => x.category === b.key)?.amount || 0;
+                const budget = budgets[b.key] || 5000;
+                return (
+                  <CircularProgress key={b.key} spent={spent} budget={budget} label={b.label} sym={sym} size={96} />
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -507,7 +585,7 @@ export default function InsightsScreen() {
           {!loading && aiInsights.length > 0 ? (
             <View style={{ borderTopWidth: 1, borderTopColor: `${c.border}30` }}>
               {aiInsights.map((ins, i) => (
-                <AIInsightCard key={i} index={i} emoji={ins.emoji} title={ins.title} sub={ins.sub} trendDir={ins.trendDir} />
+                <AIInsightCard key={i} index={i} emoji={ins.emoji} title={ins.title} sub={ins.sub} trendDir={ins.trendDir} onPress={() => setSelectedInsight(ins)} />
               ))}
             </View>
           ) : loading ? (
@@ -600,6 +678,51 @@ export default function InsightsScreen() {
         onSave={saveBudgets}
       />
       <ProGate visible={showPro} onClose={() => setShowPro(false)} feature={proFeature} />
+
+      {/* ── Insight explanation modal ── */}
+      <Modal visible={!!selectedInsight} transparent animationType="fade" onRequestClose={() => setSelectedInsight(null)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setSelectedInsight(null)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={{ backgroundColor: c.bg, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40, borderTopWidth: 1, borderTopColor: `${c.border}40` }}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ fontFamily: type.family.bold, fontSize: 17, color: c.textPrimary, lineHeight: 23 }}>
+                    {selectedInsight?.title}
+                  </Text>
+                  {selectedInsight?.sub && (
+                    <Text style={{ fontFamily: type.family.regular, fontSize: 12, color: c.textMuted, marginTop: 4 }}>
+                      {selectedInsight.sub}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setSelectedInsight(null)} style={{ padding: 4 }}>
+                  <CloseIcon color={c.textMuted} size={18} />
+                </TouchableOpacity>
+              </View>
+              <View style={{ height: 1, backgroundColor: c.border, opacity: 0.2, marginBottom: 16 }} />
+              {[
+                { label: "WHY", value: selectedInsight?.why },
+                { label: "WHERE", value: selectedInsight?.where },
+                { label: "WHEN", value: selectedInsight?.when },
+                { label: "HOW MUCH", value: selectedInsight?.howMuch },
+              ].map(({ label, value }) => value ? (
+                <View key={label} style={{ marginBottom: 14 }}>
+                  <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
+                    {label}
+                  </Text>
+                  <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textPrimary, lineHeight: 20 }}>
+                    {value}
+                  </Text>
+                </View>
+              ) : null)}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

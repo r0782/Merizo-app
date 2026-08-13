@@ -1962,14 +1962,6 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
     setName(""); setAmount(""); setManualCat(null); setCustomAmounts({}); setPercentAmounts({}); setShareAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod(initialSplitMethod === "custom" ? "custom" : "equal"); setAiQuick("");
   }, []);
   const [submitting, setSubmitting] = useState(false);
-  const [showUpi, setShowUpi] = useState(false);
-  const [upiText, setUpiText] = useState("");
-  const [upiLoading, setUpiLoading] = useState(false);
-  const [upiFilled, setUpiFilled] = useState<{ name: boolean; amount: boolean; category: boolean }>({
-    name: false,
-    amount: false,
-    category: false,
-  });
   const [manualCat, setManualCat] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [recurring, setRecurring] = useState<"none"|"weekly"|"biweekly"|"monthly">("none");
@@ -2100,49 +2092,13 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
     }
   };
 
-  const onParseUpi = async () => {
-    if (!upiText.trim()) {
-      Alert.alert("Paste a message", "Paste your UPI / SMS text first.");
-      return;
-    }
-    setUpiLoading(true);
-    try {
-      const r = await api.post("/expenses/parse-upi", { text: upiText });
-      const d = r.data;
-      const filled = { name: false, amount: false, category: false };
-      if (d.merchant) {
-        setName(d.merchant);
-        filled.name = true;
-      }
-      if (d.amount && d.amount > 0) {
-        setAmount(String(d.amount));
-        filled.amount = true;
-      }
-      if (d.category) {
-        setManualCat(d.category);
-        filled.category = true;
-      }
-      if (d.currency) setCurrency(d.currency);
-      setUpiFilled(filled);
-      setShowUpi(false);
-      setUpiText("");
-    } catch (e: any) {
-      Alert.alert("Could not parse", "Please type the expense manually.");
-    } finally {
-      setUpiLoading(false);
-    }
-  };
-
   const onChangeName = (t: string) => {
     setName(t);
-    if (upiFilled.name) setUpiFilled((f) => ({ ...f, name: false }));
-    // user is typing - clear manual category override so auto-tag kicks back in
-    if (manualCat && !upiFilled.category) setManualCat(null);
+    if (manualCat) setManualCat(null);
   };
 
   const onChangeAmount = (t: string) => {
     setAmount(t.replace(/[^0-9.]/g, ""));
-    if (upiFilled.amount) setUpiFilled((f) => ({ ...f, amount: false }));
   };
 
   const allSelected = splitAmong.length === trip.members.length;
@@ -2168,23 +2124,6 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
             </TouchableOpacity>
           </View>
 
-          {/* Paste UPI button */}
-          <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
-            <TouchableOpacity
-              testID="add-exp-paste-upi"
-              onPress={() => setShowUpi(true)}
-              style={[styles.upiBtn, { backgroundColor: c.surface, borderColor: c.border }]}
-            >
-              <Text style={{ fontSize: 16 }}>📋</Text>
-              <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700", marginLeft: 8 }}>
-                Paste UPI Message
-              </Text>
-              <View style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ color: c.textPrimary, fontSize: 9, fontFamily: "Manrope_700Bold", letterSpacing: 0.5 }}>AI</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
           {/* Name field */}
           <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
             <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>NAME</Text>
@@ -2198,8 +2137,8 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                 styles.input,
                 {
                   backgroundColor: c.surface,
-                  borderColor: upiFilled.name ? c.textPrimary : c.border,
-                  borderWidth: upiFilled.name ? 1.5 : 1,
+                  borderColor: c.border,
+                  borderWidth: 1,
                   color: c.textPrimary,
                 },
               ]}
@@ -2211,8 +2150,8 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                   testID="add-exp-cat-chip"
                   style={{
                     flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4,
-                    borderWidth: upiFilled.category ? 1.5 : 1,
-                    borderColor: upiFilled.category ? c.textPrimary : c.border,
+                    borderWidth: 1,
+                    borderColor: c.border,
                     backgroundColor: c.surface,
                   }}
                 >
@@ -2222,7 +2161,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                   </Text>
                 </View>
                 <Text style={{ color: c.textMuted, fontSize: 10 }}>
-                  {upiFilled.category ? "(AI)" : "(auto · tap to change)"}
+                  (auto · tap to change)
                 </Text>
               </View>
             )}
@@ -2243,7 +2182,6 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                         testID={`add-exp-cat-${k}`}
                         onPress={() => {
                           setManualCat(k);
-                          if (upiFilled.category) setUpiFilled((f) => ({ ...f, category: false }));
                         }}
                         style={{
                           flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 5,
@@ -2296,8 +2234,8 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                 styles.amountInputWrap,
                 {
                   backgroundColor: c.surface,
-                  borderColor: upiFilled.amount ? c.textPrimary : c.border,
-                  borderWidth: upiFilled.amount ? 1.5 : 1,
+                  borderColor: c.border,
+                  borderWidth: 1,
                 },
               ]}
             >
@@ -2516,53 +2454,6 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
         </ScrollView>
       </View>
 
-      {/* UPI Parser Modal */}
-      <Modal visible={showUpi} animationType="fade" transparent onRequestClose={() => setShowUpi(false)}>
-        <View style={[styles.modalRoot, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
-          <View style={[styles.upiModal, { backgroundColor: c.bg, borderColor: c.border }]}>
-            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold" }}>
-              Paste your UPI message
-            </Text>
-            <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>
-              AI will fill the fields for you. You can edit before saving.
-            </Text>
-            <TextInput
-              testID="upi-text"
-              value={upiText}
-              onChangeText={setUpiText}
-              multiline
-              autoFocus
-              placeholder="e.g. Rs 350 debited to Swiggy on 02 May…"
-              placeholderTextColor={c.textMuted}
-              style={[
-                styles.upiInput,
-                { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary },
-              ]}
-            />
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <TouchableOpacity
-                testID="upi-cancel"
-                onPress={() => setShowUpi(false)}
-                style={[styles.upiBtnSecondary, { borderColor: c.border, backgroundColor: c.surface }]}
-              >
-                <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="upi-parse"
-                onPress={onParseUpi}
-                disabled={upiLoading}
-                style={[styles.upiBtnPrimary, { backgroundColor: c.textPrimary, opacity: upiLoading ? 0.6 : 1 }]}
-              >
-                {upiLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Parse with AI</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -2948,13 +2839,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
   },
-  upiBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-  },
   aiBadge: {
     marginLeft: "auto",
     paddingHorizontal: 8,
@@ -2980,37 +2864,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     width: "100%",
-  },
-  upiModal: {
-    margin: 24,
-    padding: 22,
-    borderWidth: 1,
-    width: "85%",
-    maxWidth: 420,
-    alignSelf: "center",
-    marginTop: "auto",
-    marginBottom: "auto",
-  },
-  upiInput: {
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    fontSize: 14,
-    minHeight: 90,
-    textAlignVertical: "top",
-  },
-  upiBtnSecondary: {
-    flex: 1,
-    paddingVertical: 12,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  upiBtnPrimary: {
-    flex: 1.5,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
   },
   // AI Overview section
   aiSection: { marginTop: 22 },
