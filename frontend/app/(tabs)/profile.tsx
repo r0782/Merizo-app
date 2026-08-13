@@ -118,7 +118,7 @@ function ProfileSketchIcon({ size = 48, initial, c }: any) {
 
 export default function ProfileScreen() {
   const { c, isDark, toggle } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, refresh } = useAuth();
   const router = useRouter();
 
   const [currency,    setCurrency]    = useState("INR");
@@ -133,6 +133,9 @@ export default function ProfileScreen() {
     api.get("/trips").then(r => setTotalGroups((r.data || []).length)).catch(() => {});
   }, []);
 
+  // Sync editName whenever the live user object changes (e.g. after refresh)
+  useEffect(() => { setEditName(user?.name || ""); }, [user?.name]);
+
   const initial  = (user?.name || "U").charAt(0).toUpperCase();
   const sym      = currencySymbol(currency);
   const langMeta = getLanguageMeta(getCurrentLanguage());
@@ -140,7 +143,15 @@ export default function ProfileScreen() {
   const onSignOut = () => {
     Alert.alert("Sign out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: async () => { await logout(); router.replace("/login"); } },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          try { await logout(); } catch {}
+          // Navigate outside tabs unconditionally
+          router.replace("/login");
+        },
+      },
     ]);
   };
 
@@ -377,6 +388,7 @@ export default function ProfileScreen() {
               onPress={async () => {
                 try {
                   await api.patch("/auth/profile", { name: editName });
+                  await refresh();
                   setEditProfile(false);
                 } catch { Alert.alert("Error", "Could not update profile."); }
               }}

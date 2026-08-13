@@ -665,8 +665,14 @@ async def add_member(trip_id: str, request: Request, current_user: dict = Depend
 async def delete_member(trip_id: str, member_id: str, current_user: dict = Depends(get_current_user)):
     trip = await sb_one("trips", id=trip_id)
     if not trip: raise HTTPException(404)
-    if trip.get("owner_id") != current_user["id"]: raise HTTPException(403)
-    members = [m for m in (trip.get("members") or []) if m != member_id]
+    existing = trip.get("members") or []
+    # Must be a member of the group to manage it
+    if current_user["id"] not in existing:
+        raise HTTPException(403, "Not a member of this group")
+    # Cannot remove yourself — use Leave Group instead
+    if member_id == current_user["id"]:
+        raise HTTPException(400, "Cannot remove yourself. Use Leave Group instead.")
+    members = [m for m in existing if m != member_id]
     await sb_update("trips", {"members": members}, id=trip_id)
     return {"message": "Removed"}
 
