@@ -114,9 +114,6 @@ function IcoChevronRight({ color="", size=18 }: any) {
 function IcoBranch({ color="", size=14 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM18 9a9 9 0 01-9 9" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
 }
-function IcoPencil({ color="", size=14 }: any) {
-  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
-}
 function IcoCopy({ color="", size=18 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-8a2 2 0 01-2-2v-2" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
 }
@@ -182,6 +179,7 @@ export default function SplitDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || "journal");
   const [showAdd, setShowAdd] = useState(params.action === "add");
+  const [openAddWithCustom, setOpenAddWithCustom] = useState(false);
   const [showMember, setShowMember] = useState(false);
   const [showSettings,  setShowSettings]  = useState(false);
   const [showVoice,     setShowVoice]     = useState(false);
@@ -418,7 +416,7 @@ export default function SplitDetailScreen() {
         { label: "Quick Add",          sublabel: "Type expense manually",  icon: "write",    onPress: () => setShowAdd(true) },
         { label: "Speak Expense",      sublabel: "Say it, AI parses it",   icon: "mic",      onPress: () => setShowVoice(true) },
         { label: "Scan Receipt",       sublabel: "Camera · auto-fill",     icon: "camera",   onPress: () => setShowAdd(true) },
-        { label: "Custom Split",       sublabel: "Split by person or %",   icon: "branch",   onPress: () => router.push({ pathname: "/simple-split", params: { tripId: trip.id, tripName: trip.name } }) },
+        { label: "Custom Split",       sublabel: "Split by person or %",   icon: "branch",   onPress: () => { setOpenAddWithCustom(true); setShowAdd(true); } },
         { label: "Export Spreadsheet", sublabel: "CSV for Excel/Sheets",   icon: "download", onPress: onDownloadPDF },
       ]} />
 
@@ -432,12 +430,14 @@ export default function SplitDetailScreen() {
       )}
 
       {/* Add Expense modal */}
-      <Modal visible={showAdd} animationType="slide" transparent onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} animationType="slide" transparent onRequestClose={() => { setShowAdd(false); setOpenAddWithCustom(false); }}>
         <AddExpenseSheet
           trip={trip}
-          onClose={() => setShowAdd(false)}
+          initialSplitMethod={openAddWithCustom ? "custom" : "equal"}
+          onClose={() => { setShowAdd(false); setOpenAddWithCustom(false); }}
           onAdded={async () => {
             setShowAdd(false);
+            setOpenAddWithCustom(false);
             await load();
           }}
         />
@@ -1944,21 +1944,22 @@ function SettleTab({ trip, onChange }: { trip: any; onChange: () => void }) {
 }
 
 // --- Add Expense bottom sheet ---
-function AddExpenseSheet({ trip, onClose, onAdded }: any) {
+function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" }: any) {
   const { c } = useTheme();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(trip.currency || "INR");
   const [paidBy, setPaidBy] = useState(trip.members[0]?.id || "");
   const [splitAmong, setSplitAmong] = useState<string[]>(trip.members.map((m: any) => m.id));
-  const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [percentAmounts, setPercentAmounts] = useState<Record<string, string>>({});
+  const [shareAmounts, setShareAmounts] = useState<Record<string, string>>({});
 
   // Reset to all members every time the sheet opens
   React.useEffect(() => {
     setSplitAmong(trip.members.map((m: any) => m.id));
     setPaidBy(trip.members[0]?.id || "");
-    setName(""); setAmount(""); setManualCat(null); setSplitMode("equal"); setCustomAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod("equal"); setAiQuick("");
+    setName(""); setAmount(""); setManualCat(null); setCustomAmounts({}); setPercentAmounts({}); setShareAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod(initialSplitMethod === "custom" ? "custom" : "equal"); setAiQuick("");
   }, []);
   const [submitting, setSubmitting] = useState(false);
   const [showUpi, setShowUpi] = useState(false);
@@ -1972,7 +1973,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   const [manualCat, setManualCat] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [recurring, setRecurring] = useState<"none"|"weekly"|"biweekly"|"monthly">("none");
-  const [splitMethod, setSplitMethod] = useState<"equal"|"percent"|"shares"|"exact">("equal");
+  const [splitMethod, setSplitMethod] = useState<"equal"|"percent"|"shares"|"custom">(initialSplitMethod === "custom" ? "custom" : "equal");
   const [aiQuick, setAiQuick] = useState("");
   const [scanCount] = useState(3);
 
@@ -1989,6 +1990,14 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
 
   const toggleMember = (id: string) => {
     setSplitAmong((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
+  };
+
+  // Method info tooltips
+  const METHOD_INFO: Record<string, { title: string; body: string }> = {
+    equal:   { title: "Equal Split", body: "The total is divided equally among all selected members. Best for most group expenses where everyone shares the same benefit." },
+    percent: { title: "Split by %", body: "Each person pays a custom percentage of the total. Percentages must add up to 100%. Use this when contributions aren't equal but are proportional." },
+    shares:  { title: "Split by Shares", body: "Assign share units to each person (e.g. 2 shares vs 1 share means 2× more). The total is split proportionally. Great for trips where some people use a resource more." },
+    custom:  { title: "Custom Split", body: "Enter the exact amount each person owes. The amounts must add up to the total. Use this when you already know each person's exact share." },
   };
 
   const onSubmit = async () => {
@@ -2025,9 +2034,25 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
         );
       }
 
-      const customSplits = splitMode === "custom"
-        ? splitAmong.map(id => ({ member_id: id, amount: parseFloat(customAmounts[id] || "0") }))
-        : null;
+      const checkedIds = splitAmong;
+      let customSplits: { member_id: string; amount: number }[] | null = null;
+      if (splitMethod === "custom") {
+        customSplits = checkedIds.map(id => ({ member_id: id, amount: parseFloat(customAmounts[id] || "0") }));
+      } else if (splitMethod === "percent") {
+        const totalPct = checkedIds.reduce((s, id) => s + (parseFloat(percentAmounts[id] || "0")), 0);
+        if (totalPct <= 0) { Alert.alert("Invalid", "Enter percentages for each person."); setSubmitting(false); return; }
+        customSplits = checkedIds.map(id => ({
+          member_id: id,
+          amount: Math.round((parseFloat(percentAmounts[id] || "0") / totalPct) * amt * 100) / 100,
+        }));
+      } else if (splitMethod === "shares") {
+        const totalShares = checkedIds.reduce((s, id) => s + (parseInt(shareAmounts[id] || "0")), 0);
+        if (totalShares <= 0) { Alert.alert("Invalid", "Enter shares for each person."); setSubmitting(false); return; }
+        customSplits = checkedIds.map(id => ({
+          member_id: id,
+          amount: Math.round((parseInt(shareAmounts[id] || "0") / totalShares) * amt * 100) / 100,
+        }));
+      }
 
       const r = await api.post(`/trips/${trip.id}/expenses`, {
         name: name.trim(),
@@ -2121,7 +2146,6 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
   };
 
   const allSelected = splitAmong.length === trip.members.length;
-  const equalEach = splitAmong.length > 0 ? (parseFloat(amount || "0") / splitAmong.length) : 0;
   const customTotal = Object.values(customAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const toggleAll = () => {
     if (allSelected) setSplitAmong([]);
@@ -2319,9 +2343,41 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
             </ScrollView>
           </View>
 
-          {/* Split among */}
+          {/* Split section */}
           <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            {/* ── Split Method ── */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 8 }]}>SPLIT METHOD</Text>
+              <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.border }}>
+                {(["equal","percent","shares","custom"] as const).map((key, i) => {
+                  const labels: Record<string, string> = { equal: "Equal", percent: "%", shares: "Shares", custom: "Custom" };
+                  const active = splitMethod === key;
+                  const info = METHOD_INFO[key];
+                  return (
+                    <View key={key} style={{ flex: 1, borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: c.border, backgroundColor: active ? c.textPrimary : c.bg }}>
+                      <TouchableOpacity
+                        onPress={() => setSplitMethod(key)}
+                        style={{ paddingVertical: 10, alignItems: "center" }}
+                      >
+                        <Text style={{ fontSize: 11, fontFamily: active ? "Manrope_700Bold" : "Manrope_400Regular", color: active ? c.bg : c.textMuted }}>{labels[key]}</Text>
+                      </TouchableOpacity>
+                      {/* Info icon row */}
+                      <TouchableOpacity
+                        onPress={() => Alert.alert(info.title, info.body)}
+                        style={{ alignItems: "center", paddingBottom: 6 }}
+                      >
+                        <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: active ? `${c.bg}60` : c.border, alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 8, color: active ? `${c.bg}90` : c.textMuted, fontFamily: "Manrope_700Bold" }}>?</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Split Among ── */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <Text style={[styles.fieldLabel, { color: c.textSecondary, marginBottom: 0 }]}>SPLIT AMONG</Text>
               <TouchableOpacity testID="add-exp-toggle-all" onPress={toggleAll}>
                 <Text style={{ color: c.textPrimary, fontSize: 12, fontFamily: "Manrope_700Bold" }}>
@@ -2329,50 +2385,20 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                 </Text>
               </TouchableOpacity>
             </View>
-            <View style={{ marginTop: 8, gap: 8 }}>
-              {/* Split Method */}
-              <View style={{ marginBottom:12 }}>
-                <Text style={{ fontSize:11, fontWeight:"600", color:c.textSecondary, letterSpacing:1.2, textTransform:"uppercase", marginBottom:8 }}>Split Method</Text>
-                <View style={{ flexDirection:"row", borderWidth:1, borderColor:c.border }}>
-                  {(["Equal","%","Shares","Exact"] as const).map((m,i)=>{
-                    const key = ["equal","percent","shares","exact"][i] as any;
-                    const active = splitMethod===key;
-                    return (
-                      <TouchableOpacity key={m} onPress={()=>{setSplitMethod(key); if(key==="equal")setSplitMode("equal"); else setSplitMode("custom");}} style={{ flex:1, paddingVertical:9, alignItems:"center", backgroundColor:active?c.textPrimary:c.bg, borderLeftWidth:i>0?1:0, borderLeftColor:c.border }}>
-                        <Text style={{ fontSize:11, fontWeight:active?"700":"400", color:active?c.bg:c.textMuted }}>{m}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
 
-              {/* Equal / Custom toggle */}
-              <View style={{ flexDirection: "row", marginBottom: 12, borderWidth: 1, borderColor: c.border }}>
-                <TouchableOpacity
-                  onPress={() => setSplitMode("equal")}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                    paddingVertical: 10,
-                    backgroundColor: splitMode === "equal" ? c.textPrimary : c.bg }}
-                >
-                  <IcoBranch color={splitMode === "equal" ? c.bg : c.textMuted} size={14} />
-                  <Text style={{ color: splitMode === "equal" ? c.bg : c.textMuted, fontSize: 13, fontFamily: "Manrope_700Bold" }}>Equal Split</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setSplitMode("custom")}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                    paddingVertical: 10, borderLeftWidth: 1, borderLeftColor: c.border,
-                    backgroundColor: splitMode === "custom" ? c.textPrimary : c.bg }}
-                >
-                  <IcoPencil color={splitMode === "custom" ? c.bg : c.textMuted} size={14} />
-                  <Text style={{ color: splitMode === "custom" ? c.bg : c.textMuted, fontSize: 13, fontFamily: "Manrope_700Bold" }}>Custom Split</Text>
-                </TouchableOpacity>
-              </View>
-
+            <View style={{ gap: 8 }}>
               {trip.members.map((m: any) => {
                 const checked = splitAmong.includes(m.id);
+                const sym = currencySymbol(currency);
+                const totalAmt = parseFloat(amount || "0");
+                // Derived per-method display values
+                const equalAmt = splitAmong.length > 0 ? totalAmt / splitAmong.length : 0;
+                const totalShrs = splitAmong.reduce((s: number, id: string) => s + (parseInt(shareAmounts[id] || "0")), 0);
+                const shrAmt = totalShrs > 0 ? (parseInt(shareAmounts[m.id] || "0") / totalShrs) * totalAmt : 0;
+
                 return (
                   <View key={m.id} style={[styles.splitRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-                    {/* Checkbox + name — the only tap target for toggle */}
+                    {/* Checkbox + name — only tap target for toggle */}
                     <TouchableOpacity
                       testID={`add-exp-split-${m.id}`}
                       onPress={() => toggleMember(m.id)}
@@ -2383,15 +2409,44 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       </View>
                       <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600", marginLeft: 12 }}>{m.name}</Text>
                     </TouchableOpacity>
-                    {/* Amount — outside the toggle TouchableOpacity so tapping input doesn't deselect */}
-                    {splitMode === "equal" && checked && (
+
+                    {/* Right side — changes per method, outside toggle */}
+                    {splitMethod === "equal" && checked && (
                       <Text style={{ color: c.textMuted, fontSize: 13, fontVariant: ["tabular-nums"] as any }}>
-                        {currencySymbol(currency)}{equalEach > 0 ? Math.round(equalEach).toLocaleString("en-IN") : "0"}
+                        {sym}{equalAmt > 0 ? Math.round(equalAmt).toLocaleString("en-IN") : "0"}
                       </Text>
                     )}
-                    {splitMode === "custom" && checked && (
+                    {splitMethod === "percent" && checked && (
+                      <View style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 5, minWidth: 72 }}>
+                        <WebInput
+                          value={percentAmounts[m.id] || ""}
+                          onChange={(v: string) => setPercentAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
+                          placeholder="0"
+                          type="number"
+                          style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 36, textAlign: "right" }}
+                        />
+                        <Text style={{ color: c.textMuted, fontSize: 13, marginLeft: 2 }}>%</Text>
+                      </View>
+                    )}
+                    {splitMethod === "shares" && checked && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 5, minWidth: 52 }}>
+                          <WebInput
+                            value={shareAmounts[m.id] || ""}
+                            onChange={(v: string) => setShareAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9]/g, "") }))}
+                            placeholder="1"
+                            type="number"
+                            style={{ color: c.textPrimary, fontSize: 15, fontWeight: "700", minWidth: 30, textAlign: "right" }}
+                          />
+                        </View>
+                        {totalShrs > 0 && (
+                          <Text style={{ color: c.textMuted, fontSize: 11 }}>{sym}{Math.round(shrAmt).toLocaleString("en-IN")}</Text>
+                        )}
+                      </View>
+                    )}
+                    {splitMethod === "custom" && checked && (
                       <View style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 6, minWidth: 90 }}>
-                        <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: "600" }}>{currencySymbol(currency)}</Text>
+                        <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: "600" }}>{sym}</Text>
                         <WebInput
                           value={customAmounts[m.id] || ""}
                           onChange={(v: string) => setCustomAmounts(prev => ({ ...prev, [m.id]: v.replace(/[^0-9.]/g, "") }))}
@@ -2404,9 +2459,11 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                   </View>
                 );
               })}
-              {splitMode === "custom" && (
-                <View style={{ marginTop: 8, gap: 8 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 4 }}>
+
+              {/* Validation footer */}
+              {splitMethod === "custom" && (
+                <View style={{ marginTop: 4, gap: 4 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                     <Text style={{ color: c.textMuted, fontSize: 13 }}>Total entered</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "Manrope_700Bold" }}>
@@ -2415,7 +2472,7 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                       <Text style={{ color: c.textMuted, fontSize: 13 }}>
                         / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString("en-IN")}
                       </Text>
-                      {customTotal === parseFloat(amount || "0") && <IcoCheck color={c.textPrimary} size={16} />}
+                      {customTotal > 0 && customTotal === parseFloat(amount || "0") && <IcoCheck color={c.textPrimary} size={14} />}
                     </View>
                   </View>
                   {customTotal > 0 && customTotal !== parseFloat(amount || "0") && (
@@ -2425,6 +2482,26 @@ function AddExpenseSheet({ trip, onClose, onAdded }: any) {
                   )}
                 </View>
               )}
+              {splitMethod === "percent" && (() => {
+                const totalPctVal = splitAmong.reduce((s: number, id: string) => s + (parseFloat(percentAmounts[id] || "0")), 0);
+                return totalPctVal > 0 ? (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>Total %</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Manrope_700Bold", color: Math.abs(totalPctVal - 100) < 0.01 ? c.textPrimary : c.textPrimary }}>
+                      {totalPctVal.toFixed(1)}% {Math.abs(totalPctVal - 100) < 0.01 ? "✓" : `(${totalPctVal > 100 ? "over" : "under"} by ${Math.abs(100 - totalPctVal).toFixed(1)}%)`}
+                    </Text>
+                  </View>
+                ) : null;
+              })()}
+              {splitMethod === "shares" && (() => {
+                const totalShrsVal = splitAmong.reduce((s: number, id: string) => s + (parseInt(shareAmounts[id] || "0")), 0);
+                return totalShrsVal > 0 ? (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>Total shares</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>{totalShrsVal}</Text>
+                  </View>
+                ) : null;
+              })()}
             </View>
 
             <TouchableOpacity

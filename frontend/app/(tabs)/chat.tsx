@@ -140,7 +140,8 @@ export default function AIChatScreen() {
     group_name:  activeGroup?.name,
     user_name:   userName,
     currency:    activeGroup?.currency || "INR",
-  }), [activeGroup, userName]);
+    groups:      groups.map(g => ({ id: g.id, name: g.name, currency: g.currency, my_net: g.my_net })),
+  }), [activeGroup, userName, groups]);
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();

@@ -196,6 +196,21 @@ async def handle_chat(
     # 1. Build full context
     fetched = await _fetch_context(token, current_group_id)
     groups = fetched["groups"]
+    # Fall back to groups passed from the frontend if server-side fetch failed
+    if not groups and context.get("groups"):
+        groups = [
+            {
+                "id": g.get("id", ""),
+                "name": g.get("name", ""),
+                "currency": g.get("currency", "INR"),
+                "my_net": g.get("my_net", 0),
+                "total_spent": 0,
+                "members": [],
+                "member_count": 0,
+            }
+            for g in context["groups"]
+            if g.get("id") and g.get("name")
+        ]
     cg_detail = fetched.get("current_group_detail")
 
     # Find current group object

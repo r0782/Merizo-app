@@ -13,6 +13,7 @@ export interface ChatV2Context {
   group_name?: string;
   user_name?: string;
   currency?: string;
+  groups?: { id: string; name: string; currency: string; my_net?: number }[];
 }
 
 export interface ChatV2Response {
