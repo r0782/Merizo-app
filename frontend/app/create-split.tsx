@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Alert,
   Modal,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
@@ -47,6 +48,13 @@ export default function CreateSplitScreen() {
   const [coverOverride, setCoverOverride] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const [cachedContacts, setCachedContacts] = useState<{ name: string; groups: string[] }[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("merizo_contacts_cache").then(v => {
+      if (v) setCachedContacts(JSON.parse(v));
+    }).catch(() => {});
+  }, []);
 
   const cover = useMemo(
     () => resolveCover(destinations, category, coverOverride || undefined),
@@ -254,6 +262,48 @@ export default function CreateSplitScreen() {
                 });
               }}
             />
+
+            {/* Quick-add from previous groups */}
+            {cachedContacts.length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: "600", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>
+                  From your groups
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {cachedContacts.slice(0, 12).map((ct, i) => {
+                    const already = members.includes(ct.name);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => {
+                          if (already) {
+                            setMembers(prev => prev.filter(m => m !== ct.name));
+                          } else {
+                            setMembers(prev => [...prev, ct.name]);
+                          }
+                        }}
+                        style={{
+                          flexDirection: "row", alignItems: "center", gap: 6,
+                          paddingVertical: 7, paddingHorizontal: 10,
+                          borderWidth: 1,
+                          borderColor: already ? c.textPrimary : c.border,
+                          backgroundColor: already ? c.textPrimary : c.surface,
+                        }}
+                      >
+                        <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center", backgroundColor: already ? c.bg : c.surfaceAlt }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: already ? c.textPrimary : c.textSecondary }}>
+                            {ct.name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: already ? c.bg : c.textPrimary }}>
+                          {ct.name.split(" ")[0]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 12 }}>
               You{"'"}ll be added automatically. Tip: typed text is auto-included on Next.

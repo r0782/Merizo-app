@@ -270,6 +270,40 @@ function GroupDoodleIcon({ trip, color, size = 28 }: { trip: any; color: string;
 }
 
 // ── Compact group row ─────────────────────────────────────────────────────────
+// ── People horizontal scroll ─────────────────────────────────────────────────
+function ScrollViewH({ contacts, c, type }: { contacts: { name: string; groups: string[] }[]; c: any; type: any }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+    >
+      {contacts.map((ct, i) => {
+        const initial = (ct.name || "?").charAt(0).toUpperCase();
+        const groupHint = ct.groups.length === 1
+          ? ct.groups[0]
+          : `${ct.groups.length} groups`;
+        return (
+          <View key={i} style={{ alignItems: "center", width: 64 }}>
+            {/* Square avatar with initial */}
+            <View style={{ width: 44, height: 44, backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ fontFamily: type.family.bold, fontSize: 18, color: c.textPrimary }}>
+                {initial}
+              </Text>
+            </View>
+            <Text style={{ fontFamily: type.family.medium, fontSize: 10, color: c.textPrimary, marginTop: 5, textAlign: "center" }} numberOfLines={1}>
+              {ct.name.split(" ")[0]}
+            </Text>
+            <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, marginTop: 1, textAlign: "center" }} numberOfLines={1}>
+              {groupHint}
+            </Text>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function GroupRow({ trip, sym, onPress, c }: any) {
   const net      = trip.my_net || 0;
   const absNet   = Math.abs(net);
@@ -335,6 +369,7 @@ export default function HomeScreen() {
   const [showNewGroup,    setShowNewGroup]    = useState(false);
   const [recurring,       setRecurring]       = useState<Subscription[]>([]);
   const [showAllGroups,   setShowAllGroups]   = useState(false);
+  const [contacts,        setContacts]        = useState<{ name: string; groups: string[] }[]>([]);
 
   useEffect(() => {
     AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
@@ -348,16 +383,30 @@ export default function HomeScreen() {
 
       let owed = 0, owing = 0, spent = 0;
       const allExp: any[] = [];
+      const contactMap = new Map<string, { name: string; groups: string[] }>();
 
       await Promise.all(trips.slice(0, 5).map(async (t: any) => {
         try {
-          const expR = await api.get(`/expenses/${t.id}`);
+          const [expR, detailR] = await Promise.all([
+            api.get(`/expenses/${t.id}`),
+            api.get(`/trips/${t.id}`),
+          ]);
           const exps = (expR.data || []).map((e: any) => ({ ...e, tripName: t.name, tripId: t.id }));
           allExp.push(...exps);
           const net = t.my_net || 0;
           if (net > 0) owed  += net;
           if (net < 0) owing += Math.abs(net);
           exps.forEach((e: any) => { spent += e.amount || 0; });
+          // Aggregate unique contacts from group members
+          const members: any[] = detailR.data?.members || [];
+          members.forEach((m: any) => {
+            if (!m.id || !m.name) return;
+            if (contactMap.has(m.id)) {
+              contactMap.get(m.id)!.groups.push(t.name);
+            } else {
+              contactMap.set(m.id, { name: m.name, groups: [t.name] });
+            }
+          });
         } catch {}
       }));
 
@@ -366,6 +415,11 @@ export default function HomeScreen() {
       setTotalOwed(Math.round(owed));
       setTotalOwing(Math.round(owing));
       setTotalSpent(Math.round(spent));
+
+      // Save contacts for quick-add in create-split
+      const contactList = Array.from(contactMap.values()).slice(0, 20);
+      setContacts(contactList);
+      AsyncStorage.setItem("merizo_contacts_cache", JSON.stringify(contactList)).catch(() => {});
     } catch {}
     setLoading(false);
   }, []);
@@ -578,6 +632,25 @@ export default function HomeScreen() {
                 + Create a Group
               </Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        <InkLine opacity={0.2} />
+
+        {/* ── People ── contacts from shared groups ── */}
+        {contacts.length > 0 && (
+          <View style={{ paddingTop: 16, marginBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 10 }}>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
+                People
+              </Text>
+              <TouchableOpacity onPress={() => setShowNewGroup(true)}>
+                <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
+                  + New Group
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollViewH contacts={contacts} c={c} type={type} />
           </View>
         )}
 
