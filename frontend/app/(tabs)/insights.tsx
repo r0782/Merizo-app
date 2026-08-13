@@ -496,7 +496,7 @@ export default function InsightsScreen() {
             {periods.map((p, i) => (
               <TouchableOpacity
                 key={p}
-                onPress={() => setPeriod(p)}
+                onPress={() => { setPeriod(p); load(p); }}
                 style={{
                   flex: 1,
                   paddingVertical: 10,

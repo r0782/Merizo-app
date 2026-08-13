@@ -28,6 +28,16 @@ async def scan_bill(image_bytes: bytes, members: list, currency: str = "INR") ->
             ],
         )
         raw = re.sub(r"```json|```", "", response.text).strip()
-        return json.loads(raw)
+        result = json.loads(raw)
+        # Normalise alternate field names the model sometimes uses
+        if "merchant" in result and "vendor" not in result:
+            result["vendor"] = result.pop("merchant")
+        if "total" in result and "amount" not in result:
+            result["amount"] = result.pop("total")
+        elif "suggested_total" in result and "amount" not in result:
+            result["amount"] = result.pop("suggested_total")
+        if "suggested_name" not in result:
+            result["suggested_name"] = result.get("vendor", "Bill")
+        return result
     except Exception as e:
         return {"error": str(e)}

@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { useTheme } from "../../lib/theme";
 import { ActionCard } from "./ActionCard";
+import { type } from "../../lib/tokens";
 
 export interface Message {
   id: string;
@@ -9,14 +10,16 @@ export interface Message {
   content: string;
   action_type?: string | null;
   action_data?: Record<string, any> | null;
+  quickReplies?: { label: string; value: string }[];
 }
 
 interface ChatBubbleProps {
   message: Message;
   onNavigate?: (groupId: string) => void;
+  onQuickReply?: (label: string, value: string) => void;
 }
 
-export function ChatBubble({ message, onNavigate }: ChatBubbleProps) {
+export function ChatBubble({ message, onNavigate, onQuickReply }: ChatBubbleProps) {
   const { c, isDark } = useTheme();
   const isUser = message.role === "user";
 
@@ -56,6 +59,34 @@ export function ChatBubble({ message, onNavigate }: ChatBubbleProps) {
             data={message.action_data}
             onNavigate={onNavigate}
           />
+        </View>
+      )}
+
+      {/* Quick reply chips */}
+      {!isUser && message.quickReplies && message.quickReplies.length > 0 && (
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap", maxWidth: "92%" }}>
+          {message.quickReplies.map((qr, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => onQuickReply?.(qr.label, qr.value)}
+              activeOpacity={0.7}
+              style={{
+                borderWidth: 1,
+                borderColor: `${c.border}60`,
+                paddingHorizontal: 13,
+                paddingVertical: 8,
+                backgroundColor: i === 0 ? c.textPrimary : "transparent",
+              }}
+            >
+              <Text style={{
+                fontFamily: type.family.regular,
+                fontSize: 13,
+                color: i === 0 ? c.bg : c.textSecondary,
+              }}>
+                {qr.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </View>

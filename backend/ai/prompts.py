@@ -184,18 +184,28 @@ If amount is missing return: {{"error": "amount_missing"}}
 If payer is unclear return: {{"error": "payer_unclear"}}
 """
 
-BILL_SCAN_PROMPT = """Analyse this receipt/bill image.
+BILL_SCAN_PROMPT = """Analyse this receipt/bill image carefully.
 Members who will split: {members}
 Currency: {currency}
-Return ONLY valid JSON:
+
+Return ONLY valid JSON with exactly these keys:
 {{
-  "merchant": "name",
-  "total": 0.0,
-  "tax": null,
-  "items": [{{"name": "item", "amount": 0.0, "quantity": 1}}],
-  "suggested_total": 0.0,
-  "confidence": 0.9
-}}"""
+  "vendor": "restaurant or shop name from the receipt",
+  "amount": 0.0,
+  "date": "YYYY-MM-DD",
+  "category": "food",
+  "items": [{{"name": "item name", "amount": 0.0, "quantity": 1}}],
+  "suggested_name": "short descriptive expense name",
+  "currency": "{currency}"
+}}
+
+Rules:
+- amount: the final total amount as a number (include tax/service charge if shown)
+- vendor: the merchant/restaurant/shop name printed on the receipt
+- suggested_name: a short human-friendly name like "Dinner at Hyderabad Biryani"
+- category: one of food, travel, entertainment, shopping, bills, other
+- date: the date from the receipt in YYYY-MM-DD format; use today if not visible
+- Do NOT wrap in markdown code blocks"""
 
 EXPLAIN_BALANCE_PROMPT = """You are a professional financial advisor. Analyse these group balances concisely.
 Currency: {currency}

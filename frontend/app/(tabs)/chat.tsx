@@ -167,12 +167,26 @@ export default function AIChatScreen() {
         }
       }
 
+      const lower = result.reply.toLowerCase();
+      const suggestsCreate = !result.action_type && (
+        lower.includes("create a new group") ||
+        lower.includes("would you like to create") ||
+        lower.includes("shall i create") ||
+        lower.includes("want to create a group")
+      );
+
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: result.reply,
         action_type: result.action_type,
         action_data: result.action_data,
+        ...(suggestsCreate ? {
+          quickReplies: [
+            { label: "Create New Group", value: "__create_group__" },
+            { label: "No Thanks",        value: "no thanks" },
+          ],
+        } : {}),
       }]);
     } catch (e: any) {
       const msg = e?.response?.status === 401
@@ -186,6 +200,13 @@ export default function AIChatScreen() {
 
   const onVoiceTranscript = useCallback((text: string) => { if (text) send(text); }, [send]);
   const handleNavigate    = useCallback((groupId: string) => { router.push(`/split/${groupId}` as any); }, [router]);
+  const handleQuickReply  = useCallback((_label: string, value: string) => {
+    if (value === "__create_group__") {
+      router.push({ pathname: "/create-split", params: { category: "other" } } as any);
+    } else {
+      send(value);
+    }
+  }, [send, router]);
 
   const prompts = activeGroup ? PROMPTS_WITH_GROUP(activeGroup.name) : PROMPTS_NO_GROUP;
   const showSuggestions = messages.length <= 1;
@@ -260,7 +281,7 @@ export default function AIChatScreen() {
         keyExtractor={m => m.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 8, gap: 4 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => <ChatBubble message={item} onNavigate={handleNavigate} />}
+        renderItem={({ item }) => <ChatBubble message={item} onNavigate={handleNavigate} onQuickReply={handleQuickReply} />}
         ListHeaderComponent={showSuggestions ? (
           <SuggestionList prompts={prompts} onSelect={send} />
         ) : null}
