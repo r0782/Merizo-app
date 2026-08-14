@@ -11,7 +11,7 @@ import { api } from "../../src/lib/api";
 import { currencySymbol } from "../../src/lib/tokens";
 
 export default function JoinTripPage() {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const { token } = useLocalSearchParams<{ token: string }>();
@@ -21,10 +21,12 @@ export default function JoinTripPage() {
     trip_name: string;
     member_count: number;
     currency: string;
+    invited_by?: string;
   } | null>(null);
   const [fetchError, setFetchError] = useState("");
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [alreadyMember, setAlreadyMember] = useState(false);
   const [joinError, setJoinError] = useState("");
 
   // Fetch trip info (public endpoint — no auth required)
@@ -32,26 +34,33 @@ export default function JoinTripPage() {
     if (!token) return;
     api.get(`/invite/${token}`, { skipAuth: true } as any)
       .then(r => setTripInfo(r.data))
-      .catch(() => setFetchError("This invite link is invalid or has expired."));
+      .catch(e => {
+        const status = e?.response?.status;
+        if (status === 410) setFetchError("This invite link has expired.");
+        else if (status === 409) setFetchError("This invite link is no longer available.");
+        else setFetchError("This invite link is invalid.");
+      });
   }, [token]);
 
   const join = async () => {
     if (!user) {
-      // Save token in route state and redirect to login
       router.push(`/login?redirect=/join/${token}` as any);
       return;
     }
     setJoining(true);
     setJoinError("");
     try {
-      await api.post(`/invite/${token}/join`, {});
+      const r = await api.post(`/invite/${token}/join`, {});
+      setAlreadyMember(!!r.data?.already_member);
       setJoined(true);
-      // Navigate to the group after a short delay
       setTimeout(() => {
         router.replace(`/split/${tripInfo?.trip_id}` as any);
       }, 1200);
     } catch (e: any) {
-      setJoinError(e?.response?.data?.detail || "Could not join. Please try again.");
+      const status = e?.response?.status;
+      if (status === 410) setJoinError("This invite link has expired.");
+      else if (status === 409) setJoinError("This invite link is no longer available.");
+      else setJoinError(e?.response?.data?.detail || "Could not join. Please try again.");
     } finally {
       setJoining(false);
     }
@@ -65,13 +74,13 @@ export default function JoinTripPage() {
 
         {/* Logo / Icon */}
         <View style={{
-          width: 72, height: 72, borderRadius: 22,
-          backgroundColor: isDark ? "rgba(109,93,252,0.2)" : "#EDE9FE",
+          width: 64, height: 64,
+          backgroundColor: c.surface,
           alignItems: "center", justifyContent: "center",
           marginBottom: 24,
-          borderWidth: 1.5, borderColor: isDark ? "rgba(109,93,252,0.4)" : "#C4B5FD",
+          borderWidth: 1, borderColor: c.border,
         }}>
-          <Ionicons name="people" size={34} color={isDark ? "#A78BFA" : "#6D28D9"} />
+          <Ionicons name="people" size={30} color={c.textPrimary} />
         </View>
 
         {/* Error state */}
@@ -86,32 +95,35 @@ export default function JoinTripPage() {
             <TouchableOpacity
               onPress={() => router.replace("/(tabs)/" as any)}
               style={{
-                marginTop: 16, backgroundColor: isDark ? "#7B6FFF" : "#6D28D9",
-                borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14,
+                marginTop: 16, backgroundColor: c.textPrimary,
+                paddingHorizontal: 28, paddingVertical: 14,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Go Home</Text>
+              <Text style={{ color: c.bg, fontSize: 15, fontWeight: "700" }}>Go Home</Text>
             </TouchableOpacity>
           </View>
         ) : !tripInfo ? (
           // Loading
           <View style={{ alignItems: "center", gap: 12 }}>
-            <ActivityIndicator size="large" color={isDark ? "#9D7BFF" : "#6D28D9"} />
+            <ActivityIndicator size="large" color={c.textPrimary} />
             <Text style={{ color: c.textMuted, fontSize: 14 }}>Loading invite…</Text>
           </View>
         ) : joined ? (
           // Success
           <View style={{ alignItems: "center", gap: 12 }}>
             <View style={{
-              width: 64, height: 64, borderRadius: 32,
-              backgroundColor: "rgba(0,196,140,0.12)",
+              width: 64, height: 64,
+              backgroundColor: c.surface,
               alignItems: "center", justifyContent: "center",
+              borderWidth: 1, borderColor: c.border,
             }}>
-              <Ionicons name="checkmark-circle" size={40} color="#00C48C" />
+              <Ionicons name="checkmark" size={34} color={c.textPrimary} />
             </View>
-            <Text style={{ fontSize: 22, fontWeight: "800", color: c.textPrimary }}>Joined!</Text>
+            <Text style={{ fontSize: 22, fontWeight: "800", color: c.textPrimary }}>
+              {alreadyMember ? "Already a member" : "Joined!"}
+            </Text>
             <Text style={{ fontSize: 15, color: c.textSecondary, textAlign: "center" }}>
-              You're now in <Text style={{ fontWeight: "700", color: c.textPrimary }}>{tripInfo.trip_name}</Text>
+              You're in <Text style={{ fontWeight: "700", color: c.textPrimary }}>{tripInfo.trip_name}</Text>
             </Text>
             <ActivityIndicator size="small" color={c.textMuted} style={{ marginTop: 8 }} />
             <Text style={{ fontSize: 12, color: c.textMuted }}>Opening group…</Text>
@@ -119,7 +131,7 @@ export default function JoinTripPage() {
         ) : (
           // Main invite card
           <View style={{ width: "100%", alignItems: "center", gap: 8 }}>
-            <Text style={{ fontSize: 13, color: isDark ? "#A78BFA" : "#6D28D9", fontWeight: "600", letterSpacing: 1.2 }}>
+            <Text style={{ fontSize: 13, color: c.textSecondary, fontWeight: "600", letterSpacing: 1.2 }}>
               YOU'VE BEEN INVITED
             </Text>
             <Text style={{
@@ -130,13 +142,14 @@ export default function JoinTripPage() {
             </Text>
             <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 20 }}>
               {tripInfo.member_count} member{tripInfo.member_count !== 1 ? "s" : ""} already splitting expenses
+              {tripInfo.invited_by ? ` · invited by ${tripInfo.invited_by}` : ""}
             </Text>
 
             {/* Info card */}
             <View style={{
               width: "100%", marginTop: 20, marginBottom: 8,
-              backgroundColor: isDark ? "#1C1C1E" : "#FAFAF8",
-              borderRadius: 18, padding: 18,
+              backgroundColor: c.surface,
+              padding: 18,
               borderWidth: 1, borderColor: c.border,
               gap: 12,
             }}>
@@ -147,8 +160,9 @@ export default function JoinTripPage() {
               ].map(({ icon, label, value }) => (
                 <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View style={{
-                    width: 36, height: 36, borderRadius: 10,
-                    backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F0EDE8",
+                    width: 36, height: 36,
+                    backgroundColor: c.bg,
+                    borderWidth: 1, borderColor: c.border,
                     alignItems: "center", justifyContent: "center",
                   }}>
                     <Ionicons name={icon} size={17} color={c.textSecondary} />
@@ -162,7 +176,7 @@ export default function JoinTripPage() {
             </View>
 
             {joinError ? (
-              <Text style={{ color: "#FF453A", fontSize: 13, textAlign: "center" }}>{joinError}</Text>
+              <Text style={{ color: c.textPrimary, fontSize: 13, textAlign: "center", fontWeight: "600" }}>{joinError}</Text>
             ) : null}
 
             {/* Join button */}
@@ -170,15 +184,15 @@ export default function JoinTripPage() {
               onPress={join}
               disabled={joining}
               style={{
-                width: "100%", backgroundColor: isDark ? "#7B6FFF" : "#6D28D9",
-                borderRadius: 16, paddingVertical: 16, alignItems: "center",
+                width: "100%", backgroundColor: c.textPrimary,
+                paddingVertical: 16, alignItems: "center",
                 opacity: joining ? 0.7 : 1, marginTop: 4,
               }}
             >
               {joining ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={c.bg} size="small" />
               ) : (
-                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>
+                <Text style={{ color: c.bg, fontSize: 16, fontWeight: "800" }}>
                   {user ? `Join ${tripInfo.trip_name}` : "Log in to join"}
                 </Text>
               )}

@@ -15,6 +15,7 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
 import { getLanguageMeta, getCurrentLanguage } from "../../src/lib/i18n";
+import { confirmAction } from "../../src/lib/confirm";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "JPY", "AUD", "CAD"];
 
@@ -140,26 +141,24 @@ export default function ProfileScreen() {
   const sym      = currencySymbol(currency);
   const langMeta = getLanguageMeta(getCurrentLanguage());
 
-  const onSignOut = () => {
-    Alert.alert("Sign out", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          try { await logout(); } catch {}
-          // Navigate outside tabs unconditionally
-          router.replace("/login");
-        },
-      },
-    ]);
+  const onSignOut = async () => {
+    // Alert.alert's multi-button form is a no-op on web (react-native-web
+    // doesn't implement it) — confirmAction degrades to an immediate
+    // confirm there and shows a real native Alert on iOS/Android.
+    const ok = await confirmAction("Sign out", "Are you sure?", "Sign out", true);
+    if (!ok) return;
+    try { await logout(); } catch {}
+    // Navigate outside tabs unconditionally
+    router.replace("/login");
   };
 
-  const onDeleteAccount = () => {
-    Alert.alert("Delete account",
+  const onDeleteAccount = async () => {
+    const ok = await confirmAction(
+      "Delete account",
       "Email support@merizo.app to permanently delete your account.",
-      [{ text: "Cancel", style: "cancel" },
-       { text: "Email Support", onPress: () => Linking.openURL("mailto:support@merizo.app?subject=Delete%20my%20account") }]);
+      "Email Support"
+    );
+    if (ok) Linking.openURL("mailto:support@merizo.app?subject=Delete%20my%20account");
   };
 
   // Simple inline SVG icons
@@ -295,7 +294,7 @@ export default function ProfileScreen() {
               <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Share Link</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push("/scan")}
+              onPress={() => router.push("/scan-qr" as any)}
               style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
             >
               <Svg width={14} height={14} viewBox="0 0 14 14">
@@ -305,7 +304,7 @@ export default function ProfileScreen() {
                 <Path d="M 10 12 L 12 12 L 12 10" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
                 <Line x1={2} y1={7} x2={12} y2={7} stroke={c.textPrimary} strokeWidth={0.8} opacity={0.4} />
               </Svg>
-              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Scan Friend</Text>
+              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Scan QR</Text>
             </TouchableOpacity>
           </View>
         </View>

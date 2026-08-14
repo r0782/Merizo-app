@@ -4,7 +4,7 @@ import {
   ScrollView, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { validateEmail as validateEmailAPI } from "../src/lib/externalApis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
@@ -26,17 +26,18 @@ function InputField({ icon, children, c }: any) {
   );
 }
 
-type Screen = "main" | "email_otp" | "phone_otp" | "verify_email" | "verify_phone";
+type Screen = "main" | "email_otp" | "verify_email";
 
 export default function LoginScreen() {
   const { c } = useTheme();
   const { loginWithToken } = useAuth();
   const router = useRouter();
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
+  const goAfterLogin = () => router.replace((redirect as any) || "/(tabs)/home");
 
   const [screen, setScreen] = useState<Screen>("main");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -55,17 +56,6 @@ export default function LoginScreen() {
     } finally { setLoading(false); }
   };
 
-  const demoLogin = async () => {
-    setLoading(true);
-    try {
-      const r = await api.post("/auth/demo-login", {});
-      await loginWithToken(r.data.access_token, r.data.user);
-      router.replace("/(tabs)/home");
-    } catch (e: any) {
-      Alert.alert("Demo login failed", e?.message || "Try again");
-    } finally { setLoading(false); }
-  };
-
   const doLogin = async () => {
     if (!email.trim() || !password) { Alert.alert("Fill in all fields"); return; }
     const emailCheck = await validateEmailAPI(email.trim());
@@ -74,7 +64,7 @@ export default function LoginScreen() {
     try {
       const r = await api.post("/auth/login", { email: email.trim().toLowerCase(), password });
       await loginWithToken(r.data.access_token, r.data.user);
-      router.replace("/(tabs)/home");
+      goAfterLogin();
     } catch (e: any) {
       Alert.alert("Login failed", e?.response?.data?.detail || "Check your credentials");
     } finally { setLoading(false); }
@@ -95,49 +85,24 @@ export default function LoginScreen() {
     } finally { setLoading(false); }
   };
 
-  const sendPhoneOtp = async () => {
-    const raw = phone.replace(/\D/g, "");
-    if (raw.length < 10) { Alert.alert("Enter a valid 10-digit number"); return; }
-    const num = "+91" + raw.slice(-10);
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: num });
-      if (error) throw error;
-      setScreen("verify_phone");
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Could not send SMS");
-    } finally { setLoading(false); }
-  };
-
-  const verifyOtp = async (type: "email" | "phone") => {
+  const verifyOtp = async () => {
     if (otp.length < 6) { Alert.alert("Enter the 6-digit code"); return; }
     setLoading(true);
     try {
-      let session: any;
-      if (type === "email") {
-        const { data, error } = await supabase.auth.verifyOtp({
-          email: email.trim().toLowerCase(), token: otp, type: "email",
-        });
-        if (error) throw error;
-        session = data.session;
-      } else {
-        const num = "+91" + phone.replace(/\D/g, "").slice(-10);
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: num, token: otp, type: "sms",
-        });
-        if (error) throw error;
-        session = data.session;
-      }
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(), token: otp, type: "email",
+      });
+      if (error) throw error;
+      const session = data.session;
       const r = await api.post("/auth/social-login", {
         supabase_token: session?.access_token,
         email: session?.user?.email || email,
-        phone: session?.user?.phone || phone,
         name: session?.user?.user_metadata?.full_name
           || session?.user?.email?.split("@")[0]
           || "User",
       });
       await loginWithToken(r.data.token, r.data.user);
-      router.replace("/(tabs)/home");
+      goAfterLogin();
     } catch (e: any) {
       Alert.alert("Invalid code", e?.message || "Try again");
     } finally { setLoading(false); }
@@ -184,18 +149,17 @@ export default function LoginScreen() {
   );
 
   // ── OTP verify screen ──────────────────────────────────────────────────────
-  if (screen === "verify_email" || screen === "verify_phone") {
-    const isEmail = screen === "verify_email";
+  if (screen === "verify_email") {
     return (
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
-          <BackBtn to={isEmail ? "email_otp" : "phone_otp"} />
+          <BackBtn to="email_otp" />
           <Wordmark c={c} />
           <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
             Enter the code
           </Text>
           <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 40 }}>
-            {isEmail ? `Sent to ${email}` : `Sent via SMS to +91 ${phone}`}
+            Sent to {email}
           </Text>
           <TextInput
             value={otp}
@@ -212,8 +176,8 @@ export default function LoginScreen() {
               letterSpacing: 12, marginBottom: 16,
             } as any}
           />
-          <PrimaryBtn onPress={() => verifyOtp(isEmail ? "email" : "phone")} label="Verify" />
-          <TouchableOpacity onPress={isEmail ? sendEmailOtp : sendPhoneOtp} style={{ alignItems: "center", paddingVertical: 20 }}>
+          <PrimaryBtn onPress={() => verifyOtp()} label="Verify" />
+          <TouchableOpacity onPress={sendEmailOtp} style={{ alignItems: "center", paddingVertical: 20 }}>
             <Text style={{ color: c.textSecondary, fontSize: 14 }}>
               Didn't receive it?{" "}
               <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Resend</Text>
@@ -246,45 +210,6 @@ export default function LoginScreen() {
             />
           </InputField>
           <PrimaryBtn onPress={sendEmailOtp} label="Send code" />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
-
-  // ── Phone OTP screen ───────────────────────────────────────────────────────
-  if (screen === "phone_otp") {
-    return (
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
-          <BackBtn to="main" />
-          <Wordmark c={c} />
-          <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
-            Sign in with phone
-          </Text>
-          <Text style={{ color: c.textSecondary, fontSize: 14, marginBottom: 40 }}>
-            We'll send a 6-digit SMS code
-          </Text>
-          <View style={{
-            flexDirection: "row", alignItems: "center",
-            backgroundColor: c.surface, borderRadius: 12,
-            borderWidth: 1, borderColor: c.border,
-            paddingHorizontal: 16, gap: 10, marginBottom: 16,
-          }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 16, borderRightWidth: 1, borderRightColor: c.border, paddingRight: 16 }}>
-              <Text style={{ fontSize: 16 }}>🇮🇳</Text>
-              <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "600" }}>+91</Text>
-            </View>
-            <TextInput
-              value={phone}
-              onChangeText={v => setPhone(v.replace(/\D/g, "").slice(0, 10))}
-              placeholder="98765 43210"
-              placeholderTextColor={c.textMuted}
-              keyboardType="phone-pad"
-              maxLength={10}
-              style={{ flex: 1, fontSize: 16, color: c.textPrimary, paddingVertical: 16 } as any}
-            />
-          </View>
-          <PrimaryBtn onPress={sendPhoneOtp} label="Send OTP" />
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -362,34 +287,7 @@ export default function LoginScreen() {
           <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>Continue with Google</Text>
         </TouchableOpacity>
 
-        {/* Phone OTP */}
-        <TouchableOpacity
-          onPress={() => setScreen("phone_otp")}
-          activeOpacity={0.8}
-          style={{
-            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-            backgroundColor: c.surface, borderRadius: 12, padding: 15,
-            borderWidth: 1, borderColor: c.border, marginBottom: 10,
-          }}
-        >
-          <Text style={{ fontSize: 16 }}>🇮🇳</Text>
-          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>Continue with Phone OTP</Text>
-        </TouchableOpacity>
-
-        {/* Demo */}
-        <TouchableOpacity
-          onPress={demoLogin}
-          activeOpacity={0.8}
-          style={{
-            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-            borderRadius: 12, padding: 15, marginBottom: 32,
-            borderWidth: 1, borderColor: c.border,
-          }}
-        >
-          <Text style={{ color: c.textSecondary, fontSize: 15, fontWeight: "500" }}>Try demo account</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push("/register")} style={{ alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.push("/register")} style={{ alignItems: "center", marginTop: 22 }}>
           <Text style={{ color: c.textSecondary, fontSize: 14 }}>
             New here?{" "}
             <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Create account</Text>

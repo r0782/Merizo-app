@@ -309,32 +309,7 @@ export default function SplitDetailScreen() {
     return txns.length === 0 ? "All balances settled." : `${txns.length} payment${txns.length > 1 ? "s" : ""} needed to settle.`;
   };
 
-  const onShareInvite = async () => {
-    try {
-      const inv = await api.get(`/trips/${tripId}/invite`);
-      const token = inv.data.token;
-      const webLink = `https://merizo-app.onrender.com/join/${token}`;
-      const message = [
-        `Join "${trip.name}" on Merizo! 💸`,
-        "",
-        "Split expenses effortlessly with the group.",
-        "",
-        `👇 Tap to join:`,
-        webLink,
-        "",
-        `Or open the Merizo app and use invite code: ${token}`,
-      ].join("\n");
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `Join ${trip.name} on Merizo`, text: message, url: webLink });
-      } else {
-        await Share.share({ message, title: `Join ${trip.name} on Merizo` });
-      }
-    } catch (e: any) {
-      if (e?.message !== "Share canceled") {
-        Alert.alert("Invite link ready", "Link copied! Send it to your friends.");
-      }
-    }
-  };
+  const onShareInvite = () => router.push(`/invite/${tripId}` as any);
 
   const net = trip.my_net || 0;
   const isOwed = net > 0;

@@ -111,6 +111,9 @@ DEMO_EMAIL    = os.environ.get("DEMO_EMAIL", "demo@merizo.app")
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "Demo@123")
 DEMO_NAME     = os.environ.get("DEMO_NAME", "Demo User")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+# Web origin used to build shareable invite links (QR codes, share sheet). Same
+# default host as CORS/BACKEND_URL below, overridable per environment.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://merizo-app.onrender.com").rstrip("/")
 
 def hash_pw(pw): return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 def verify_pw(pw, h):
@@ -599,52 +602,145 @@ async def share_summary(trip_id: str, current_user: dict = Depends(get_current_u
     lines += ["", "Tracked with Merizo — merizo.app"]
     return {"text": "\n".join(lines)}
 
+# ── Invite links (QR / shareable) — backed by trip_invites table ──────────────
+INVITE_DEFAULT_TTL_DAYS = 7
+
+class InviteRegenerateRequest(BaseModel):
+    ttl_days: Optional[int] = INVITE_DEFAULT_TTL_DAYS   # None/0 = no expiry
+
+def _invite_status(invite: dict) -> str:
+    """Resolve effective status: active | expired | revoked | exhausted."""
+    if invite.get("status") == "revoked":
+        return "revoked"
+    exp = invite.get("expires_at")
+    if exp and datetime.fromisoformat(exp.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+        return "expired"
+    max_uses = invite.get("max_uses")
+    if max_uses is not None and invite.get("usage_count", 0) >= max_uses:
+        return "exhausted"
+    return "active"
+
+async def _get_active_invite(trip_id: str) -> Optional[dict]:
+    rows = await sb_get("trip_invites", trip_id=trip_id, status="active")
+    rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    for r in rows:
+        if _invite_status(r) == "active":
+            return r
+    return None
+
+async def _create_invite(trip_id: str, user_id: str, ttl_days: Optional[int] = INVITE_DEFAULT_TTL_DAYS) -> dict:
+    now = datetime.now(timezone.utc)
+    doc = {
+        "id": str(uuid.uuid4()), "trip_id": trip_id, "token": secrets.token_urlsafe(12),
+        "created_by": user_id, "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=ttl_days)).isoformat() if ttl_days else None,
+        "status": "active", "usage_count": 0, "max_uses": None,
+    }
+    return await sb_insert("trip_invites", doc)
+
+def _invite_response(invite: dict, trip_name: str) -> dict:
+    return {
+        "token": invite["token"], "trip_name": trip_name,
+        "expires_at": invite.get("expires_at"),
+        "usage_count": invite.get("usage_count", 0),
+        "max_uses": invite.get("max_uses"),
+        "join_url": f"{FRONTEND_URL}/join/{invite['token']}",
+    }
+
+async def _perform_join(token: str, current_user: dict, ip: str) -> dict:
+    check_rate_limit(ip, "join-trip")
+    invite = await sb_one("trip_invites", token=token)
+    if not invite:
+        raise HTTPException(404, "Invalid invite link")
+    st = _invite_status(invite)
+    if st == "expired":
+        raise HTTPException(410, "This invite link has expired")
+    if st in ("revoked", "exhausted"):
+        raise HTTPException(409, "This invite link is no longer available")
+    trip = await sb_one("trips", id=invite["trip_id"])
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if current_user["id"] in (trip.get("members") or []):
+        return {"message": "You're already a member of this group", "trip_id": trip["id"],
+                "trip_name": trip["name"], "already_member": True}
+    members = list(trip.get("members") or [])
+    members.append(current_user["id"])
+    await sb_update("trips", {"members": members}, id=trip["id"])
+    await sb_update("trip_invites", {"usage_count": invite.get("usage_count", 0) + 1}, id=invite["id"])
+    audit("TRIP_JOINED", user_id=current_user["id"], ip=ip, detail=f"trip={trip['id']}")
+    return {"message": "Joined successfully", "trip_id": trip["id"], "trip_name": trip["name"]}
+
 @api.get("/trips/{trip_id}/invite")
 async def get_invite(trip_id: str, current_user: dict = Depends(get_current_user)):
     trip = await sb_one("trips", id=trip_id)
-    if not trip: raise HTTPException(404)
-    token = trip.get("invite_token") or secrets.token_urlsafe(12)
-    if not trip.get("invite_token"):
-        await sb_update("trips", {"invite_token": token}, id=trip_id)
-    return {"token": token, "trip_name": trip["name"]}
+    if not trip or current_user["id"] not in (trip.get("members") or []):
+        raise HTTPException(404, "Trip not found")
+    invite = await _get_active_invite(trip_id) or await _create_invite(trip_id, current_user["id"])
+    return _invite_response(invite, trip["name"])
+
+@api.post("/trips/{trip_id}/invite/regenerate")
+async def regenerate_invite(trip_id: str, body: InviteRegenerateRequest,
+                             current_user: dict = Depends(get_current_user)):
+    """Revoke any existing link and issue a fresh one — e.g. if a QR was shared too widely."""
+    trip = await sb_one("trips", id=trip_id)
+    if not trip or current_user["id"] not in (trip.get("members") or []):
+        raise HTTPException(404, "Trip not found")
+    old = await _get_active_invite(trip_id)
+    if old:
+        await sb_update("trip_invites", {"status": "revoked"}, id=old["id"])
+    invite = await _create_invite(trip_id, current_user["id"], ttl_days=body.ttl_days)
+    audit("INVITE_REGENERATED", user_id=current_user["id"], detail=f"trip={trip_id}")
+    return _invite_response(invite, trip["name"])
+
+@api.post("/trips/{trip_id}/invite/revoke")
+async def revoke_invite(trip_id: str, current_user: dict = Depends(get_current_user)):
+    """Turn off the invite link entirely — owner only."""
+    trip = await sb_one("trips", id=trip_id)
+    if not trip: raise HTTPException(404, "Trip not found")
+    if trip.get("owner_id") != current_user["id"]:
+        raise HTTPException(403, "Only the trip owner can revoke the invite link")
+    invite = await _get_active_invite(trip_id)
+    if invite:
+        await sb_update("trip_invites", {"status": "revoked"}, id=invite["id"])
+    audit("INVITE_REVOKED", user_id=current_user["id"], detail=f"trip={trip_id}")
+    return {"message": "Invite link revoked"}
 
 @api.post("/trips/{trip_id}/join")
 async def join_trip(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Legacy path: trip_id + token in body. Delegates to the same token validation as /invite/{token}/join."""
     data = await request.json()
-    trip = await sb_one("trips", id=trip_id, invite_token=data.get("token"))
-    if not trip: raise HTTPException(404, "Invalid invite link")
-    if current_user["id"] not in (trip.get("members") or []):
-        members = list(trip.get("members") or [])
-        members.append(current_user["id"])
-        await sb_update("trips", {"members": members}, id=trip_id)
-    return {"message": "Joined successfully"}
+    result = await _perform_join(data.get("token", ""), current_user, get_client_ip(request))
+    if result.get("trip_id") != trip_id:
+        raise HTTPException(404, "Invalid invite link")
+    return result
 
 @api.get("/invite/{token}")
 async def get_invite_by_token(token: str):
-    """Public — look up trip by invite token so guest can see trip name before logging in."""
-    rows = await sb_get("trips", invite_token=token)
-    if not rows:
+    """Public — look up trip by invite token so a guest can preview it before logging in."""
+    invite = await sb_one("trip_invites", token=token)
+    if not invite:
         raise HTTPException(404, "Invalid invite link")
-    trip = rows[0]
+    st = _invite_status(invite)
+    if st == "expired":
+        raise HTTPException(410, "This invite link has expired")
+    if st in ("revoked", "exhausted"):
+        raise HTTPException(409, "This invite link is no longer available")
+    trip = await sb_one("trips", id=invite["trip_id"])
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    inviter = await sb_one("users", id=invite.get("created_by")) if invite.get("created_by") else None
     return {
         "trip_id": trip["id"],
         "trip_name": trip["name"],
         "member_count": len(trip.get("members") or []),
         "currency": trip.get("currency", "INR"),
+        "invited_by": (inviter or {}).get("name"),
     }
 
 @api.post("/invite/{token}/join")
-async def join_by_token(token: str, current_user: dict = Depends(get_current_user)):
-    """Authenticated — join a trip using only its invite token."""
-    rows = await sb_get("trips", invite_token=token)
-    if not rows:
-        raise HTTPException(404, "Invalid invite link")
-    trip = rows[0]
-    if current_user["id"] not in (trip.get("members") or []):
-        members = list(trip.get("members") or [])
-        members.append(current_user["id"])
-        await sb_update("trips", {"members": members}, id=trip["id"])
-    return {"message": "Joined successfully", "trip_id": trip["id"], "trip_name": trip["name"]}
+async def join_by_token(token: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Authenticated — join a trip using only its invite token (QR / deep-link path)."""
+    return await _perform_join(token, current_user, get_client_ip(request))
 
 @api.post("/trips/{trip_id}/members")
 async def add_member(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):

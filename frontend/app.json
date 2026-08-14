@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan bills to log expenses fast",
+        "NSCameraUsageDescription": "Scan bills and invite QR codes",
         "NSPhotoLibraryUsageDescription": "Pick a bill photo to log an expense"
       },
       "bundleIdentifier": "com.raghu30.merizo"
@@ -49,7 +49,13 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan bills and invite QR codes"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
