@@ -12,11 +12,13 @@ import Animated, {
   useAnimatedStyle,
 } from "react-native-reanimated";
 import { useRouter, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import Svg, { Path, Line, Circle } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
+import { getDeviceLocale } from "../../src/lib/currency";
 import { BalanceSplit } from "../../src/components/merizo/LedgerRow";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadRecurring, type Subscription } from "../recurring";
@@ -54,7 +56,7 @@ function NotebookHeader({ greeting, date, c }: any) {
   useEffect(() => {
     opacity.value    = withTiming(1, { duration: 500 });
     translateY.value = withSpring(0, { damping: 20 });
-  }, []);
+  }, [opacity, translateY]);
 
   const as = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: translateY.value }] }));
 
@@ -106,23 +108,24 @@ function NotebookHeader({ greeting, date, c }: any) {
 
 // ── Total balance ─────────────────────────────────────────────────────────────
 function TotalBalance({ amount, sym, c }: any) {
+  const { t } = useTranslation();
   const scale   = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     scale.value   = withDelay(200, withSpring(1, { damping: 16 }));
     opacity.value = withDelay(200, withTiming(1, { duration: 400 }));
-  }, []);
+  }, [opacity, scale]);
 
   const as = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: opacity.value }));
 
   return (
     <Animated.View style={[as, { paddingHorizontal: 20, paddingVertical: 20 }]}>
       <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 8 }}>
-        Total Balance
+        {t("home.totalBalance")}
       </Text>
       <Text style={{ fontFamily: type.family.bold, fontSize: 48, color: c.textPrimary, letterSpacing: -2.5, lineHeight: 52 }}>
-        {sym}{Math.abs(amount).toLocaleString("en-IN")}
+        {sym}{Math.abs(amount).toLocaleString(getDeviceLocale())}
       </Text>
     </Animated.View>
   );
@@ -305,12 +308,13 @@ function ScrollViewH({ contacts, c, type }: { contacts: { name: string; groups: 
 }
 
 function GroupRow({ trip, sym, onPress, c }: any) {
+  const { t } = useTranslation();
   const net      = trip.my_net || 0;
   const absNet   = Math.abs(net);
-  const hint     = net > 0 ? "you are owed" : net < 0 ? "you owe" : "settled";
+  const hint     = net > 0 ? t("home.hintYouAreOwed") : net < 0 ? t("home.hintYouOwe") : t("home.hintSettled");
   const amtStr   = net === 0
     ? "—"
-    : `${net > 0 ? "+" : "-"}${sym}${absNet.toLocaleString("en-IN")}`;
+    : `${net > 0 ? "+" : "-"}${sym}${absNet.toLocaleString(getDeviceLocale())}`;
 
   return (
     <TouchableOpacity
@@ -329,7 +333,7 @@ function GroupRow({ trip, sym, onPress, c }: any) {
           {trip.name}
         </Text>
         <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 1 }}>
-          {trip.member_count || trip.members?.length || 0} members
+          {t("groups.memberCount", { count: trip.member_count || trip.members?.length || 0 })}
         </Text>
       </View>
 
@@ -354,6 +358,7 @@ function GroupRow({ trip, sym, onPress, c }: any) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { c } = useTheme();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -429,9 +434,9 @@ export default function HomeScreen() {
   const onRefresh = async () => { setRefreshing(true); await load(); loadRecurring().then(setRecurring); setRefreshing(false); };
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? t("time.goodMorning") : hour < 17 ? t("time.goodAfternoon") : t("time.goodEvening");
   const name  = user?.name?.split(" ")[0] || "";
-  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date().toLocaleDateString(getDeviceLocale(), { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -451,8 +456,8 @@ export default function HomeScreen() {
         {(totalOwed > 0 || totalOwing > 0) && (
           <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
             <BalanceSplit
-              leftLabel="You Owe"      leftAmount={totalOwing}
-              rightLabel="Owed to You" rightAmount={totalOwed}
+              leftLabel={t("home.youOwe")}      leftAmount={totalOwing}
+              rightLabel={t("home.owedToYou")} rightAmount={totalOwed}
               sym={sym}
             />
           </View>
@@ -463,11 +468,11 @@ export default function HomeScreen() {
         {/* ── Quick Actions — 4 equal-width separate boxes ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 }}>
           <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 12 }}>
-            Quick Actions
+            {t("home.quickActionsLabel")}
           </Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <QuickAction
-              label={"Add\nExpense"}
+              label={`${t("home.wordAdd")}\n${t("home.wordExpense")}`}
               onPress={() => setShowAddExpense(true)}
               c={c}
               icon={<>
@@ -476,7 +481,7 @@ export default function HomeScreen() {
               </>}
             />
             <QuickAction
-              label={"Scan\nBill"}
+              label={`${t("home.wordScan")}\n${t("home.wordBill")}`}
               onPress={() => router.push("/scan")}
               c={c}
               icon={<>
@@ -488,7 +493,7 @@ export default function HomeScreen() {
               </>}
             />
             <QuickAction
-              label={"New\nGroup"}
+              label={`${t("home.wordNew")}\n${t("home.wordGroup")}`}
               onPress={() => setShowNewGroup(true)}
               c={c}
               icon={<>
@@ -498,7 +503,7 @@ export default function HomeScreen() {
               </>}
             />
             <QuickAction
-              label={"AI\nAdvisor"}
+              label={`${t("home.wordAi")}\n${t("home.wordAdvisor")}`}
               onPress={() => router.push("/(tabs)/chat")}
               c={c}
               icon={<>
@@ -518,11 +523,11 @@ export default function HomeScreen() {
           <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
-                Recurring Bills
+                {t("home.recurringBillsLabel")}
               </Text>
               <TouchableOpacity onPress={() => router.push("/recurring")}>
                 <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                  Manage →
+                  {t("home.manageArrow")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -539,20 +544,20 @@ export default function HomeScreen() {
                   {bill.name}
                 </Text>
                 <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, marginRight: 4 }}>
-                  {sym}{bill.amount > 0 ? bill.amount.toLocaleString("en-IN") : "—"}
+                  {sym}{bill.amount > 0 ? bill.amount.toLocaleString(getDeviceLocale()) : "—"}
                 </Text>
                 <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted }}>
-                  /{bill.period === "monthly" ? "mo" : "yr"}
+                  {bill.period === "monthly" ? t("home.perMonth") : t("home.perYear")}
                 </Text>
               </TouchableOpacity>
             ))}
             {recurring.length > 0 && (
               <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 10 }}>
                 <Text style={{ fontFamily: type.family.light, fontSize: 11, color: c.textMuted }}>
-                  {recurring.length} bill{recurring.length !== 1 ? "s" : ""}
+                  {t("home.billCount", { count: recurring.length })}
                 </Text>
                 <Text style={{ fontFamily: type.family.semibold, fontSize: 12, color: c.textPrimary }}>
-                  {sym}{recurring.reduce((s, b) => s + (b.amount || 0), 0).toLocaleString("en-IN")}/mo
+                  {sym}{recurring.reduce((s, b) => s + (b.amount || 0), 0).toLocaleString(getDeviceLocale())}{t("home.perMonth")}
                 </Text>
               </View>
             )}
@@ -565,9 +570,9 @@ export default function HomeScreen() {
             style={{ marginHorizontal: 20, paddingVertical: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: `${c.border}50`, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}
           >
             <View>
-              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 2 }}>Recurring Bills</Text>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 2 }}>{t("home.recurringBillsLabel")}</Text>
               <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textSecondary }}>
-                Track subscriptions & fixed expenses
+                {t("home.trackSubscriptions")}
               </Text>
             </View>
             <Text style={{ fontFamily: type.family.light, fontSize: 16, color: c.textMuted }}>+</Text>
@@ -581,19 +586,19 @@ export default function HomeScreen() {
           <View style={{ paddingTop: 16, marginBottom: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 4 }}>
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
-                Groups
+                {t("groups.title")}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
                 {trips.length > 5 && (
                   <TouchableOpacity onPress={() => setShowAllGroups(v => !v)}>
                     <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                      {showAllGroups ? "Show less" : `See all (${trips.length})`}
+                      {showAllGroups ? t("home.showLess") : t("home.seeAllCount", { count: trips.length })}
                     </Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={() => setShowNewGroup(true)}>
                   <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                    + New
+                    {t("home.addNew")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -622,14 +627,14 @@ export default function HomeScreen() {
         {trips.length === 0 && !loading && (
           <View style={{ paddingHorizontal: 20, paddingVertical: 24, alignItems: "flex-start" }}>
             <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textMuted, lineHeight: 22 }}>
-              No groups yet. Create one to start splitting expenses with friends.
+              {t("home.noGroupsMessage")}
             </Text>
             <TouchableOpacity
-              onPress={() => router.push("/create-split")}
+              onPress={() => setShowNewGroup(true)}
               style={{ marginTop: 16, borderWidth: 1, borderColor: c.border, paddingVertical: 12, paddingHorizontal: 20 }}
             >
               <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }}>
-                + Create a Group
+                {t("home.createGroupCta")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -642,11 +647,11 @@ export default function HomeScreen() {
           <View style={{ paddingTop: 16, marginBottom: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 10 }}>
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
-                People
+                {t("home.peopleLabel")}
               </Text>
               <TouchableOpacity onPress={() => setShowNewGroup(true)}>
                 <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                  + New Group
+                  {t("home.newGroupCta")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -661,11 +666,11 @@ export default function HomeScreen() {
           <View style={{ paddingTop: 16, marginBottom: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 8 }}>
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase" }}>
-                Recent Activity
+                {t("home.recentActivityLabel")}
               </Text>
               <TouchableOpacity onPress={() => router.push("/(tabs)/activity")}>
                 <Text style={{ fontFamily: type.family.medium, fontSize: type.size.xs, color: c.textSecondary }}>
-                  See all →
+                  {t("home.seeAllArrow")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -679,14 +684,14 @@ export default function HomeScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textPrimary }} numberOfLines={1}>
-                      {exp.name || "Expense"}
+                      {exp.name || t("expenses.expense")}
                     </Text>
                     <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textMuted, marginTop: 1 }}>
                       {exp.tripName}
                     </Text>
                   </View>
                   <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, letterSpacing: -0.3 }}>
-                    {sym}{Math.round(exp.amount || 0).toLocaleString("en-IN")}
+                    {sym}{Math.round(exp.amount || 0).toLocaleString(getDeviceLocale())}
                   </Text>
                 </TouchableOpacity>
                 {i < recentExp.length - 1 && <DottedLine c={c} />}
@@ -699,7 +704,7 @@ export default function HomeScreen() {
         {/* ── Footer ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 }}>
           <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", textAlign: "center", opacity: 0.5 }}>
-            MERIZO · Financial Notebook
+            {t("home.footerTagline")}
           </Text>
         </View>
       </ScrollView>
@@ -713,27 +718,27 @@ export default function HomeScreen() {
         >
           <View style={{ backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
             <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>
-              Add Expense
+              {t("home.addExpenseTitle")}
             </Text>
             <Text style={{ fontFamily: type.family.bold, fontSize: 20, color: c.textPrimary, marginBottom: 20 }}>
-              How would you like to add?
+              {t("home.howToAdd")}
             </Text>
             <TouchableOpacity
               onPress={() => { setShowAddExpense(false); router.push("/simple-split"); }}
               style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 16, paddingHorizontal: 16, marginBottom: 10 }}
             >
-              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.textPrimary }}>Quick Split</Text>
+              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.textPrimary }}>{t("home.quickSplitLabel")}</Text>
               <Text style={{ fontFamily: type.family.regular, fontSize: 12, color: c.textMuted, marginTop: 2 }}>
-                Split a one-off expense between friends
+                {t("home.quickSplitDesc")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { setShowAddExpense(false); router.push("/create-split"); }}
+              onPress={() => { setShowAddExpense(false); setShowNewGroup(true); }}
               style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.textPrimary, paddingVertical: 16, paddingHorizontal: 16 }}
             >
-              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.bg }}>Create Group</Text>
+              <Text style={{ fontFamily: type.family.semibold, fontSize: 14, color: c.bg }}>{t("home.createGroupLabel")}</Text>
               <Text style={{ fontFamily: type.family.regular, fontSize: 12, color: `${c.bg}99`, marginTop: 2 }}>
-                Start a group for ongoing shared expenses
+                {t("home.createGroupDesc")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -749,20 +754,20 @@ export default function HomeScreen() {
         >
           <View style={{ backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
             <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>
-              New Group
+              {t("home.newGroupTitle")}
             </Text>
             <Text style={{ fontFamily: type.family.bold, fontSize: 20, color: c.textPrimary, marginBottom: 20 }}>
-              What's the group for?
+              {t("home.whatsItFor")}
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               {([
-                { label: "Travel",        category: "travel",        icon: "✈️" },
-                { label: "Food",          category: "food",          icon: "🍽️" },
-                { label: "Home",          category: "home",          icon: "🏠" },
-                { label: "Shopping",      category: "shopping",      icon: "🛍️" },
-                { label: "Entertainment", category: "entertainment",  icon: "🎬" },
-                { label: "Other",         category: "other",         icon: "📦" },
-              ] as const).map(({ label, category, icon }) => (
+                { label: t("home.catTravel"),        category: "travel",        icon: "✈️" },
+                { label: t("home.catFood"),          category: "food",          icon: "🍽️" },
+                { label: t("home.catHome"),          category: "home",          icon: "🏠" },
+                { label: t("home.catShopping"),      category: "shopping",      icon: "🛍️" },
+                { label: t("home.catEntertainment"), category: "entertainment",  icon: "🎬" },
+                { label: t("home.catOther"),         category: "other",         icon: "📦" },
+              ]).map(({ label, category, icon }) => (
                 <TouchableOpacity
                   key={category}
                   onPress={() => {

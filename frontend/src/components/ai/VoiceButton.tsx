@@ -1,7 +1,13 @@
 import React, { useState, useRef } from "react";
-import { TouchableOpacity, Animated, Platform, Alert } from "react-native";
+import { TouchableOpacity, Animated, Platform, Alert, PermissionsAndroid } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../lib/theme";
+import { getCurrentLanguage, getLanguageMeta } from "../../lib/i18n";
+import * as AndroidSpeech from "../../lib/androidSpeech";
+
+// Errors that just mean "nothing useful was said" rather than a real failure —
+// worth staying silent about rather than alarming the user with a dialog.
+const SILENT_ANDROID_ERRORS = new Set(["no_match", "speech_timeout", "client_error"]);
 
 export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => void }) {
   const { c } = useTheme();
@@ -27,6 +33,41 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
     pulse.setValue(1);
   };
 
+  const finishAndroidTurn = (transcript?: string) => {
+    stopPulse();
+    setIsRecording(false);
+    setIsLoading(false);
+    if (transcript) onTranscript(transcript);
+  };
+
+  const startAndroidNative = async () => {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      {
+        title: "Microphone permission",
+        message: "Merizo needs microphone access for voice input.",
+        buttonPositive: "Allow",
+      }
+    );
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+      throw new Error("permission_denied");
+    }
+    const languageTag = getLanguageMeta(getCurrentLanguage()).region;
+    await AndroidSpeech.start({
+      languageTag,
+      onFinal: (event) => {
+        finishAndroidTurn(event.text || undefined);
+        if (!event.text) Alert.alert("Didn't catch that", "No speech detected — please try again.");
+      },
+      onError: (event) => {
+        finishAndroidTurn();
+        if (!SILENT_ANDROID_ERRORS.has(event.message)) {
+          Alert.alert("Voice input failed", "Please try again or type instead.");
+        }
+      },
+    });
+  };
+
   const safeUnload = async () => {
     if (recordingRef.current) {
       try {
@@ -49,9 +90,24 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
     }
     isStartingRef.current = true;
     try {
-      // Clean up any leftover recording first
-      await safeUnload();
+      if (AndroidSpeech.isAndroidSpeechSupported) {
+        // On-device recognition: no network round trip, no backend transcription cost.
+        setIsRecording(true);
+        startPulse();
+        try {
+          await startAndroidNative();
+        } catch (e: any) {
+          stopPulse();
+          setIsRecording(false);
+          if (e?.message === "permission_denied") {
+            Alert.alert("Permission needed", "Microphone permission is required for voice input.");
+          }
+        }
+        return;
+      }
 
+      // iOS / dev-client-less Android fallback: record audio, upload for cloud STT.
+      await safeUnload();
       const { Audio } = await import("expo-av");
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
@@ -68,12 +124,26 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
     } catch (e) {
       setIsRecording(false);
       recordingRef.current = null;
+      stopPulse();
     } finally {
       isStartingRef.current = false;
     }
   };
 
   const stopRecording = async () => {
+    if (AndroidSpeech.isAndroidSpeechSupported) {
+      if (!isRecording) return;
+      setIsLoading(true);
+      // Signals the recognizer to finalize; onFinal/onError (above) deliver the
+      // result and clear isLoading/isRecording — stop() itself doesn't.
+      try {
+        await AndroidSpeech.stop();
+      } catch {
+        finishAndroidTurn();
+      }
+      return;
+    }
+
     if (!isRecording && !recordingRef.current) return;
     stopPulse();
     setIsRecording(false);
@@ -84,7 +154,7 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
       if (uri) {
         try {
           const { transcribeVoice } = await import("../../lib/ai");
-          const result = await transcribeVoice(uri);
+          const result = await transcribeVoice(uri, getCurrentLanguage());
           if (result?.transcript) onTranscript(result.transcript);
         } catch {
           Alert.alert("Transcription failed", "Could not process audio. Please type instead.");
@@ -95,6 +165,12 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
     }
   };
 
+  const handlePress = () => {
+    if (isLoading) return;
+    if (isRecording) stopRecording();
+    else startRecording();
+  };
+
   const icon = isLoading ? "hourglass-outline" : isRecording ? "stop-circle" : "mic-outline";
   const bg = isRecording ? "#E84040" : c.surface;
   const iconColor = isRecording ? "#fff" : isLoading ? c.textMuted : c.textPrimary;
@@ -102,8 +178,7 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
   return (
     <Animated.View style={{ transform: [{ scale: pulse }] }}>
       <TouchableOpacity
-        onPressIn={startRecording}
-        onPressOut={stopRecording}
+        onPress={handlePress}
         disabled={isLoading}
         style={{
           width: 42, height: 42, borderRadius: 21,

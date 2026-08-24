@@ -5,14 +5,18 @@ import {
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../src/lib/theme";
-import { currencyOptions } from "../src/lib/tokens";
-import { type } from "../src/lib/tokens";
+import { currencyOptions, type } from "../src/lib/tokens";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "../src/lib/storage-keys";
+import { ROUTES } from "../src/lib/routes";
+import { detectLocaleCurrency } from "../src/lib/currency";
+
+const ICON_STROKE_WIDTH = 1.5;
 
 function CheckIcon({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 16 16">
-      <Path d="M 3 8 L 6.5 11.5 L 13 5" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M 3 8 L 6.5 11.5 L 13 5" stroke={color} strokeWidth={ICON_STROKE_WIDTH} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -20,7 +24,7 @@ function CheckIcon({ color }: { color: string }) {
 function ArrowIcon({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 16 16">
-      <Path d="M 3 8 L 13 8 M 9 4 L 13 8 L 9 12" stroke={color} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M 3 8 L 13 8 M 9 4 L 13 8 L 9 12" stroke={color} strokeWidth={ICON_STROKE_WIDTH} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -28,15 +32,15 @@ function ArrowIcon({ color }: { color: string }) {
 export default function CurrencyOnboarding() {
   const { c } = useTheme();
   const router = useRouter();
-  const [selectedCurrency, setSelectedCurrency] = useState("INR");
+  const [selectedCurrency, setSelectedCurrency] = useState(detectLocaleCurrency);
 
   const onFinish = async () => {
     try {
-      await AsyncStorage.setItem("default_currency", selectedCurrency);
-      await AsyncStorage.setItem("onboarding_done", "true");
-      router.replace("/(tabs)/home");
+      await AsyncStorage.setItem(STORAGE_KEYS.DEFAULT_CURRENCY, selectedCurrency);
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_DONE, "true");
+      router.replace(ROUTES.HOME);
     } catch {
-      router.replace("/(tabs)/home");
+      router.replace(ROUTES.HOME);
     }
   };
 

@@ -10,8 +10,10 @@ Language code map (ISO 639-1 app code → BCP-47 Sarvam code):
   gu → gu-IN,  pa → pa-IN,  ur → ur-IN (fallback: en-IN)
 """
 import base64
+import io
 import logging
 import os
+import wave
 
 import httpx
 
@@ -34,19 +36,21 @@ LANG_CODE: dict[str, str] = {
     "ur": "ur-IN",
 }
 
-# TTS voice options — Sarvam bulbul:v1 voices
+# TTS voice options — bulbul:v2 voices (v1 is retired; its speaker names
+# like "meera"/"pavithra"/"arvind" don't exist on v2 and error out).
+# Valid v2 speakers: anushka, manisha, vidya, arya, abhilash, karun, hitesh.
 TTS_SPEAKERS: dict[str, str] = {
-    "en": "meera",
-    "hi": "anushka",
-    "te": "pavithra",
-    "ta":  "arvind",
-    "kn":  "abhilasha",
-    "ml":  "asha",
-    "mr":  "manisha",
-    "bn":  "riya",
-    "gu":  "aarohi",
-    "pa":  "amol",
-    "ur":  "anushka",
+    "en": "anushka",
+    "hi": "manisha",
+    "te": "vidya",
+    "ta": "arya",
+    "kn": "abhilash",
+    "ml": "karun",
+    "mr": "hitesh",
+    "bn": "anushka",
+    "gu": "manisha",
+    "pa": "vidya",
+    "ur": "arya",
 }
 
 
@@ -69,7 +73,8 @@ async def transcribe_audio_sarvam(
     filename: str = "audio.m4a",
 ) -> str:
     """
-    Transcribe audio using Sarvam saarika:v2.5.
+    Transcribe audio using Sarvam saaras:v4 (saarika:v2.5 is on Sarvam's
+    deprecation path — saaras is the current recommended STT model).
 
     Returns the transcript string, or raises on failure.
     """
@@ -86,9 +91,9 @@ async def transcribe_audio_sarvam(
             headers={"api-subscription-key": key},
             files={"file": (filename, audio_bytes, mime)},
             data={
-                "model": "saarika:v2.5",
+                "model": "saaras:v4",
                 "language_code": lang_code,
-                "with_timestamps": "false",
+                "mode": "transcribe",
             },
         )
         r.raise_for_status()
@@ -104,7 +109,7 @@ async def text_to_speech_sarvam(
     speed: float = 1.0,
 ) -> bytes:
     """
-    Convert text to speech using Sarvam bulbul:v1.
+    Convert text to speech using Sarvam bulbul:v2.
 
     Returns raw WAV bytes (16 kHz, mono).
     Sarvam TTS accepts up to 500 chars per input; we chunk automatically.
@@ -114,7 +119,7 @@ async def text_to_speech_sarvam(
 
     key = _api_key()
     lang_code = _bcp47(language)
-    speaker = TTS_SPEAKERS.get(language, "meera")
+    speaker = TTS_SPEAKERS.get(language, "anushka")
 
     # Chunk text into ≤500-char segments
     chunks: list[str] = []
@@ -139,7 +144,7 @@ async def text_to_speech_sarvam(
         "loudness": 1.0,
         "speech_sample_rate": 16000,
         "enable_preprocessing": True,
-        "model": "bulbul:v1",
+        "model": "bulbul:v2",
     }
 
     async with httpx.AsyncClient(timeout=60) as client:
@@ -154,12 +159,34 @@ async def text_to_speech_sarvam(
         r.raise_for_status()
         data = r.json()
 
-    # Concatenate base64-decoded audio chunks
-    audio_chunks: list[bytes] = []
-    for b64 in data.get("audios", []):
-        audio_chunks.append(base64.b64decode(b64))
+    # Each chunk comes back as a complete, independent WAV file (its own
+    # header). Naively joining the raw bytes glues a second file's header
+    # into the middle of the audio stream, which glitches or truncates
+    # playback — so decode each WAV's PCM frames and re-encode as one file.
+    audio_chunks: list[bytes] = [base64.b64decode(b64) for b64 in data.get("audios", [])]
+    return _concat_wavs(audio_chunks)
 
-    return b"".join(audio_chunks)
+
+def _concat_wavs(chunks: list[bytes]) -> bytes:
+    if not chunks:
+        return b""
+    if len(chunks) == 1:
+        return chunks[0]
+
+    frames: list[bytes] = []
+    params = None
+    for chunk in chunks:
+        with wave.open(io.BytesIO(chunk), "rb") as w:
+            if params is None:
+                params = w.getparams()
+            frames.append(w.readframes(w.getnframes()))
+
+    out = io.BytesIO()
+    with wave.open(out, "wb") as writer:
+        writer.setparams(params)
+        for f in frames:
+            writer.writeframes(f)
+    return out.getvalue()
 
 
 # ── Language detection ────────────────────────────────────────────────────────

@@ -2,12 +2,14 @@
  * Quick Split — landing page in B&W notebook style.
  * Routes to the app's AI chat, scan, or voice features.
  */
-import { Platform } from "react-native";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { useEffect, useState } from "react";
+import { Platform, View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import Svg, { Path, Circle, Line } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
 import { useTheme } from "../src/lib/theme";
-import { type } from "../src/lib/tokens";
+import { currencySymbol, type } from "../src/lib/tokens";
+import { ROUTES } from "../src/lib/routes";
+import { getDefaultCurrency } from "../src/lib/currency";
 
 function IcoBack({ color, size = 18 }: { color: string; size?: number }) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M19 12H5M5 12L12 19M5 12L12 5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
@@ -25,15 +27,24 @@ function IcoChevron({ color, size = 16 }: { color: string; size?: number }) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M9 18l6-6-6-6" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
 }
 
-const EXAMPLES = [
-  "Hotel ₹6000 split 4 ways",
-  "Birthday dinner ₹4200 for 6 people",
-  "Cab ₹850 split with Ramu and Priya",
-];
+function examplesFor(sym: string) {
+  return [
+    `Hotel ${sym}6000 split 4 ways`,
+    `Birthday dinner ${sym}4200 for 6 people`,
+    `Cab ${sym}850 split with Ramu and Priya`,
+  ];
+}
 
 export default function SimpleSplit() {
   const { c } = useTheme();
   const router = useRouter();
+  const [sym, setSym] = useState(currencySymbol("INR"));
+
+  useEffect(() => {
+    getDefaultCurrency().then((cur) => setSym(currencySymbol(cur))).catch(() => {});
+  }, []);
+
+  const examples = examplesFor(sym);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -70,10 +81,10 @@ export default function SimpleSplit() {
           <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
             Try saying
           </Text>
-          {EXAMPLES.map((ex, i) => (
+          {examples.map((ex, i) => (
             <TouchableOpacity
               key={i}
-              onPress={() => router.push("/(tabs)/chat")}
+              onPress={() => router.push(ROUTES.CHAT)}
               style={{ flexDirection: "row", alignItems: "center", paddingVertical: 11, borderTopWidth: i === 0 ? 1 : 0, borderBottomWidth: 1, borderColor: `${c.border}40` }}
             >
               <Text style={{ fontFamily: type.family.light, fontSize: 12, color: c.textMuted, marginRight: 8 }}>→</Text>
@@ -87,7 +98,7 @@ export default function SimpleSplit() {
 
           {/* Type expense — primary, inverted */}
           <TouchableOpacity
-            onPress={() => router.push("/(tabs)/chat")}
+            onPress={() => router.push(ROUTES.CHAT)}
             style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18, paddingHorizontal: 16, backgroundColor: c.textPrimary, marginBottom: 10 }}
           >
             <View style={{ width: 38, height: 38, borderWidth: 1, borderColor: `${c.bg}30`, alignItems: "center", justifyContent: "center" }}>
@@ -104,7 +115,7 @@ export default function SimpleSplit() {
 
           {/* Scan receipt */}
           <TouchableOpacity
-            onPress={() => router.push("/scan")}
+            onPress={() => router.push(ROUTES.SCAN)}
             style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18, paddingHorizontal: 16, borderWidth: 1, borderColor: c.border, marginBottom: 10 }}
           >
             <View style={{ width: 38, height: 38, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
@@ -121,7 +132,7 @@ export default function SimpleSplit() {
 
           {/* Say it */}
           <TouchableOpacity
-            onPress={() => router.push("/scan")}
+            onPress={() => router.push(ROUTES.SCAN)}
             style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18, paddingHorizontal: 16, borderWidth: 1, borderColor: c.border }}
           >
             <View style={{ width: 38, height: 38, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>

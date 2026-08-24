@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
+import { getDeviceLocale } from "../lib/currency";
 
 // ── Size → font size map (mirrors old DotNum sizes) ──────────────────────────
 const SIZES: Record<string, number> = {
@@ -68,7 +69,7 @@ export function AnimatedSmartNum({
       const t     = step / steps;
       const eased = 1 - Math.pow(1 - t, 3);          // ease-out cubic
       const current = startNum + diff * eased;
-      setDisplayValue(prefix + Math.round(current).toLocaleString("en-IN"));
+      setDisplayValue(prefix + Math.round(current).toLocaleString(getDeviceLocale()));
 
       if (step >= steps) {
         setDisplayValue(safeValue);

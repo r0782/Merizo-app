@@ -11,7 +11,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { currencySymbol, categoryMeta, type } from "../../src/lib/tokens";
-import { FullWidthDivider } from "../../src/components/merizo/HandDrawnDivider";
+import { getDeviceLocale } from "../../src/lib/currency";
+import { STORAGE_KEYS } from "../../src/lib/storage-keys";
 
 // ── Row entrance animation ────────────────────────────────────────────────────
 function AnimRow({ children, index }: { children: React.ReactNode; index: number }) {
@@ -23,7 +24,7 @@ function AnimRow({ children, index }: { children: React.ReactNode; index: number
       Animated.timing(opacity,     { toValue: 1, duration: 280, delay: 30 + index * 40, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(translateX,  { toValue: 0, duration: 260, delay: 30 + index * 40, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-  }, [index]);
+  }, [index, opacity, translateX]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateX }] }}>
@@ -48,7 +49,7 @@ function DateHeading({ label, c }: { label: string; c: any }) {
 function JournalRow({ item, sym, onPress, c }: any) {
   const isSettlement = item._type === "settlement";
   const meta = categoryMeta[item.category || "other"] || categoryMeta.other;
-  const time = new Date(item.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const time = new Date(item.created_at).toLocaleTimeString(getDeviceLocale(), { hour: "2-digit", minute: "2-digit", hour12: true });
 
   return (
     <TouchableOpacity
@@ -77,7 +78,7 @@ function JournalRow({ item, sym, onPress, c }: any) {
               </Text>
             </View>
             <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, letterSpacing: -0.3 }}>
-              {isSettlement ? "+" : ""}{sym}{Math.round(item.amount || 0).toLocaleString("en-IN")}
+              {isSettlement ? "+" : ""}{sym}{Math.round(item.amount || 0).toLocaleString(getDeviceLocale())}
             </Text>
           </View>
         </View>
@@ -97,7 +98,7 @@ function groupByDate(items: any[]) {
     let label: string;
     if (diff < 86400000)  label = "Today";
     else if (diff < 172800000) label = "Yesterday";
-    else label = date.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+    else label = date.toLocaleDateString(getDeviceLocale(), { weekday: "long", day: "numeric", month: "long" });
 
     if (!map[label]) { map[label] = []; groups.push({ label, items: map[label] }); }
     map[label].push(item);
@@ -116,7 +117,7 @@ export default function ActivityScreen() {
   const [sym, setSym] = useState("₹");
 
   useEffect(() => {
-    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
+    AsyncStorage.getItem(STORAGE_KEYS.DEFAULT_CURRENCY).then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -175,7 +176,7 @@ export default function ActivityScreen() {
               {allActivity.length} entries
             </Text>
             <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary, marginTop: 2 }}>
-              {sym}{totalSpent.toLocaleString("en-IN")}
+              {sym}{totalSpent.toLocaleString(getDeviceLocale())}
             </Text>
           </View>
         </View>

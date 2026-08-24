@@ -11,8 +11,11 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import Svg, { Path, Line, Rect } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "../src/lib/theme";
+import { useAuth } from "../src/lib/auth";
 import { api } from "../src/lib/api";
 import { categoryMeta, currencySymbol, type } from "../src/lib/tokens";
+import { ROUTES } from "../src/lib/routes";
+import { getDefaultCurrency, getDeviceLocale } from "../src/lib/currency";
 
 // ── Back arrow SVG ────────────────────────────────────────────────────────────
 function BackArrow({ color }: { color: string }) {
@@ -82,7 +85,7 @@ function ScanLine({ width, height, active }: { width: number; height: number; ac
       loop.current?.stop();
     }
     return () => loop.current?.stop();
-  }, [active]);
+  }, [active, sweepAnim]);
 
   const top = sweepAnim.interpolate({ inputRange: [0, 1], outputRange: [8, height - 8] });
 
@@ -172,7 +175,7 @@ function InkButton({
 
 // Simple loading dots
 function LoadingDots({ color }: { color: string }) {
-  const dots = [useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current];
+  const dots = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
   useEffect(() => {
     dots.forEach((d, i) => {
       Animated.loop(
@@ -183,7 +186,7 @@ function LoadingDots({ color }: { color: string }) {
         ])
       ).start();
     });
-  }, []);
+  }, [dots]);
   return (
     <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
       {dots.map((d, i) => (
@@ -233,6 +236,7 @@ const PREVIEW_H = 220;
 export default function ScanBillScreen() {
   const { c } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ trip_id?: string }>();
   const tripId = params.trip_id as string | undefined;
 
@@ -245,12 +249,15 @@ export default function ScanBillScreen() {
   const [adding,         setAdding]         = useState(false);
   const [editAmount,     setEditAmount]     = useState("");
   const [editName,       setEditName]       = useState("");
+  const [defaultCurrency, setDefaultCurrency] = useState("INR");
 
   useEffect(() => {
     api.get("/trips").then((r) => {
       setTrips(r.data || []);
       if (!selectedTripId && r.data?.[0]) setSelectedTripId(r.data[0].id);
     }).catch(() => {});
+    getDefaultCurrency().then(setDefaultCurrency).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
   }, []);
 
   const pickFromGallery = async () => {
@@ -306,18 +313,21 @@ export default function ScanBillScreen() {
     const trip = trips.find((t) => t.id === selectedTripId);
     if (!trip) return;
     const meta = categoryMeta[result.category] || categoryMeta.other;
+    // Prefer whoever's actually logged in over always crediting the first
+    // member — trip.members[0] isn't necessarily the person scanning the bill.
+    const payer = trip.members.find((m: any) => m.id === user?.id) || trip.members[0];
     setAdding(true);
     try {
       await api.post(`/trips/${selectedTripId}/expenses`, {
         name: editName || result.suggested_name || "Bill",
         amount: amt,
-        currency: result.currency || trip.currency || "INR",
+        currency: result.currency || trip.currency || defaultCurrency,
         category: result.category || "other",
         emoji: meta.emoji,
-        paid_by: trip.members[0].id,
+        paid_by: payer.id,
         split_among: trip.members.map((m: any) => m.id),
       });
-      router.replace({ pathname: "/split/[id]", params: { id: selectedTripId } });
+      router.replace({ pathname: ROUTES.SPLIT_DETAIL, params: { id: selectedTripId } });
     } catch {
       Alert.alert("Error", "Could not add expense");
     } finally {
@@ -325,7 +335,7 @@ export default function ScanBillScreen() {
     }
   };
 
-  const sym = currencySymbol(result?.currency || "INR");
+  const sym = currencySymbol(result?.currency || defaultCurrency);
   const resultMeta = result ? (categoryMeta[result.category] || categoryMeta.other) : null;
 
   return (
@@ -436,7 +446,7 @@ export default function ScanBillScreen() {
                   </Text>
                 </View>
                 <Text style={{ fontFamily: type.family.bold, fontSize: 18, color: c.textPrimary, letterSpacing: -0.5 }}>
-                  {sym}{Math.round(parseFloat(editAmount) || 0).toLocaleString("en-IN")}
+                  {sym}{Math.round(parseFloat(editAmount) || 0).toLocaleString(getDeviceLocale())}
                 </Text>
               </View>
 
@@ -464,7 +474,7 @@ export default function ScanBillScreen() {
               {/* Edit amount */}
               <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: `${c.border}15` }}>
                 <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>
-                  Amount ({result.currency || "INR"})
+                  Amount ({result.currency || defaultCurrency})
                 </Text>
                 <TextInput
                   testID="scan-edit-amount"

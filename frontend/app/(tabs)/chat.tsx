@@ -8,10 +8,11 @@ import {
   KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import Svg, { Path, Line, Rect } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { chatV2, type ChatV2Context } from "../../src/lib/ai";
-import { detectLanguage } from "../../src/lib/externalApis";
+import { getCurrentLanguage } from "../../src/lib/i18n";
 import { ChatBubble, type Message } from "../../src/components/ai/ChatBubble";
 import { VoiceButton } from "../../src/components/ai/VoiceButton";
 import { api } from "../../src/lib/api";
@@ -21,18 +22,18 @@ import { InkLoader } from "../../src/components/merizo/MerizoButton";
 
 interface Group { id: string; name: string; currency: string; my_net: number }
 
-const PROMPTS_NO_GROUP = [
-  { text: "Create a Goa Trip group" },
-  { text: "Show all my groups" },
-  { text: "What's my spending this month?" },
-  { text: "Who owes me the most?" },
+const getPromptsNoGroup = (t: (key: string) => string) => [
+  { text: t("chat.suggestions.createGroup") },
+  { text: t("chat.suggestions.showGroups") },
+  { text: t("chat.suggestions.monthlySpend") },
+  { text: t("chat.suggestions.whoOwes") },
 ];
 
-const PROMPTS_WITH_GROUP = (name: string) => [
-  { text: `Who owes the most in ${name}?` },
-  { text: `Show recent expenses in ${name}` },
-  { text: `Add an expense to ${name}` },
-  { text: `Summarise ${name}` },
+const getPromptsWithGroup = (name: string, t: (key: string, opts?: any) => string) => [
+  { text: t("chat.promptWhoOwesInGroup", { name }) },
+  { text: t("chat.promptRecentExpenses", { name }) },
+  { text: t("chat.promptAddExpense", { name }) },
+  { text: t("chat.promptSummarise", { name }) },
 ];
 
 // ── Typing indicator — three ink dots ────────────────────────────────────────
@@ -51,10 +52,11 @@ function TypingIndicator() {
 // ── Suggestion chips — ledger-style ──────────────────────────────────────────
 function SuggestionList({ prompts, onSelect }: { prompts: { text: string }[]; onSelect: (t: string) => void }) {
   const { c } = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={{ gap: 0, marginBottom: 16 }}>
       <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 8 }}>
-        Try asking
+        {t("chat.tryAsking")}
       </Text>
       {prompts.map((p, i) => (
         <TouchableOpacity
@@ -87,6 +89,7 @@ function SuggestionList({ prompts, onSelect }: { prompts: { text: string }[]; on
 // ── Context pill ──────────────────────────────────────────────────────────────
 function ContextBadge({ group, onClear }: { group: Group; onClear: () => void }) {
   const { c } = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={{
       flexDirection: "row", alignItems: "center", gap: 8,
@@ -95,7 +98,7 @@ function ContextBadge({ group, onClear }: { group: Group; onClear: () => void })
     }}>
       <View style={{ width: 6, height: 6, borderWidth: 1, borderColor: c.textPrimary, transform: [{ rotate: "45deg" }] }} />
       <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary, flex: 1 }}>
-        Context: {group.name}
+        {t("chat.contextGroup", { name: group.name })}
       </Text>
       <TouchableOpacity onPress={onClear} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Svg width={14} height={14} viewBox="0 0 14 14">
@@ -109,13 +112,14 @@ function ContextBadge({ group, onClear }: { group: Group; onClear: () => void })
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AIChatScreen() {
   const { c } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
   const listRef = useRef<FlatList>(null);
 
   const [messages, setMessages] = useState<Message[]>([{
     id: "0",
     role: "assistant",
-    content: "Hello! I'm your Merizo financial assistant.\n\nI can create groups, add expenses, show balances, and more. Just tell me what you need.",
+    content: `${t("chat.greetingIntro")}\n\n${t("chat.greetingCapabilities")}`,
     action_type: null,
     action_data: null,
   }]);
@@ -153,7 +157,7 @@ export default function AIChatScreen() {
     setLoading(true);
 
     try {
-      const lang    = await detectLanguage(trimmed);
+      const lang    = getCurrentLanguage();
       const history = messages.filter(m => m.id !== "0").slice(-12).map(m => ({ role: m.role, content: m.content }));
       const result  = await chatV2(trimmed, history, buildContext(), lang);
 
@@ -183,20 +187,20 @@ export default function AIChatScreen() {
         action_data: result.action_data,
         ...(suggestsCreate ? {
           quickReplies: [
-            { label: "Create New Group", value: "__create_group__" },
-            { label: "No Thanks",        value: "no thanks" },
+            { label: t("chat.createNewGroup"), value: "__create_group__" },
+            { label: t("chat.noThanks"),        value: "no thanks" },
           ],
         } : {}),
       }]);
     } catch (e: any) {
       const msg = e?.response?.status === 401
-        ? "Session expired. Please log in again."
-        : "Something went wrong. Please check your connection.";
+        ? t("chat.sessionExpired")
+        : t("chat.connectionError");
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: msg }]);
     } finally {
       setLoading(false);
     }
-  }, [loading, messages, buildContext, activeGroup]);
+  }, [loading, messages, buildContext, activeGroup, t]);
 
   const onVoiceTranscript = useCallback((text: string) => { if (text) send(text); }, [send]);
   const handleNavigate    = useCallback((groupId: string) => { router.push(`/split/${groupId}` as any); }, [router]);
@@ -208,16 +212,16 @@ export default function AIChatScreen() {
     }
   }, [send, router]);
 
-  const prompts = activeGroup ? PROMPTS_WITH_GROUP(activeGroup.name) : PROMPTS_NO_GROUP;
+  const prompts = activeGroup ? getPromptsWithGroup(activeGroup.name, t) : getPromptsNoGroup(t);
   const showSuggestions = messages.length <= 1;
   const hasInput = input.trim().length > 0;
 
   const openGroupPicker = () => {
-    if (groups.length === 0) { Alert.alert("No groups", "Create a group first."); return; }
-    Alert.alert("Set Context", "Focus on which group?", [
+    if (groups.length === 0) { Alert.alert(t("chat.noGroupsTitle"), t("chat.noGroupsDesc")); return; }
+    Alert.alert(t("chat.setContextTitle"), t("chat.setContextDesc"), [
       ...groups.slice(0, 5).map(g => ({ text: g.name, onPress: () => setActiveGroup(g) })),
-      { text: "Clear", onPress: () => setActiveGroup(null), style: "destructive" as const },
-      { text: "Cancel", style: "cancel" as const },
+      { text: t("chat.clearContext"), onPress: () => setActiveGroup(null), style: "destructive" as const },
+      { text: t("common.cancel"), style: "cancel" as const },
     ]);
   };
 
@@ -241,10 +245,10 @@ export default function AIChatScreen() {
             <SketchAIAvatar size={36} />
             <View>
               <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, letterSpacing: -0.3 }}>
-                Merizo AI
+                {t("chat.title")}
               </Text>
               <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, marginTop: 1, letterSpacing: 1 }}>
-                FINANCIAL ASSISTANT
+                {t("chat.financialAssistant")}
               </Text>
             </View>
           </View>
@@ -265,7 +269,7 @@ export default function AIChatScreen() {
               <Rect x={7} y={7} width={4} height={4} stroke={c.textMuted} strokeWidth={1} fill="none" />
             </Svg>
             <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary }} numberOfLines={1}>
-              {activeGroup ? activeGroup.name : "All groups"}
+              {activeGroup ? activeGroup.name : t("chat.allGroups")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -320,7 +324,7 @@ export default function AIChatScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Ask anything or describe an expense…"
+            placeholder={t("chat.inputPlaceholder")}
             placeholderTextColor={c.textMuted}
             style={{
               flex: 1,

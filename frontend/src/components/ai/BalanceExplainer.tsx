@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Modal, ScrollView, Platform } from "react
 import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../../lib/theme";
 import { currencySymbol } from "../../lib/tokens";
+import { getDeviceLocale } from "../../lib/currency";
 
 function IcoSparkles({ color, size = 16 }: { color: string; size?: number }) {
   return (
@@ -86,7 +87,7 @@ function SettlementFlow({
           <SketchArrow width={80} />
           <View style={{ borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 4 }}>
             <Text style={{ color: c.textPrimary, fontSize: 13, fontFamily: "Manrope_700Bold" }}>
-              {sym}{Math.round(amount).toLocaleString("en-IN")}
+              {sym}{Math.round(amount).toLocaleString(getDeviceLocale())}
             </Text>
           </View>
         </View>
@@ -97,7 +98,7 @@ function SettlementFlow({
         <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.2, fontFamily: "Manrope_700Bold" }}>WHY THIS PAYMENT</Text>
         <Text style={{ fontSize: 12, color: c.textSecondary, lineHeight: 18, marginTop: 4 }}>
           <Text style={{ fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{from}</Text>
-          {` paid ${sym}${Math.round(paid).toLocaleString("en-IN")} but fair share is ${sym}${Math.round(perPerson).toLocaleString("en-IN")} — shortfall of ${sym}${Math.round(amount).toLocaleString("en-IN")}.`}
+          {` paid ${sym}${Math.round(paid).toLocaleString(getDeviceLocale())} but fair share is ${sym}${Math.round(perPerson).toLocaleString(getDeviceLocale())} — shortfall of ${sym}${Math.round(amount).toLocaleString(getDeviceLocale())}.`}
         </Text>
       </View>
     </View>
@@ -224,7 +225,7 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                   <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Text style={{ fontSize: 12, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>Balance Sheet</Text>
                     <Text style={{ fontSize: 11, color: c.textMuted }}>
-                      fair share {sym}{Math.round(perPerson).toLocaleString("en-IN")} each
+                      fair share {sym}{Math.round(perPerson).toLocaleString(getDeviceLocale())} each
                     </Text>
                   </View>
                   {bals.map((b: any, i: number) => {
@@ -243,7 +244,7 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                             {isMe ? `${b.name} (You)` : b.name}
                           </Text>
                           <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                            {isPos ? "+" : "-"}{sym}{Math.abs(Math.round(b.net || 0)).toLocaleString("en-IN")}
+                            {isPos ? "+" : "-"}{sym}{Math.abs(Math.round(b.net || 0)).toLocaleString(getDeviceLocale())}
                           </Text>
                         </View>
                         <View style={{ height: 5, backgroundColor: c.border }}>
@@ -255,8 +256,8 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                         </View>
                         <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 4 }}>
                           {isPos
-                            ? `Paid ${sym}${Math.round(b.paid || 0).toLocaleString("en-IN")} · over-contributed ${sym}${Math.abs(Math.round(b.net || 0)).toLocaleString("en-IN")}`
-                            : `Paid ${sym}${Math.round(b.paid || 0).toLocaleString("en-IN")} · under-contributed ${sym}${Math.abs(Math.round(b.net || 0)).toLocaleString("en-IN")}`}
+                            ? `Paid ${sym}${Math.round(b.paid || 0).toLocaleString(getDeviceLocale())} · over-contributed ${sym}${Math.abs(Math.round(b.net || 0)).toLocaleString(getDeviceLocale())}`
+                            : `Paid ${sym}${Math.round(b.paid || 0).toLocaleString(getDeviceLocale())} · under-contributed ${sym}${Math.abs(Math.round(b.net || 0)).toLocaleString(getDeviceLocale())}`}
                         </Text>
                       </View>
                     );
@@ -285,7 +286,7 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
                             <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{meta.label}</Text>
                             <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                              {sym}{Math.round(amt).toLocaleString("en-IN")}
+                              {sym}{Math.round(amt).toLocaleString(getDeviceLocale())}
                               <Text style={{ fontSize: 11, color: c.textMuted, fontFamily: "Manrope_400Regular" }}> · {Math.round(pct)}%</Text>
                             </Text>
                           </View>

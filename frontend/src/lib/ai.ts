@@ -41,14 +41,6 @@ export async function chatV2(
   return r.data as ChatV2Response;
 }
 
-// ── v1 legacy — Groq (kept for existing code that uses sendChat) ──────────────
-
-export async function sendChat(message: string, history: any[], context: any = {}) {
-  const token = await getStoredToken();
-  const r = await api.post("/ai/chat", { message, history, context, token });
-  return r.data.reply as string;
-}
-
 // ── Other AI utilities ────────────────────────────────────────────────────────
 
 export async function parseExpenseText(text: string, members: string[], currency: string = "INR") {

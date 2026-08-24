@@ -5,12 +5,14 @@ import {
   KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { validateEmail as validateEmailAPI } from "../src/lib/externalApis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth } from "../src/lib/auth";
 import { api } from "../src/lib/api";
 import { supabase } from "../src/lib/supabase";
+import { ROUTES } from "../src/lib/routes";
 
 function InputField({ icon, children, c }: any) {
   return (
@@ -30,10 +32,11 @@ type Screen = "main" | "email_otp" | "verify_email";
 
 export default function LoginScreen() {
   const { c } = useTheme();
+  const { t } = useTranslation();
   const { loginWithToken } = useAuth();
   const router = useRouter();
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
-  const goAfterLogin = () => router.replace((redirect as any) || "/(tabs)/home");
+  const goAfterLogin = () => router.replace((redirect as any) || ROUTES.HOME);
 
   const [screen, setScreen] = useState<Screen>("main");
   const [email, setEmail] = useState("");
@@ -144,7 +147,7 @@ export default function LoginScreen() {
       style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 40 }}
     >
       <Ionicons name="arrow-back" size={18} color={c.textSecondary} />
-      <Text style={{ color: c.textSecondary, fontSize: 14 }}>Back</Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14 }}>{t("common.back")}</Text>
     </TouchableOpacity>
   );
 
@@ -156,10 +159,10 @@ export default function LoginScreen() {
           <BackBtn to="email_otp" />
           <Wordmark c={c} />
           <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
-            Enter the code
+            {t("auth.enterTheCode")}
           </Text>
           <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 40 }}>
-            Sent to {email}
+            {t("auth.sentTo", { email })}
           </Text>
           <TextInput
             value={otp}
@@ -176,11 +179,11 @@ export default function LoginScreen() {
               letterSpacing: 12, marginBottom: 16,
             } as any}
           />
-          <PrimaryBtn onPress={() => verifyOtp()} label="Verify" />
+          <PrimaryBtn onPress={() => verifyOtp()} label={t("auth.verify")} />
           <TouchableOpacity onPress={sendEmailOtp} style={{ alignItems: "center", paddingVertical: 20 }}>
             <Text style={{ color: c.textSecondary, fontSize: 14 }}>
-              Didn't receive it?{" "}
-              <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Resend</Text>
+              {t("auth.didntReceiveIt")}{" "}
+              <Text style={{ color: c.textPrimary, fontWeight: "600" }}>{t("auth.resend")}</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -196,20 +199,20 @@ export default function LoginScreen() {
           <BackBtn to="main" />
           <Wordmark c={c} />
           <Text style={{ color: c.textPrimary, fontSize: 26, fontWeight: "700", marginTop: 32, marginBottom: 8, letterSpacing: -0.5 }}>
-            Sign in with email
+            {t("auth.signInWithEmail")}
           </Text>
           <Text style={{ color: c.textSecondary, fontSize: 14, marginBottom: 40 }}>
-            We'll send a 6-digit code — no password needed
+            {t("auth.emailOtpTagline")}
           </Text>
           <InputField icon="mail-outline" c={c}>
             <TextInput
               value={email} onChangeText={setEmail}
-              placeholder="you@example.com" placeholderTextColor={c.textMuted}
+              placeholder={t("auth.emailPlaceholderExample")} placeholderTextColor={c.textMuted}
               keyboardType="email-address" autoCapitalize="none"
               style={{ flex: 1, fontSize: 15, color: c.textPrimary, paddingVertical: 16 } as any}
             />
           </InputField>
-          <PrimaryBtn onPress={sendEmailOtp} label="Send code" />
+          <PrimaryBtn onPress={sendEmailOtp} label={t("auth.sendCode")} />
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -226,17 +229,17 @@ export default function LoginScreen() {
         <Wordmark c={c} />
 
         <Text style={{ color: c.textPrimary, fontSize: 32, fontWeight: "700", marginTop: 40, marginBottom: 6, letterSpacing: -1 }}>
-          Welcome back.
+          {t("auth.welcomeBack")}
         </Text>
         <Text style={{ color: c.textSecondary, fontSize: 15, marginBottom: 40, lineHeight: 22 }}>
-          Split smarter. Settle faster.
+          {t("auth.taglineSplit")}
         </Text>
 
         {/* Email */}
         <InputField icon="mail-outline" c={c}>
           <TextInput
             value={email} onChangeText={setEmail}
-            placeholder="Email address"
+            placeholder={t("auth.emailPlaceholder")}
             placeholderTextColor={c.textMuted}
             keyboardType="email-address" autoCapitalize="none"
             autoCorrect={false} autoComplete="email"
@@ -248,7 +251,7 @@ export default function LoginScreen() {
         <InputField icon="lock-closed-outline" c={c}>
           <TextInput
             value={password} onChangeText={setPassword}
-            placeholder="Password"
+            placeholder={t("auth.passwordPlaceholder")}
             placeholderTextColor={c.textMuted}
             secureTextEntry={!showPw}
             autoComplete="password"
@@ -260,15 +263,15 @@ export default function LoginScreen() {
         </InputField>
 
         <TouchableOpacity onPress={doForgotPassword} style={{ alignSelf: "flex-end", marginBottom: 24 }}>
-          <Text style={{ color: c.textSecondary, fontSize: 13 }}>Forgot password?</Text>
+          <Text style={{ color: c.textSecondary, fontSize: 13 }}>{t("auth.forgotPassword")}</Text>
         </TouchableOpacity>
 
-        <PrimaryBtn onPress={doLogin} label="Sign in" />
+        <PrimaryBtn onPress={doLogin} label={t("auth.signIn")} />
 
         {/* Divider */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 28 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-          <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>OR</Text>
+          <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>{t("common.or")}</Text>
           <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
         </View>
 
@@ -284,13 +287,13 @@ export default function LoginScreen() {
           }}
         >
           <Text style={{ fontSize: 16 }}>G</Text>
-          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>Continue with Google</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>{t("auth.continueWithGoogle")}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/register")} style={{ alignItems: "center", marginTop: 22 }}>
+        <TouchableOpacity onPress={() => router.push(ROUTES.REGISTER)} style={{ alignItems: "center", marginTop: 22 }}>
           <Text style={{ color: c.textSecondary, fontSize: 14 }}>
-            New here?{" "}
-            <Text style={{ color: c.textPrimary, fontWeight: "600" }}>Create account</Text>
+            {t("auth.newHere")}{" "}
+            <Text style={{ color: c.textPrimary, fontWeight: "600" }}>{t("auth.createAccount")}</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>

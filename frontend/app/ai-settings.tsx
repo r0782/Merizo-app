@@ -3,7 +3,6 @@ import {
   View, Text, Switch, TouchableOpacity, ScrollView, Alert, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   SparkleIcon, MicrophoneIcon, SpeakerHighIcon, GaugeIcon,
@@ -11,13 +10,14 @@ import {
 } from "phosphor-react-native";
 import { useTheme } from "../src/lib/theme";
 import { spacing, radius, type } from "../src/lib/tokens";
+import { STORAGE_KEYS } from "../src/lib/storage-keys";
 
 const KEYS = {
-  enableAi:     "merizo_ai_enabled",
-  enableVoice:  "merizo_voice_enabled",
-  voiceOutput:  "merizo_tts_enabled",
-  voiceSpeed:   "merizo_voice_speed",
-  provider:     "merizo_ai_provider",
+  enableAi:     STORAGE_KEYS.AI_ENABLED,
+  enableVoice:  STORAGE_KEYS.VOICE_ENABLED,
+  voiceOutput:  STORAGE_KEYS.TTS_ENABLED,
+  voiceSpeed:   STORAGE_KEYS.VOICE_SPEED,
+  provider:     STORAGE_KEYS.AI_PROVIDER,
 };
 
 const PROVIDERS = ["sarvam", "gemini", "groq"] as const;
@@ -83,7 +83,6 @@ function RowDivider({ c }: any) {
 
 export default function AISettings() {
   const { c } = useTheme();
-  const { t } = useTranslation();
   const router = useRouter();
 
   const [enableAi,    setEnableAi]    = useState(true);
@@ -119,7 +118,7 @@ export default function AISettings() {
       {
         text: "Reset", style: "destructive",
         onPress: async () => {
-          await AsyncStorage.removeItem("merizo_chat_history").catch(() => {});
+          await AsyncStorage.removeItem(STORAGE_KEYS.CHAT_HISTORY).catch(() => {});
           Alert.alert("", "Conversation cleared.");
         },
       },

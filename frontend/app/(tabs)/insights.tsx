@@ -9,10 +9,11 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Svg, { Path, Line, Circle } from "react-native-svg";
+import Svg, { Path, Circle } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { categoryMeta, currencySymbol, type } from "../../src/lib/tokens";
+import { getDefaultCurrency, getDeviceLocale } from "../../src/lib/currency";
 import { ProGate, ProBadge } from "../../src/components/ProGate";
 import { LiveTicker } from "../../src/components/LiveTicker";
 import {
@@ -82,7 +83,7 @@ function AnimRow({ children, index }: { children: React.ReactNode; index: number
       Animated.timing(opacity,    { toValue: 1, duration: 340, delay: 60 + index * 60, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(translateY, { toValue: 0, duration: 320, delay: 60 + index * 60, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-  }, [index]);
+  }, [index, opacity, translateY]);
   return <Animated.View style={{ opacity, transform: [{ translateY }] }}>{children}</Animated.View>;
 }
 
@@ -101,7 +102,7 @@ function CategoryRow({ cc, sym, barWidth, index }: { cc: any; sym: string; barWi
             {cc.percent.toFixed(0)}%
           </Text>
           <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.sm, color: c.textPrimary, marginLeft: 8, letterSpacing: -0.3 }}>
-            {sym}{Math.round(cc.amount).toLocaleString("en-IN")}
+            {sym}{Math.round(cc.amount).toLocaleString(getDeviceLocale())}
           </Text>
         </View>
         <SketchBudgetBar
@@ -132,7 +133,7 @@ function CircularProgress({ spent, budget, label, sym, size = 96 }: { spent: num
     const id = animVal.addListener(({ value }) => setDisplayPct(value));
     Animated.timing(animVal, { toValue: targetPct, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     return () => animVal.removeListener(id);
-  }, [targetPct]);
+  }, [targetPct, animVal]);
 
   const offset = circumference * (1 - displayPct);
 
@@ -168,7 +169,7 @@ function CircularProgress({ spent, budget, label, sym, size = 96 }: { spent: num
       </View>
       <Text style={{ fontFamily: type.family.medium, fontSize: 10, color: c.textSecondary, marginTop: 6, textAlign: "center" }}>{label}</Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, marginTop: 1 }}>
-        {sym}{Math.round(spent).toLocaleString("en-IN")} / {sym}{(budget || 0).toLocaleString("en-IN")}
+        {sym}{Math.round(spent).toLocaleString(getDeviceLocale())} / {sym}{(budget || 0).toLocaleString(getDeviceLocale())}
       </Text>
     </View>
   );
@@ -200,13 +201,13 @@ function deriveInsights(data: any, sym: string): Insight[] {
     const meta = categoryMeta[top.category] || categoryMeta.other;
     insights.push({
       emoji: meta.emoji,
-      title: `${meta.label} is your top spend — ${sym}${Math.round(top.amount).toLocaleString("en-IN")}`,
+      title: `${meta.label} is your top spend — ${sym}${Math.round(top.amount).toLocaleString(getDeviceLocale())}`,
       sub: `${top.percent.toFixed(0)}% of your total spending this period`,
       trendDir: "neutral",
       why: `${meta.label} accounts for ${top.percent.toFixed(0)}% of all your tracked expenses, making it the single largest spending category in this period.`,
       where: `This spending occurred across your shared groups in the ${meta.label.toLowerCase()} category.`,
       when: trend.length > 0 ? `Observed during ${trend[trend.length - 1]?.month || "this period"}.` : "Observed over your tracked period.",
-      howMuch: `${sym}${Math.round(top.amount).toLocaleString("en-IN")} total, which is ${top.percent.toFixed(0)}% of ${sym}${Math.round(total).toLocaleString("en-IN")} overall spending.`,
+      howMuch: `${sym}${Math.round(top.amount).toLocaleString(getDeviceLocale())} total, which is ${top.percent.toFixed(0)}% of ${sym}${Math.round(total).toLocaleString(getDeviceLocale())} overall spending.`,
     });
   }
 
@@ -225,7 +226,7 @@ function deriveInsights(data: any, sym: string): Insight[] {
         why: `Your total spending ${changePct > 0 ? "increased" : "decreased"} by ${Math.abs(changePct)}% compared to the previous month. This trend is calculated from your recorded group expenses.`,
         where: "Aggregated across all your shared expense groups.",
         when: `${trend[trend.length - 2]?.month} → ${trend[trend.length - 1]?.month}`,
-        howMuch: `${sym}${Math.round(prev).toLocaleString("en-IN")} → ${sym}${Math.round(last).toLocaleString("en-IN")} (${changePct > 0 ? "+" : ""}${changePct}%)`,
+        howMuch: `${sym}${Math.round(prev).toLocaleString(getDeviceLocale())} → ${sym}${Math.round(last).toLocaleString(getDeviceLocale())} (${changePct > 0 ? "+" : ""}${changePct}%)`,
       });
     }
   }
@@ -233,24 +234,24 @@ function deriveInsights(data: any, sym: string): Insight[] {
   if (owed > 0 && owing === 0) {
     insights.push({
       emoji: "✅",
-      title: `+${sym}${Math.round(owed).toLocaleString("en-IN")} owed to you`,
+      title: `+${sym}${Math.round(owed).toLocaleString(getDeviceLocale())} owed to you`,
       sub: "You're in a great position — others owe you",
       trendDir: "down",
       why: "You have paid more than your share in shared expenses, resulting in others owing you money.",
       where: "Across your active expense groups based on your settlement balances.",
       when: "Current as of your last sync.",
-      howMuch: `${sym}${Math.round(owed).toLocaleString("en-IN")} net owed to you. No outstanding debts.`,
+      howMuch: `${sym}${Math.round(owed).toLocaleString(getDeviceLocale())} net owed to you. No outstanding debts.`,
     });
   } else if (owing > 0) {
     insights.push({
       emoji: "⚡",
-      title: `-${sym}${Math.round(owing).toLocaleString("en-IN")} you owe across groups`,
+      title: `-${sym}${Math.round(owing).toLocaleString(getDeviceLocale())} you owe across groups`,
       sub: "Settle up to keep balances clean",
       trendDir: "up",
       why: "Others have covered expenses on your behalf. Your net balance across groups is negative.",
       where: "Distributed across your active shared expense groups.",
       when: "Current as of your last sync.",
-      howMuch: `You owe ${sym}${Math.round(owing).toLocaleString("en-IN")} in total across your groups.`,
+      howMuch: `You owe ${sym}${Math.round(owing).toLocaleString(getDeviceLocale())} in total across your groups.`,
     });
   }
 
@@ -265,18 +266,18 @@ function deriveInsights(data: any, sym: string): Insight[] {
       why: `Your top two spending categories — ${names.join(" and ")} — dominate your expenses, accounting for ${Math.round(topTwo)}% of total spending. This level of concentration may indicate an opportunity to review your budget allocation.`,
       where: "Observed in your category breakdown for the selected period.",
       when: trend.length > 0 ? `During ${trend[trend.length - 1]?.month || "this period"}.` : "This period.",
-      howMuch: `${Math.round(topTwo)}% of ${sym}${Math.round(total).toLocaleString("en-IN")} is in just two categories.`,
+      howMuch: `${Math.round(topTwo)}% of ${sym}${Math.round(total).toLocaleString(getDeviceLocale())} is in just two categories.`,
     });
   } else if (total > 0) {
     insights.push({
       emoji: "✨",
-      title: `Total: ${sym}${Math.round(total).toLocaleString("en-IN")} across ${cats.length} categories`,
+      title: `Total: ${sym}${Math.round(total).toLocaleString(getDeviceLocale())} across ${cats.length} categories`,
       sub: "Your spending is well distributed",
       trendDir: "neutral",
       why: "Your expenses are spread across multiple categories without any single one dominating, which indicates balanced spending habits.",
       where: `Across ${cats.length} expense categories in your groups.`,
       when: trend.length > 0 ? `During ${trend[trend.length - 1]?.month || "this period"}.` : "This period.",
-      howMuch: `${sym}${Math.round(total).toLocaleString("en-IN")} total across ${cats.length} categories — well balanced.`,
+      howMuch: `${sym}${Math.round(total).toLocaleString(getDeviceLocale())} total across ${cats.length} categories — well balanced.`,
     });
   }
 
@@ -376,9 +377,13 @@ export default function InsightsScreen() {
   const [showBudget, setShowBudget] = useState(false);
   const [budgets, setBudgets] = useState<Record<string, number>>(DEFAULT_BUDGETS);
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
+  const [currency, setCurrency] = useState("INR");
+
+  useEffect(() => {
+    getDefaultCurrency().then(setCurrency).catch(() => {});
+  }, []);
 
   const px = 20;
-  const budgetBarW = screenW - px * 2 - 32;
   const catBarW    = screenW - px * 2;
 
   useEffect(() => {
@@ -401,9 +406,9 @@ export default function InsightsScreen() {
     setLoading(false);
   }, [period]);
 
-  useFocusEffect(useCallback(() => { load(period); }, [period]));
+  useFocusEffect(useCallback(() => { load(period); }, [period, load]));
 
-  const sym = currencySymbol("INR");
+  const sym = currencySymbol(currency);
   const total   = data?.total || 0;
   const cats: any[]    = data?.by_category || [];
   const owed    = data?.owed_to_you || 0;
@@ -455,7 +460,7 @@ export default function InsightsScreen() {
               Owed to you
             </Text>
             <Text style={{ fontFamily: type.family.bold, fontSize: 22, color: c.textPrimary, letterSpacing: -0.5 }}>
-              +{sym}{Math.round(owed).toLocaleString("en-IN")}
+              +{sym}{Math.round(owed).toLocaleString(getDeviceLocale())}
             </Text>
           </View>
           {/* You owe */}
@@ -464,7 +469,7 @@ export default function InsightsScreen() {
               You owe
             </Text>
             <Text style={{ fontFamily: type.family.bold, fontSize: 22, color: c.textPrimary, letterSpacing: -0.5 }}>
-              {owing > 0 ? "-" : ""}{sym}{Math.round(owing).toLocaleString("en-IN")}
+              {owing > 0 ? "-" : ""}{sym}{Math.round(owing).toLocaleString(getDeviceLocale())}
             </Text>
           </View>
         </View>
@@ -475,7 +480,7 @@ export default function InsightsScreen() {
             Total spending
           </Text>
           <Text style={{ fontFamily: type.family.bold, fontSize: 38, color: c.bg, letterSpacing: -1.5, marginBottom: 4 }}>
-            {sym}{Math.round(total).toLocaleString("en-IN")}
+            {sym}{Math.round(total).toLocaleString(getDeviceLocale())}
           </Text>
           <Text style={{ fontFamily: type.family.light, fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: monthlyTrend.length > 0 ? 16 : 0 }}>
             This period across all groups
@@ -635,14 +640,14 @@ export default function InsightsScreen() {
                     <View>
                       <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase" }}>Peak</Text>
                       <Text style={{ fontFamily: type.family.bold, fontSize: 14, color: c.textPrimary, marginTop: 2 }}>
-                        {sym}{Math.round(max).toLocaleString("en-IN")}
+                        {sym}{Math.round(max).toLocaleString(getDeviceLocale())}
                       </Text>
                       <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted }}>{maxMonth}</Text>
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
                       <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase" }}>Lowest</Text>
                       <Text style={{ fontFamily: type.family.bold, fontSize: 14, color: c.textPrimary, marginTop: 2 }}>
-                        {sym}{Math.round(min).toLocaleString("en-IN")}
+                        {sym}{Math.round(min).toLocaleString(getDeviceLocale())}
                       </Text>
                       <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted }}>{minMonth}</Text>
                     </View>
@@ -662,7 +667,7 @@ export default function InsightsScreen() {
           <View style={{ paddingHorizontal: px }}>
             <SectionLabel>Live rates</SectionLabel>
           </View>
-          <LiveTicker base="INR" />
+          <LiveTicker base={currency} />
         </View>
 
         {/* Footer */}

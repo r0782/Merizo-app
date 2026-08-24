@@ -25,9 +25,12 @@ import {
   currencyOptions,
   resolveCover,
 } from "../src/lib/tokens";
+import { STORAGE_KEYS } from "../src/lib/storage-keys";
+import { ROUTES } from "../src/lib/routes";
+import { getDefaultCurrency } from "../src/lib/currency";
 
 export default function CreateSplitScreen() {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string }>();
   const category = (params.category as string) || "trip";
@@ -51,9 +54,10 @@ export default function CreateSplitScreen() {
   const [cachedContacts, setCachedContacts] = useState<{ name: string; groups: string[] }[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem("merizo_contacts_cache").then(v => {
+    AsyncStorage.getItem(STORAGE_KEYS.CONTACTS_CACHE).then(v => {
       if (v) setCachedContacts(JSON.parse(v));
     }).catch(() => {});
+    getDefaultCurrency().then(setCurrency).catch(() => {});
   }, []);
 
   const cover = useMemo(
@@ -136,7 +140,7 @@ export default function CreateSplitScreen() {
           });
         } catch {}
       }
-      router.replace({ pathname: "/split/[id]", params: { id: res.data.id } });
+      router.replace({ pathname: ROUTES.SPLIT_DETAIL, params: { id: res.data.id } });
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       Alert.alert("Could not create split", typeof detail === "string" ? detail : "Please try again");
@@ -173,14 +177,14 @@ export default function CreateSplitScreen() {
                 style={[
                   styles.stepDot,
                   {
-                    backgroundColor: s <= step ? (isDark ? c.indigo : "#0A0A0A") : "transparent",
+                    backgroundColor: s <= step ? c.indigo : "transparent",
                     borderColor: s <= step ? "transparent" : c.border,
                   },
                 ]}
               >
                 <Text style={{ color: s <= step ? "#fff" : c.textSecondary, fontSize: 12, fontWeight: "800" }}>{s + 1}</Text>
               </View>
-              {s < 2 && <View style={[styles.stepLine, { backgroundColor: s < step ? (isDark ? c.indigo : "#0A0A0A") : c.border }]} />}
+              {s < 2 && <View style={[styles.stepLine, { backgroundColor: s < step ? c.indigo : c.border }]} />}
             </View>
           ))}
         </View>
@@ -329,7 +333,7 @@ export default function CreateSplitScreen() {
                     style={[
                       styles.curPill,
                       {
-                        backgroundColor: active ? (isDark ? c.indigo : "#0A0A0A") : c.surface,
+                        backgroundColor: active ? c.indigo : c.surface,
                         borderColor: active ? "transparent" : c.border,
                       },
                     ]}
@@ -373,7 +377,7 @@ export default function CreateSplitScreen() {
           testID="create-action"
           disabled={submitting}
           onPress={step === 2 ? onCreate : onNext}
-          style={[styles.primaryBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", marginTop: 28, opacity: submitting ? 0.7 : 1 }]}
+          style={[styles.primaryBtn, { backgroundColor: c.indigo, marginTop: 28, opacity: submitting ? 0.7 : 1 }]}
         >
           {submitting ? (
             <ActivityIndicator color="#fff" />
@@ -602,7 +606,7 @@ function ChipInput({
   placeholder?: string;
   testID?: string;
 }) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   return (
     <View style={{ marginTop: 4 }}>
       <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: 8, fontWeight: "600", letterSpacing: 0.4 }}>
@@ -621,7 +625,7 @@ function ChipInput({
         <TouchableOpacity
           testID={`${testID}-add`}
           onPress={onAdd}
-          style={[styles.addBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A" }]}
+          style={[styles.addBtn, { backgroundColor: c.indigo }]}
         >
           <Ionicons name="add" size={20} color="#fff" />
         </TouchableOpacity>

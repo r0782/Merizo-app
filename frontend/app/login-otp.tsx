@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { api } from "../src/lib/api";
+import { ROUTES } from "../src/lib/routes";
 
 export default function LoginOTPScreen() {
   const { c, isDark, toggle } = useTheme();
@@ -36,7 +37,7 @@ export default function LoginOTPScreen() {
       await api.post("/auth/send-otp", { phone: cleanPhone });
 
       router.push({
-        pathname: "/login-verify",
+        pathname: ROUTES.LOGIN_VERIFY,
         params: { phone: cleanPhone },
       });
     } catch (e: any) {
@@ -123,7 +124,7 @@ export default function LoginOTPScreen() {
             style={[
               styles.primaryBtn,
               {
-                backgroundColor: isDark ? c.indigo : "#0A0A0A",
+                backgroundColor: c.indigo,
                 opacity: loading || phone.length < 10 ? 0.5 : 1,
               },
             ]}

@@ -21,7 +21,7 @@ async def parse_expense_from_text(text: str, members: list, currency: str = "INR
     )
     try:
         response = _get_client().chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=512,
             temperature=0.1,

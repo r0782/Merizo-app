@@ -10,11 +10,12 @@ import {
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Path, Circle, Line } from "react-native-svg";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
-import { getLanguageMeta, getCurrentLanguage } from "../../src/lib/i18n";
+import { getLanguageMeta } from "../../src/lib/i18n";
 import { confirmAction } from "../../src/lib/confirm";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "JPY", "AUD", "CAD"];
@@ -120,6 +121,7 @@ function ProfileSketchIcon({ size = 48, initial, c }: any) {
 export default function ProfileScreen() {
   const { c, isDark, toggle } = useTheme();
   const { user, logout, refresh } = useAuth();
+  const { i18n } = useTranslation();
   const router = useRouter();
 
   const [currency,    setCurrency]    = useState("INR");
@@ -139,7 +141,7 @@ export default function ProfileScreen() {
 
   const initial  = (user?.name || "U").charAt(0).toUpperCase();
   const sym      = currencySymbol(currency);
-  const langMeta = getLanguageMeta(getCurrentLanguage());
+  const langMeta = getLanguageMeta(i18n.language);
 
   const onSignOut = async () => {
     // Alert.alert's multi-button form is a no-op on web (react-native-web

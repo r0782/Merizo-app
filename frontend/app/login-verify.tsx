@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth } from "../src/lib/auth";
 import { api } from "../src/lib/api";
+import { ROUTES } from "../src/lib/routes";
 
 export default function LoginVerifyOTPScreen() {
   const { c, isDark, toggle } = useTheme();
@@ -31,7 +32,7 @@ export default function LoginVerifyOTPScreen() {
 
   useEffect(() => {
     if (!phone) {
-      router.replace("/login-otp");
+      router.replace(ROUTES.LOGIN_OTP);
     }
   }, [phone, router]);
 
@@ -67,8 +68,8 @@ export default function LoginVerifyOTPScreen() {
       try {
         await loginWithToken(access_token, user);
         await new Promise(resolve => setTimeout(resolve, 500));
-        router.replace("/(tabs)/home");
-      } catch (err) {
+        router.replace(ROUTES.HOME);
+      } catch {
         setError("Failed to save login info. Please try again.");
       }
     } catch (e: any) {
@@ -175,7 +176,7 @@ export default function LoginVerifyOTPScreen() {
             style={[
               styles.primaryBtn,
               {
-                backgroundColor: isDark ? c.indigo : "#0A0A0A",
+                backgroundColor: c.indigo,
                 opacity: loading || otp.length !== 6 ? 0.5 : 1,
               },
             ]}

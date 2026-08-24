@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth } from "../src/lib/auth";
 import { validateEmail as validateEmailAPI } from "../src/lib/externalApis";
+import { ROUTES } from "../src/lib/routes";
 
 export default function RegisterScreen() {
   const { c, isDark, toggle } = useTheme();
@@ -31,7 +32,7 @@ export default function RegisterScreen() {
       if (!emailCheck.format) { setError("Please enter a valid email address."); setLoading(false); return; }
       if (!emailCheck.valid)  { setError(emailCheck.reason || "This email cannot receive messages. Please use a different one."); setLoading(false); return; }
       await register(email.trim(), password, name.trim());
-      router.replace("/currency-onboarding");
+      router.replace(ROUTES.CURRENCY_ONBOARDING);
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Could not create account");
@@ -132,7 +133,7 @@ export default function RegisterScreen() {
         <TouchableOpacity
           testID="register-go-login"
           style={{ marginTop: 24, alignItems: "center" }}
-          onPress={() => router.push("/login")}
+          onPress={() => router.push(ROUTES.LOGIN)}
         >
           <Text style={{ color: c.textSecondary, fontSize: 14 }}>
             Already have an account?{" "}

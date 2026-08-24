@@ -11,6 +11,7 @@ import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { currencySymbol, categoryMeta, detectCategory } from "../lib/tokens";
+import { getDeviceLocale } from "../lib/currency";
 
 type Props = { trip: any; onClose: () => void; onAdded: () => Promise<void>; };
 
@@ -367,10 +368,10 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
 
                   {[
                     { k: "Expense",    v: parsed.name || "—" },
-                    { k: "Amount",     v: parsed.amount > 0 ? `${sym}${parsed.amount.toLocaleString("en-IN")}` : "Not detected ⚠️" },
+                    { k: "Amount",     v: parsed.amount > 0 ? `${sym}${parsed.amount.toLocaleString(getDeviceLocale())}` : "Not detected ⚠️" },
                     { k: "Paid by",    v: parsed.paidByName || "You" },
                     { k: "Split among",v: parsed.splitAmongNames?.length > 0 ? `${parsed.splitAmongNames.join(", ")} (${parsed.splitAmongNames.length})` : "All members" },
-                    { k: "Each owes",  v: parsed.splitAmongIds?.length > 0 && parsed.amount > 0 ? `${sym}${Math.round(parsed.amount / parsed.splitAmongIds.length).toLocaleString("en-IN")}` : "—" },
+                    { k: "Each owes",  v: parsed.splitAmongIds?.length > 0 && parsed.amount > 0 ? `${sym}${Math.round(parsed.amount / parsed.splitAmongIds.length).toLocaleString(getDeviceLocale())}` : "—" },
                     { k: "Category",   v: `${categoryMeta[parsed.category]?.emoji || "💸"} ${categoryMeta[parsed.category]?.label || parsed.category}` },
                   ].map(({ k, v }, i, arr) => (
                     <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderColor: c.border }}>

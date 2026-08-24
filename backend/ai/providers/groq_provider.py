@@ -1,5 +1,5 @@
 """
-Groq provider — llama-3.3-70b-versatile with native tool calling.
+Groq provider — openai/gpt-oss-120b with native tool calling.
 Used as fallback when Gemini is unavailable or as a fast alternative.
 """
 import asyncio
@@ -13,7 +13,7 @@ logger = logging.getLogger("merizo.groq_provider")
 
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
+    def __init__(self, api_key: str, model: str = "openai/gpt-oss-120b"):
         if not api_key:
             raise RuntimeError("GROQ_API_KEY is not configured")
         self.api_key = api_key

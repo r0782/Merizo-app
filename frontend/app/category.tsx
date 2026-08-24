@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../src/lib/theme";
+import { ROUTES } from "../src/lib/routes";
 
 const items = [
   { key: "trip", emoji: "✈️", label: "Trip / Travel", description: "Beach, mountains, road trips", grad: ["#0EA5E9", "#0369A1"] },
@@ -50,7 +51,7 @@ export default function CategoryScreen() {
             <TouchableOpacity
               key={it.key}
               testID={`cat-${it.key}`}
-              onPress={() => router.push({ pathname: "/create-split", params: { category: it.key } })}
+              onPress={() => router.push({ pathname: ROUTES.CREATE_SPLIT, params: { category: it.key } })}
               style={styles.cardWrap}
             >
               {isDark ? (

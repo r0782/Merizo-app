@@ -20,7 +20,7 @@ interface ChatBubbleProps {
 }
 
 export function ChatBubble({ message, onNavigate, onQuickReply }: ChatBubbleProps) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const isUser = message.role === "user";
 
   return (
@@ -29,9 +29,7 @@ export function ChatBubble({ message, onNavigate, onQuickReply }: ChatBubbleProp
       {!!message.content && (
         <View style={{
           maxWidth: "82%",
-          backgroundColor: isUser
-            ? (isDark ? "#F0F0F0" : "#1C1A14")
-            : c.surface,
+          backgroundColor: isUser ? c.textPrimary : c.surface,
           borderRadius: 18,
           borderBottomRightRadius: isUser ? 4 : 18,
           borderBottomLeftRadius: isUser ? 18 : 4,
@@ -41,7 +39,7 @@ export function ChatBubble({ message, onNavigate, onQuickReply }: ChatBubbleProp
           borderColor: c.border,
         }}>
           <Text style={{
-            color: isUser ? (isDark ? "#0C0C0C" : "#F0F0F0") : c.textPrimary,
+            color: isUser ? c.bg : c.textPrimary,
             fontSize: 14,
             lineHeight: 21,
             fontFamily: "Manrope_400Regular",

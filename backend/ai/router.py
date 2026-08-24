@@ -5,12 +5,6 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 _NOT_CONFIGURED = "AI features are not configured on this server."
 
-class ChatRequest(BaseModel):
-    message: str
-    history: list = []
-    context: dict = {}
-    token: str = ""
-
 class ChatV2Request(BaseModel):
     message: str
     history: list = []
@@ -69,17 +63,6 @@ async def chat_v2(req: ChatV2Request):
         logging.getLogger("merizo.router").error(f"Chat v2 error: {e}", exc_info=True)
         return {"reply": "I'm having trouble right now. Please try again in a moment.", "action_type": None, "action_data": None, "tool_called": None}
 
-@router.post("/chat")
-async def chat(req: ChatRequest):
-    try:
-        from .chat import get_chat_response
-        reply = await get_chat_response(req.message, req.history, req.context, req.token)
-        return {"reply": reply}
-    except RuntimeError as e:
-        return {"reply": "AI assistant is not available right now. Please try again later."}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
 @router.post("/expense/parse")
 async def parse_expense(req: ParseRequest):
     try:
@@ -136,13 +119,27 @@ async def voice_transcribe(
 ):
     """
     Transcribe audio and parse it as an expense.
-    Uses Sarvam STT if SARVAM_API_KEY is set, falls back to OpenAI Whisper.
+    Tries Gemini first, then Sarvam STT, then falls back to OpenAI Whisper.
     """
     import os
     audio_bytes = await audio.read()
     member_list = [m.strip() for m in members.split(",") if m.strip()]
 
-    # Try Sarvam STT first
+    # Try Gemini first
+    if os.environ.get("GEMINI_API_KEY"):
+        try:
+            from .gemini_voice import transcribe_audio_gemini
+            from .parser import parse_expense_from_text
+            transcript = await transcribe_audio_gemini(
+                audio_bytes, language, audio.filename or "audio.m4a"
+            )
+            parsed = await parse_expense_from_text(transcript, member_list, currency)
+            return {"transcript": transcript, "parsed": parsed}
+        except Exception as e:
+            import logging
+            logging.getLogger("merizo.router").warning(f"Gemini STT failed, falling back: {e}")
+
+    # Then Sarvam STT
     if os.environ.get("SARVAM_API_KEY"):
         try:
             from .sarvam_voice import transcribe_audio_sarvam
@@ -161,7 +158,7 @@ async def voice_transcribe(
         from .voice import transcribe_and_parse
         return await transcribe_and_parse(audio_bytes, member_list, currency, language)
     except RuntimeError:
-        raise HTTPException(503, "Voice transcription requires SARVAM_API_KEY or OPENAI_API_KEY.")
+        raise HTTPException(503, "Voice transcription requires GEMINI_API_KEY, SARVAM_API_KEY, or OPENAI_API_KEY.")
     except Exception as e:
         raise HTTPException(500, str(e))
 

@@ -14,7 +14,7 @@ logger = logging.getLogger("merizo.gemini_provider")
 
 
 class GeminiProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-3.6-flash"):
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
         self.api_key = api_key

@@ -34,7 +34,7 @@ async def explain_settlement(transactions: list, currency: str, language: str = 
         [f"{t['from']} pays {t['to']}: {currency}{t['amount']}" for t in transactions]
     )
     response = _get_client().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": SETTLEMENT_EXPLAIN_PROMPT.format(
             currency=currency, transactions=tx_text, language=language
         )}],
@@ -44,7 +44,7 @@ async def explain_settlement(transactions: list, currency: str, language: str = 
 
 async def explain_balances(balances: dict, currency: str, language: str = "en") -> str:
     response = _get_client().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": EXPLAIN_BALANCE_PROMPT.format(
             currency=currency, balances=str(balances), language=language
         )}],

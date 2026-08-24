@@ -1,5 +1,5 @@
-import { Platform, View, Text, TouchableOpacity } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Platform, View, Text } from "react-native";
+import { Tabs } from "expo-router";
 import Svg, { Path, Circle, Line } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { type } from "../../src/lib/tokens";

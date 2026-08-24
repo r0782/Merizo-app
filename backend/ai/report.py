@@ -21,7 +21,7 @@ async def generate_trip_report(
     categories = Counter(e.get("category", "other") for e in expenses)
     top_cats   = ", ".join([f"{cat}({count})" for cat, count in categories.most_common(3)])
     response = _get_client().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": TRIP_REPORT_PROMPT.format(
             trip_name=trip.get("name", "Trip"),
             total=total,

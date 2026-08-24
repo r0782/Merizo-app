@@ -155,9 +155,7 @@ otp_store: dict = {}           # phone → {code, expires, attempts}
 _otp_send_log: dict = {}       # phone → [send_timestamps]  (per-phone rate limit)
 
 app.add_middleware(CORSMiddleware,
-    allow_origins=[
-        "https://merizo-app.onrender.com",
-    ],
+    allow_origins=[FRONTEND_URL],
     allow_origin_regex=r"http://localhost:\d+",   # any localhost port (Expo web, dev servers)
     allow_credentials=True,
     allow_methods=["*"],
@@ -803,6 +801,32 @@ async def delete_trip(trip_id: str, current_user: dict = Depends(get_current_use
 # ══════════════════════════════════════════════════════════════════════════════
 # EXPENSE ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
+RECURRING_MIN_DAYS = 25
+
+async def _detect_recurring(trip_id: str, name: str, category: str) -> Optional[dict]:
+    """
+    If a HOME-category expense with the same name was logged >25 days ago in
+    this trip, surface it so the frontend can offer a monthly reminder.
+    """
+    if category != "home":
+        return None
+    existing = await sb_get("expenses", trip_id=trip_id)
+    matches = [
+        e for e in existing
+        if not e.get("is_settlement") and (e.get("name") or "").strip().lower() == name.strip().lower()
+    ]
+    if not matches:
+        return None
+    matches.sort(key=lambda e: e.get("created_at") or "", reverse=True)
+    latest = matches[0]
+    try:
+        prior_dt = datetime.fromisoformat(latest["created_at"])
+    except (KeyError, ValueError):
+        return None
+    if (datetime.now(timezone.utc) - prior_dt).days <= RECURRING_MIN_DAYS:
+        return None
+    return {"name": name, "expense_id": latest["id"], "previous_at": latest["created_at"]}
+
 @api.post("/trips/{trip_id}/expenses")
 async def add_expense(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     trip = await sb_one("trips", id=trip_id)
@@ -812,18 +836,24 @@ async def add_expense(trip_id: str, request: Request, current_user: dict = Depen
     pid = data.get("paid_by", current_user["id"])
     payer = await sb_one("users", id=pid)
     split = data.get("split_among") or trip.get("members") or []
+    name = sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200)
+    category = data.get("category","other")
     eid = str(uuid.uuid4())
     doc = {"id": eid, "trip_id": trip_id, "paid_by": pid,
            "paid_by_name": (payer or {}).get("name", current_user.get("name","")),
            "split_among": split,
-           "description": sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200),
-           "name": sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200),
+           "description": name,
+           "name": name,
            "amount": float(data.get("amount",0)), "currency": data.get("currency", trip.get("currency","INR")),
-           "category": data.get("category","other"), "is_settlement": False,
+           "category": category, "is_settlement": False,
            "date": data.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
            "created_at": datetime.now(timezone.utc).isoformat()}
+    recurring_suggestion = await _detect_recurring(trip_id, name, category)
     await sb_insert("expenses", doc)
-    return {"id": eid, "message": "Expense added"}
+    resp = {"id": eid, "message": "Expense added"}
+    if recurring_suggestion:
+        resp["recurring_suggestion"] = recurring_suggestion
+    return resp
 
 @api.get("/expenses/{trip_id}")
 async def get_expenses(trip_id: str, current_user: dict = Depends(get_current_user)):
@@ -839,13 +869,37 @@ async def delete_expense(expense_id: str, current_user: dict = Depends(get_curre
 # ══════════════════════════════════════════════════════════════════════════════
 @api.post("/trips/{trip_id}/settle")
 async def settle(trip_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    trip = await sb_one("trips", id=trip_id)
+    if not trip:
+        raise HTTPException(404, "Trip not found")
     data = await request.json()
+    from_member = data.get("from_member")
+    to_member = data.get("to_member")
+    amount = float(data.get("amount",0))
+    now_iso = datetime.now(timezone.utc).isoformat()
     sid = str(uuid.uuid4())
     await sb_insert("settlements", {"id": sid, "trip_id": trip_id,
-        "from_user": data.get("from_member"), "to_user": data.get("to_member"),
-        "amount": float(data.get("amount",0)), "status": "completed",
-        "proof_uri": data.get("proof_uri"), "created_at": datetime.now(timezone.utc).isoformat()})
-    return {"id": sid, "message": "Settlement recorded"}
+        "from_user": from_member, "to_user": to_member,
+        "amount": amount, "status": "completed",
+        "proof_uri": data.get("proof_uri"), "created_at": now_iso})
+
+    # Mirror into the expense ledger (flagged is_settlement) so it shows up
+    # in the trip's activity feed alongside regular expenses. Excluded from
+    # balance/total math wherever is_settlement is checked.
+    from_user = await sb_one("users", id=from_member) if from_member else None
+    to_user   = await sb_one("users", id=to_member) if to_member else None
+    label = f"Settlement to {(to_user or {}).get('name','')}".strip()
+    await sb_insert("expenses", {
+        "id": str(uuid.uuid4()), "trip_id": trip_id, "paid_by": from_member,
+        "paid_by_name": (from_user or {}).get("name",""),
+        "split_among": [to_member] if to_member else [],
+        "description": label, "name": label,
+        "amount": amount, "currency": trip.get("currency","INR"),
+        "category": "settlement", "is_settlement": True,
+        "date": now_iso[:10], "created_at": now_iso,
+    })
+
+    return await get_trip(trip_id, current_user)
 
 @api.get("/settlements/{trip_id}")
 async def get_settlements(trip_id: str, current_user: dict = Depends(get_current_user)):

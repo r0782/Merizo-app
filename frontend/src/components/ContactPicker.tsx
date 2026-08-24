@@ -16,7 +16,7 @@ import { useTheme } from "../lib/theme";
 type Contact = {
   id: string;
   name: string;
-  email: string;
+  subtitle: string;
 };
 
 type Props = {
@@ -50,7 +50,7 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
       }
 
       const response = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.Name, Contacts.Fields.Emails],
+        fields: [Contacts.Fields.Name, Contacts.Fields.Emails, Contacts.Fields.PhoneNumbers],
       });
 
       if (!response || !response.data || response.data.length === 0) {
@@ -59,15 +59,18 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
         return;
       }
 
-      const withEmails = response.data
-        .filter((c) => c.emails && c.emails.length > 0 && c.emails[0].email)
+      // Members are added by name (guests don't need an email — see
+      // _resolve_member on the backend), so don't require an email here.
+      // Most phone contacts only have a phone number, not an email.
+      const named = response.data
+        .filter((c) => c.id && c.name && c.name.trim())
         .map((c) => ({
-          id: c.id,
-          name: c.name || "Unknown",
-          email: c.emails![0].email as string,
+          id: c.id as string,
+          name: c.name!.trim(),
+          subtitle: c.emails?.[0]?.email || c.phoneNumbers?.[0]?.number || "",
         }));
 
-      setContacts(withEmails);
+      setContacts(named);
     } catch (error) {
       console.error("Error loading contacts:", error);
       Alert.alert("Error", "Failed to load contacts");
@@ -83,16 +86,19 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
   };
 
   const handleConfirm = () => {
-    onSelectContacts(Array.from(selected));
+    const names = contacts
+      .filter((c) => selected.has(c.id))
+      .map((c) => c.name);
+    onSelectContacts(names);
     setIsOpen(false);
   };
 
-  const toggleContact = (email: string) => {
+  const toggleContact = (id: string) => {
     const newSelected = new Set(selected);
-    if (newSelected.has(email)) {
-      newSelected.delete(email);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
     } else {
-      newSelected.add(email);
+      newSelected.add(id);
     }
     setSelected(newSelected);
   };
@@ -158,14 +164,14 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
             </View>
 
             {loading ? (
-              <ActivityIndicator size="large" color="#7C5CFF" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="large" color={c.indigo} style={{ marginTop: 40 }} />
             ) : (
               <FlatList
                 data={contacts}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    onPress={() => toggleContact(item.email)}
+                    onPress={() => toggleContact(item.id)}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
@@ -184,10 +190,10 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
                         borderWidth: 2,
                         alignItems: "center",
                         justifyContent: "center",
-                        backgroundColor: selected.has(item.email) ? "#7C5CFF" : "transparent",
+                        backgroundColor: selected.has(item.id) ? c.indigo : "transparent",
                       }}
                     >
-                      {selected.has(item.email) && (
+                      {selected.has(item.id) && (
                         <Ionicons name="checkmark" size={16} color="#fff" />
                       )}
                     </View>
@@ -195,9 +201,11 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
                       <Text style={{ fontWeight: "600", color: c.textPrimary }}>
                         {item.name}
                       </Text>
-                      <Text style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-                        {item.email}
-                      </Text>
+                      {!!item.subtitle && (
+                        <Text style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                          {item.subtitle}
+                        </Text>
+                      )}
                     </View>
                   </TouchableOpacity>
                 )}
@@ -232,7 +240,7 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
                   flex: 1,
                   paddingVertical: 12,
                   borderRadius: 8,
-                  backgroundColor: "#7C5CFF",
+                  backgroundColor: c.indigo,
                   alignItems: "center",
                 }}
               >

@@ -17,11 +17,14 @@ async def transcribe_audio(audio_bytes: bytes, language: str = "en") -> str:
     with tempfile.NamedTemporaryFile(suffix=".m4a", delete=False) as f:
         f.write(audio_bytes)
         tmp_path = f.name
-    with open(tmp_path, "rb") as f:
-        transcript = await _get_client().audio.transcriptions.create(
-            model="whisper-1", file=f, language=language
-        )
-    return transcript.text
+    try:
+        with open(tmp_path, "rb") as f:
+            transcript = await _get_client().audio.transcriptions.create(
+                model="whisper-1", file=f, language=language
+            )
+        return transcript.text
+    finally:
+        os.remove(tmp_path)
 
 async def transcribe_and_parse(
     audio_bytes: bytes, members: list, currency: str, language: str = "en"

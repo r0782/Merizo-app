@@ -20,6 +20,7 @@ import { useTheme } from "../src/lib/theme";
 import { api } from "../src/lib/api";
 import { SmartNum } from "../src/components/DotNum";
 import { currencySymbol } from "../src/lib/tokens";
+import { getDefaultCurrency, getDeviceLocale } from "../src/lib/currency";
 import { setNotifId, popNotifId } from "../src/lib/settings";
 import { confirmAction } from "../src/lib/confirm";
 
@@ -34,13 +35,18 @@ Notifications.setNotificationHandler({
 });
 
 export default function RemindersScreen() {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [permission, setPermission] = useState<boolean | null>(null);
+  const [currency, setCurrency] = useState("INR");
+
+  useEffect(() => {
+    getDefaultCurrency().then(setCurrency).catch(() => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -95,7 +101,7 @@ export default function RemindersScreen() {
         content: {
           title: "Merizo reminder",
           body: rem.amount
-            ? `${rem.title} · ${currencySymbol("INR")}${rem.amount}`
+            ? `${rem.title} · ${currencySymbol(currency)}${rem.amount}`
             : rem.title,
           data: { reminder_id: rem.id },
         },
@@ -160,7 +166,7 @@ export default function RemindersScreen() {
           <TouchableOpacity
             testID="reminders-add"
             onPress={() => setShowAdd(true)}
-            style={[styles.iconBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", borderColor: "transparent" }]}
+            style={[styles.iconBtn, { backgroundColor: c.indigo, borderColor: "transparent" }]}
           >
             <Ionicons name="add" size={20} color="#fff" />
           </TouchableOpacity>
@@ -200,6 +206,7 @@ export default function RemindersScreen() {
               <ReminderRow
                 key={r.id}
                 reminder={r}
+                currency={currency}
                 onComplete={() => onComplete(r.id)}
                 onDelete={() => onDelete(r.id)}
               />
@@ -222,7 +229,7 @@ export default function RemindersScreen() {
   );
 }
 
-function ReminderRow({ reminder, onComplete, onDelete }: any) {
+function ReminderRow({ reminder, currency, onComplete, onDelete }: any) {
   const { c, isDark } = useTheme();
   const due = reminder.due_date;
   const dueDate = due ? new Date(due) : null;
@@ -262,7 +269,7 @@ function ReminderRow({ reminder, onComplete, onDelete }: any) {
       </View>
       {!!reminder.amount && (
         <SmartNum
-          value={`${currencySymbol("INR")}${Math.round(reminder.amount).toLocaleString("en-IN")}`}
+          value={`${currencySymbol(currency)}${Math.round(reminder.amount).toLocaleString(getDeviceLocale())}`}
           size="sm"
           color={isDark ? "indigo" : "black"}
         />
@@ -279,7 +286,7 @@ function ReminderRow({ reminder, onComplete, onDelete }: any) {
 }
 
 function AddReminderSheet({ onClose, onAdded }: any) {
-  const { c, isDark } = useTheme();
+  const { c } = useTheme();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("3");
@@ -356,7 +363,7 @@ function AddReminderSheet({ onClose, onAdded }: any) {
                   style={[
                     styles.whenChip,
                     {
-                      backgroundColor: active ? (isDark ? c.indigo : "#0A0A0A") : c.surface,
+                      backgroundColor: active ? (c.indigo) : c.surface,
                       borderColor: active ? "transparent" : c.border,
                     },
                   ]}
@@ -373,7 +380,7 @@ function AddReminderSheet({ onClose, onAdded }: any) {
             testID="rem-submit"
             onPress={onSubmit}
             disabled={submitting}
-            style={[styles.primaryBtn, { backgroundColor: isDark ? c.indigo : "#0A0A0A", marginTop: 22 }]}
+            style={[styles.primaryBtn, { backgroundColor: c.indigo, marginTop: 22 }]}
           >
             {submitting ? (
               <ActivityIndicator color="#fff" />

@@ -7,14 +7,15 @@
 import React, { useState } from "react";
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, Alert, ActivityIndicator, Platform,
+  Alert, ActivityIndicator, Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { useAuth } from "../src/lib/auth";
 import { api } from "../src/lib/api";
-import { currencySymbol, categoryMeta, detectCategory } from "../src/lib/tokens";
+import { currencySymbol, detectCategory } from "../src/lib/tokens";
+import { getDeviceLocale } from "../src/lib/currency";
 
 type Item = { id: string; name: string; price: number; assignedTo: string[] };
 type Member = { id: string; name: string };
@@ -45,6 +46,7 @@ export default function ItemSplitScreen() {
         setPaidBy(user?.id || "");
       }).catch(() => router.back());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when tripId changes
   }, [tripId]);
 
   const members: Member[] = trip?.members || [];
@@ -97,7 +99,7 @@ export default function ItemSplitScreen() {
     if (!tripId) return;
     if (items.length === 0) { Alert.alert("Add items first"); return; }
     if (unassignedTotal > 0) {
-      Alert.alert("Unassigned items", `${sym}${Math.round(unassignedTotal).toLocaleString("en-IN")} worth of items have no one assigned. Assign them or remove them.`);
+      Alert.alert("Unassigned items", `${sym}${Math.round(unassignedTotal).toLocaleString(getDeviceLocale())} worth of items have no one assigned. Assign them or remove them.`);
       return;
     }
 
@@ -213,7 +215,7 @@ export default function ItemSplitScreen() {
                   <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{item.name || "Unnamed item"}</Text>
                   {item.assignedTo.length > 0 && (
                     <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
-                      {sym}{Math.round(item.price / item.assignedTo.length).toLocaleString("en-IN")} each · {item.assignedTo.length} {item.assignedTo.length === 1 ? "person" : "people"}
+                      {sym}{Math.round(item.price / item.assignedTo.length).toLocaleString(getDeviceLocale())} each · {item.assignedTo.length} {item.assignedTo.length === 1 ? "person" : "people"}
                     </Text>
                   )}
                   {item.assignedTo.length === 0 && (
@@ -221,7 +223,7 @@ export default function ItemSplitScreen() {
                   )}
                 </View>
                 <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 16, color: c.textPrimary, marginRight: 12, fontVariant: ["tabular-nums"] as any }}>
-                  {sym}{item.price.toLocaleString("en-IN")}
+                  {sym}{item.price.toLocaleString(getDeviceLocale())}
                 </Text>
                 <TouchableOpacity onPress={() => removeItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={18} color={c.textMuted} />
@@ -266,7 +268,7 @@ export default function ItemSplitScreen() {
                     {m.id === user?.id ? "You" : m.name}
                   </Text>
                   <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 14, color: m.id === paidBy ? c.positive : c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
-                    {sym}{Math.round(personTotals[m.id] || 0).toLocaleString("en-IN")}
+                    {sym}{Math.round(personTotals[m.id] || 0).toLocaleString(getDeviceLocale())}
                     {m.id === paidBy ? " (paid)" : ""}
                   </Text>
                 </View>
@@ -274,7 +276,7 @@ export default function ItemSplitScreen() {
               <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 10 }}>
                 <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>Total</Text>
                 <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 15, color: c.textPrimary, fontVariant: ["tabular-nums"] as any }}>
-                  {sym}{Math.round(grandTotal).toLocaleString("en-IN")}
+                  {sym}{Math.round(grandTotal).toLocaleString(getDeviceLocale())}
                 </Text>
               </View>
             </View>
@@ -292,13 +294,13 @@ export default function ItemSplitScreen() {
           {submitting
             ? <ActivityIndicator color="#fff" size="small" />
             : <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>
-                Save to Ledger — {sym}{Math.round(grandTotal).toLocaleString("en-IN")}
+                Save to Ledger — {sym}{Math.round(grandTotal).toLocaleString(getDeviceLocale())}
               </Text>
           }
         </TouchableOpacity>
         {unassignedTotal > 0 && (
           <Text style={{ color: "#FF8B7B", fontSize: 12, textAlign: "center", marginTop: 8 }}>
-            {sym}{Math.round(unassignedTotal).toLocaleString("en-IN")} still unassigned — tap "Everyone" or select people for each item
+            {sym}{Math.round(unassignedTotal).toLocaleString(getDeviceLocale())} still unassigned — tap &quot;Everyone&quot; or select people for each item
           </Text>
         )}
       </View>

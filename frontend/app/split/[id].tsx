@@ -32,6 +32,7 @@ import {
   currencyOptions,
   detectCategory,
 } from "../../src/lib/tokens";
+import { getDeviceLocale } from "../../src/lib/currency";
 import { SmartNum } from "../../src/components/DotNum";
 import { BalanceExplainer } from "../../src/components/ai/BalanceExplainer";
 import { ExpandingFAB } from "../../src/components/ExpandingFAB";
@@ -240,7 +241,7 @@ export default function SplitDetailScreen() {
       const balances: any[] = trip.balances || [];
       const total = trip.total_spent || 0;
       const perPerson = total / Math.max(balances.length, 1);
-      const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      const date = new Date().toLocaleDateString(getDeviceLocale(), { day: "numeric", month: "long", year: "numeric" });
       const txns: any[] = trip.settlement_transactions || [];
 
       // Build CSV
@@ -250,10 +251,10 @@ export default function SplitDetailScreen() {
       lines.push(`Merizo Expense Report`);
       lines.push(`Group,${trip.name}`);
       lines.push(`Generated,${date}`);
-      lines.push(`Total Spent,${sym}${Math.round(total).toLocaleString("en-IN")}`);
+      lines.push(`Total Spent,${sym}${Math.round(total).toLocaleString(getDeviceLocale())}`);
       lines.push(`Members,${balances.length}`);
       lines.push(`Expenses,${trip.expense_count || 0}`);
-      lines.push(`Per Person,${sym}${Math.round(perPerson).toLocaleString("en-IN")}`);
+      lines.push(`Per Person,${sym}${Math.round(perPerson).toLocaleString(getDeviceLocale())}`);
       lines.push(``);
 
       // Member balances
@@ -345,13 +346,13 @@ export default function SplitDetailScreen() {
           <View>
             <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Your balance</Text>
             <Text style={{ fontSize: 22, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>
-              {net === 0 ? "Settled" : `${isOwed ? "+" : "-"}${sym}${Math.abs(Math.round(net)).toLocaleString("en-IN")}`}
+              {net === 0 ? "Settled" : `${isOwed ? "+" : "-"}${sym}${Math.abs(Math.round(net)).toLocaleString(getDeviceLocale())}`}
             </Text>
             {net !== 0 && <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{isOwed ? "others owe you" : "you owe"}</Text>}
           </View>
           <View style={{ alignItems: "flex-end", gap: 3 }}>
             <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1, textTransform: "uppercase" }}>Total</Text>
-            <Text style={{ fontSize: 18, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sym}{Math.round(trip.total_spent || 0).toLocaleString("en-IN")}</Text>
+            <Text style={{ fontSize: 18, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sym}{Math.round(trip.total_spent || 0).toLocaleString(getDeviceLocale())}</Text>
             <Text style={{ fontSize: 10, color: c.textMuted }}>{trip.expense_count || 0} expenses</Text>
           </View>
         </View>
@@ -488,9 +489,9 @@ function AIOverviewSection({ trip }: { trip: any }) {
 
   if (failed) return null;
 
-  const indigo = isDark ? c.indigo : "#0A0A0A";
+  const indigo = c.indigo;
   const indigoBg = isDark ? "rgba(124,92,255,0.16)" : "#0A0A0A";
-  const personalityFg = isDark ? "#fff" : "#fff";
+  const personalityFg = "#fff";
 
   const showAnything =
     loading ||
@@ -658,7 +659,7 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
 
   const formatDay = (d: string) => {
     try {
-      return new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase();
+      return new Date(d).toLocaleDateString(getDeviceLocale(), { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase();
     } catch { return d; }
   };
 
@@ -740,7 +741,7 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
                   </View>
                   <View style={{ alignItems: "flex-end", flexShrink: 0, marginLeft: 8 }}>
                     <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 17, color: c.textPrimary }}>
-                      {sym}{Math.round(exp.amount).toLocaleString("en-IN")}
+                      {sym}{Math.round(exp.amount).toLocaleString(getDeviceLocale())}
                     </Text>
                     <TouchableOpacity onPress={doDelete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginTop: 4 }}>
                       <IcoTrash color={c.textMuted} size={14} />
@@ -751,7 +752,7 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
                 {/* Split section */}
                 <View style={{ paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 }}>
                   <Text style={{ color: c.textMuted, fontSize: 10, letterSpacing: 1.5, marginBottom: 6, textTransform: "uppercase" }}>
-                    Split among {splitCount} · {sym}{perPerson.toLocaleString("en-IN")} each
+                    Split among {splitCount} · {sym}{perPerson.toLocaleString(getDeviceLocale())} each
                   </Text>
                   <Text style={{ color: c.textMuted, fontSize: 11, lineHeight: 16 }}>
                     {splitDisplay.slice(0, 4).map((m) => `${m.isPayer ? "✓" : "·"} ${m.name}`).join("  ")}
@@ -759,8 +760,8 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
                   </Text>
                   <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 6, lineHeight: 14 }}>
                     {isYouPaid
-                      ? `You paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount} — each owes you ${sym}${perPerson.toLocaleString("en-IN")}.`
-                      : `${payerName} paid ${sym}${Math.round(exp.amount).toLocaleString("en-IN")} for ${splitCount}.${splitIds.includes(userId) ? ` You owe ${sym}${perPerson.toLocaleString("en-IN")}.` : " Not in your split."}`
+                      ? `You paid ${sym}${Math.round(exp.amount).toLocaleString(getDeviceLocale())} for ${splitCount} — each owes you ${sym}${perPerson.toLocaleString(getDeviceLocale())}.`
+                      : `${payerName} paid ${sym}${Math.round(exp.amount).toLocaleString(getDeviceLocale())} for ${splitCount}.${splitIds.includes(userId) ? ` You owe ${sym}${perPerson.toLocaleString(getDeviceLocale())}.` : " Not in your split."}`
                     }
                   </Text>
                 </View>
@@ -870,7 +871,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
 
             <View style={{ flex: 1, alignItems: "center", gap: 4 }}>
               <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>
-                {sym}{Math.round(t.amount).toLocaleString("en-IN")}
+                {sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4, width: "100%" }}>
                 <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
@@ -891,9 +892,9 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
           {/* Breakdown */}
           <View style={{ backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, padding: 12, gap: 6, marginBottom: 12 }}>
             {[
-              { label: "Paid", value: sym + Math.round(fromBal?.paid || 0).toLocaleString("en-IN") },
-              { label: "Fair share", value: sym + Math.round(perPerson).toLocaleString("en-IN") },
-              { label: "Difference", value: sym + Math.round(t.amount).toLocaleString("en-IN") },
+              { label: "Paid", value: sym + Math.round(fromBal?.paid || 0).toLocaleString(getDeviceLocale()) },
+              { label: "Fair share", value: sym + Math.round(perPerson).toLocaleString(getDeviceLocale()) },
+              { label: "Difference", value: sym + Math.round(t.amount).toLocaleString(getDeviceLocale()) },
             ].map((row, i) => (
               <View key={i} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ fontSize: 12, color: c.textMuted }}>{row.label}</Text>
@@ -916,16 +917,16 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
               <Text style={{ fontSize: 10, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: 1.5, textTransform: "uppercase" }}>Settlement Breakdown</Text>
               <View style={{ gap: 3 }}>
                 <Text style={{ fontSize: 12, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{t.from_name} {yPay ? "(You)" : ""}</Text>
-                <Text style={{ fontSize: 11, color: c.textMuted }}>Paid: {sym}{Math.round(fromBal?.paid || 0).toLocaleString("en-IN")} · Share: {sym}{Math.round(perPerson).toLocaleString("en-IN")} · Shortfall: {sym}{Math.round(t.amount).toLocaleString("en-IN")}</Text>
+                <Text style={{ fontSize: 11, color: c.textMuted }}>Paid: {sym}{Math.round(fromBal?.paid || 0).toLocaleString(getDeviceLocale())} · Share: {sym}{Math.round(perPerson).toLocaleString(getDeviceLocale())} · Shortfall: {sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())}</Text>
               </View>
               <View style={{ height: 1, backgroundColor: c.border }} />
               <View style={{ gap: 3 }}>
                 <Text style={{ fontSize: 12, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{t.to_name} {yRec ? "(You)" : ""}</Text>
-                <Text style={{ fontSize: 11, color: c.textMuted }}>Paid: {sym}{Math.round(toBal?.paid || 0).toLocaleString("en-IN")} · Share: {sym}{Math.round(perPerson).toLocaleString("en-IN")}</Text>
+                <Text style={{ fontSize: 11, color: c.textMuted }}>Paid: {sym}{Math.round(toBal?.paid || 0).toLocaleString(getDeviceLocale())} · Share: {sym}{Math.round(perPerson).toLocaleString(getDeviceLocale())}</Text>
               </View>
               <View style={{ height: 1, backgroundColor: c.border }} />
               <Text style={{ fontSize: 11, color: c.textMuted, lineHeight: 17 }}>
-                {t.from_name} pays {t.to_name} {sym}{Math.round(t.amount).toLocaleString("en-IN")} to balance contributions.
+                {t.from_name} pays {t.to_name} {sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())} to balance contributions.
               </Text>
             </View>
           )}
@@ -941,7 +942,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
             >
               {busy ? <ActivityIndicator color={c.bg} size="small" /> :
                 <Text style={{ color: c.bg, fontSize: 14, fontFamily: "Manrope_600SemiBold" }}>
-                  {yPay ? `Mark as paid · ${sym}${Math.round(t.amount).toLocaleString("en-IN")}` : "Mark as received"}
+                  {yPay ? `Mark as paid · ${sym}${Math.round(t.amount).toLocaleString(getDeviceLocale())}` : "Mark as received"}
                 </Text>
               }
             </TouchableOpacity>
@@ -982,8 +983,8 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
               <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Group Summary</Text>
               <View style={{ flexDirection: "row", gap: 1 }}>
                 {[
-                  { label: "Total spent", value: sym + Math.round(total).toLocaleString("en-IN") },
-                  { label: "Per person", value: sym + Math.round(perPerson).toLocaleString("en-IN") },
+                  { label: "Total spent", value: sym + Math.round(total).toLocaleString(getDeviceLocale()) },
+                  { label: "Per person", value: sym + Math.round(perPerson).toLocaleString(getDeviceLocale()) },
                   { label: "Members", value: String(members.length) },
                 ].map((s, i) => (
                   <View key={i} style={{ flex: 1, borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: c.border, paddingLeft: i > 0 ? 12 : 0 }}>
@@ -1003,14 +1004,14 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                 <View>
                   <Text style={{ fontSize: 10, color: c.textMuted, marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" }}>Your balance</Text>
                   <Text style={{ fontSize: 26, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>
-                    {myNet === 0 ? "Settled" : (myNet > 0 ? "+" : "") + sym + Math.round(Math.abs(myNet)).toLocaleString("en-IN")}
+                    {myNet === 0 ? "Settled" : (myNet > 0 ? "+" : "") + sym + Math.round(Math.abs(myNet)).toLocaleString(getDeviceLocale())}
                   </Text>
                   <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>
                     {myNet > 0.5 ? "others owe you" : myNet < -0.5 ? "you owe others" : "all balanced"}
                   </Text>
                 </View>
                 <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1, textTransform: "uppercase" }}>{sym}{Math.round(total).toLocaleString("en-IN")} total</Text>
+                  <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1, textTransform: "uppercase" }}>{sym}{Math.round(total).toLocaleString(getDeviceLocale())} total</Text>
                   <Text style={{ fontSize: 10, color: c.textMuted }}>{trip.expense_count || 0} expenses</Text>
                 </View>
               </View>
@@ -1018,13 +1019,13 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
               {/* Share row */}
               <View style={{ flexDirection: "row", gap: 1 }}>
                 <TouchableOpacity onPress={() => {
-                  const msg = `${trip.name} - Split Summary\nTotal: ${sym}${Math.round(total).toLocaleString("en-IN")}\n\n${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("\n")}\n\nTracked with Merizo`;
+                  const msg = `${trip.name} - Split Summary\nTotal: ${sym}${Math.round(total).toLocaleString(getDeviceLocale())}\n\n${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString(getDeviceLocale())}`).join("\n")}\n\nTracked with Merizo`;
                   Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
                 }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: 13 }}>
                   <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>WhatsApp</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={async () => {
-                  const msg = `${trip.name} - Split Summary\nTotal: ${sym}${Math.round(total).toLocaleString("en-IN")}\n\n${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString("en-IN")}`).join("\n")}\n\nTracked with Merizo`;
+                  const msg = `${trip.name} - Split Summary\nTotal: ${sym}${Math.round(total).toLocaleString(getDeviceLocale())}\n\n${txns.map((t: any) => `${t.from_name} → ${t.to_name}: ${sym}${Math.round(t.amount).toLocaleString(getDeviceLocale())}`).join("\n")}\n\nTracked with Merizo`;
                   if (Platform.OS === "web") {
                     try { await (navigator as any).clipboard.writeText(msg); Alert.alert("Copied!", "Summary copied to clipboard."); }
                     catch { Share.share({ message: msg, title: trip.name }); }
@@ -1079,10 +1080,10 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{b.name || "Member"} {isMe ? "(You)" : ""}</Text>
-                        <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{status} · Paid {sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
+                        <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{status} · Paid {sym}{Math.round(b.paid || 0).toLocaleString(getDeviceLocale())}</Text>
                       </View>
                       <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                        {net === 0 ? "✓" : (net > 0 ? "+" : "") + sym + Math.round(Math.abs(net)).toLocaleString("en-IN")}
+                        {net === 0 ? "✓" : (net > 0 ? "+" : "") + sym + Math.round(Math.abs(net)).toLocaleString(getDeviceLocale())}
                       </Text>
                     </View>
                   );
@@ -1148,13 +1149,13 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>{selectedMember.name}{isMe ? " (You)" : ""}</Text>
                         <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>
-                          Paid {sym}{Math.round(selectedBal?.paid || 0).toLocaleString("en-IN")} total
+                          Paid {sym}{Math.round(selectedBal?.paid || 0).toLocaleString(getDeviceLocale())} total
                         </Text>
                       </View>
                       <View style={{ alignItems: "flex-end" }}>
                         <Text style={{ fontSize: 11, color: c.textMuted }}>net balance</Text>
                         <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                          {net === 0 ? "✓ Settled" : (net > 0 ? "+" : "") + sym + Math.round(Math.abs(net)).toLocaleString("en-IN")}
+                          {net === 0 ? "✓ Settled" : (net > 0 ? "+" : "") + sym + Math.round(Math.abs(net)).toLocaleString(getDeviceLocale())}
                         </Text>
                         {net !== 0 && (
                           <Text style={{ fontSize: 10, color: c.textMuted }}>{net > 0 ? "gets back" : "owes"}</Text>
@@ -1178,7 +1179,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                                 <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>to {t.to_name}</Text>
                               </View>
                               <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                                {sym}{Math.round(t.amount).toLocaleString("en-IN")}
+                                {sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())}
                               </Text>
                             </View>
                           ))}
@@ -1202,7 +1203,7 @@ function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => vo
                                 <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>from {t.from_name}</Text>
                               </View>
                               <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                                {sym}{Math.round(t.amount).toLocaleString("en-IN")}
+                                {sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())}
                               </Text>
                             </View>
                           ))}
@@ -1310,13 +1311,13 @@ function InsightsTab({ trip }: { trip: any }) {
       <View style={{ flexDirection: "row", gap: 1, borderWidth: 1, borderColor: c.border }}>
         <View style={{ flex: 1, padding: 14, backgroundColor: c.surface }}>
           <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>Total spent</Text>
-          <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total).toLocaleString("en-IN")}</Text>
+          <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total).toLocaleString(getDeviceLocale())}</Text>
           <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{expenses.length} expense{expenses.length !== 1 ? "s" : ""}</Text>
         </View>
         <View style={{ width: 1, backgroundColor: c.border }} />
         <View style={{ flex: 1, padding: 14, backgroundColor: c.surface }}>
           <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>Per person</Text>
-          <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total / Math.max(balances.length, 1)).toLocaleString("en-IN")}</Text>
+          <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: c.textPrimary, letterSpacing: -0.5 }}>{sym}{Math.round(total / Math.max(balances.length, 1)).toLocaleString(getDeviceLocale())}</Text>
           <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{balances.length} members</Text>
         </View>
       </View>
@@ -1342,13 +1343,13 @@ function InsightsTab({ trip }: { trip: any }) {
                     <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }} numberOfLines={1}>{exp.title || exp.name || "Expense"}</Text>
                     <Text style={{ fontSize: 11, color: c.textMuted }}>{CAT_EMOJI[exp.category || "other"] || "📦"} {exp.paid_by_name || "Unknown"} paid</Text>
                   </View>
-                  <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>{sym}{Math.round(exp.amount).toLocaleString("en-IN")}</Text>
+                  <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>{sym}{Math.round(exp.amount).toLocaleString(getDeviceLocale())}</Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 44 }}>
                   <Text style={{ fontSize: 11, color: c.textMuted }}>÷ {splitCount} people</Text>
                   <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
                   <View style={{ borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: c.surface }}>
-                    <Text style={{ fontSize: 11, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sym}{Math.round(perPerson).toLocaleString("en-IN")}/person</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sym}{Math.round(perPerson).toLocaleString(getDeviceLocale())}/person</Text>
                   </View>
                 </View>
                 <Text style={{ fontSize: 10, color: c.textMuted, paddingLeft: 44 }}>
@@ -1381,7 +1382,7 @@ function InsightsTab({ trip }: { trip: any }) {
                 <Text style={{ flex: 1, fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{b.name}</Text>
                 <View style={{ alignItems: "flex-end" }}>
                   <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-                    {isGetting ? "+" : isOwing ? "-" : ""}{sym}{Math.round(Math.abs(net)).toLocaleString("en-IN")}
+                    {isGetting ? "+" : isOwing ? "-" : ""}{sym}{Math.round(Math.abs(net)).toLocaleString(getDeviceLocale())}
                   </Text>
                   <Text style={{ fontSize: 10, color: c.textMuted }}>{isGetting ? "gets back" : isOwing ? "owes" : "settled"}</Text>
                 </View>
@@ -1392,14 +1393,14 @@ function InsightsTab({ trip }: { trip: any }) {
                   <View style={{ flex: 1, height: 4, backgroundColor: c.border, overflow: "hidden" }}>
                     <View style={{ width: `${Math.round(paidFrac * 100)}%` as any, height: 4, backgroundColor: c.textPrimary }} />
                   </View>
-                  <Text style={{ fontSize: 10, color: c.textPrimary, fontFamily: "Manrope_600SemiBold", minWidth: 56, textAlign: "right" }}>{sym}{Math.round(b.paid || 0).toLocaleString("en-IN")}</Text>
+                  <Text style={{ fontSize: 10, color: c.textPrimary, fontFamily: "Manrope_600SemiBold", minWidth: 56, textAlign: "right" }}>{sym}{Math.round(b.paid || 0).toLocaleString(getDeviceLocale())}</Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Text style={{ fontSize: 10, color: c.textMuted, width: 34 }}>Share</Text>
                   <View style={{ flex: 1, height: 4, backgroundColor: c.border, overflow: "hidden" }}>
                     <View style={{ width: `${Math.round(shareFrac * 100)}%` as any, height: 4, backgroundColor: c.textMuted }} />
                   </View>
-                  <Text style={{ fontSize: 10, color: c.textMuted, minWidth: 56, textAlign: "right" }}>{sym}{Math.round(b.share || 0).toLocaleString("en-IN")}</Text>
+                  <Text style={{ fontSize: 10, color: c.textMuted, minWidth: 56, textAlign: "right" }}>{sym}{Math.round(b.share || 0).toLocaleString(getDeviceLocale())}</Text>
                 </View>
               </View>
             </View>
@@ -1431,7 +1432,7 @@ function InsightsTab({ trip }: { trip: any }) {
                       <Text style={{ color: c.textMuted }}> → </Text>
                       <Text style={{ fontFamily: "Manrope_700Bold" }}>{item.b}</Text>
                       <Text style={{ color: c.textMuted }}>: </Text>
-                      <Text style={{ fontFamily: "Manrope_600SemiBold" }}>{sym}{Math.round(item.aToB).toLocaleString("en-IN")}</Text>
+                      <Text style={{ fontFamily: "Manrope_600SemiBold" }}>{sym}{Math.round(item.aToB).toLocaleString(getDeviceLocale())}</Text>
                     </Text>
                   </View>
                   <View style={{ padding: 10, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border }}>
@@ -1441,14 +1442,14 @@ function InsightsTab({ trip }: { trip: any }) {
                       <Text style={{ color: c.textMuted }}> → </Text>
                       <Text style={{ fontFamily: "Manrope_700Bold" }}>{item.a}</Text>
                       <Text style={{ color: c.textMuted }}>: </Text>
-                      <Text style={{ fontFamily: "Manrope_600SemiBold" }}>{sym}{Math.round(item.bToA).toLocaleString("en-IN")}</Text>
+                      <Text style={{ fontFamily: "Manrope_600SemiBold" }}>{sym}{Math.round(item.bToA).toLocaleString(getDeviceLocale())}</Text>
                     </Text>
                   </View>
                   <View style={{ padding: 10, flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.bg }}>
                     <Text style={{ fontSize: 12, fontFamily: "Manrope_600SemiBold", color: c.textPrimary, flex: 1 }}>
                       {fullCancel
                         ? `Cancels out — no payment needed between ${item.a} & ${item.b}`
-                        : `Net: ${whoPays} pays ${whoReceives} only ${sym}${Math.round(net).toLocaleString("en-IN")} (saved ${sym}${Math.round(Math.min(item.aToB, item.bToA)).toLocaleString("en-IN")})`}
+                        : `Net: ${whoPays} pays ${whoReceives} only ${sym}${Math.round(net).toLocaleString(getDeviceLocale())} (saved ${sym}${Math.round(Math.min(item.aToB, item.bToA)).toLocaleString(getDeviceLocale())})`}
                     </Text>
                   </View>
                 </View>
@@ -1519,7 +1520,7 @@ function InsightsTab({ trip }: { trip: any }) {
                   <Text style={{ fontWeight: "500" }}>{t.to_name}</Text>
                 </Text>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: "500", color: "#FF453A" }}>{sym}{Math.round(t.amount).toLocaleString("en-IN")}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#FF453A" }}>{sym}{Math.round(t.amount).toLocaleString(getDeviceLocale())}</Text>
             </View>
           ))}
         </View>
@@ -1558,7 +1559,7 @@ function OverviewTab({ trip }: { trip: any }) {
               <SmartNum value={`${pct.toFixed(0)}%`} size="xl" color={pctColor} />
               <View style={{ marginTop: 6 }}>
                 <AnimatedSmartNum
-                  value={`${currencySymbol(currency)}${Math.round(total).toLocaleString("en-IN")}`}
+                  value={`${currencySymbol(currency)}${Math.round(total).toLocaleString(getDeviceLocale())}`}
                   size="md"
                   color={isDark ? "indigo" : "black"}
                   duration={100}
@@ -1569,7 +1570,7 @@ function OverviewTab({ trip }: { trip: any }) {
         })()}  
         {budget && (
           <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
-            Budget {currencySymbol(currency)}{budget.toLocaleString("en-IN")}
+            Budget {currencySymbol(currency)}{budget.toLocaleString(getDeviceLocale())}
           </Text>
         )}
       </View>
@@ -1585,11 +1586,11 @@ function OverviewTab({ trip }: { trip: any }) {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{b.name}</Text>
                 <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
-                  Paid {currencySymbol(currency)}{Math.round(b.paid).toLocaleString("en-IN")} · Share {currencySymbol(currency)}{Math.round(b.share).toLocaleString("en-IN")}
+                  Paid {currencySymbol(currency)}{Math.round(b.paid).toLocaleString(getDeviceLocale())} · Share {currencySymbol(currency)}{Math.round(b.share).toLocaleString(getDeviceLocale())}
                 </Text>
               </View>
               <AnimatedSmartNum 
-                value={`${currencySymbol(currency)}${Math.round(Math.abs(b.net)).toLocaleString("en-IN")}`}
+                value={`${currencySymbol(currency)}${Math.round(Math.abs(b.net)).toLocaleString(getDeviceLocale())}`}
                 size="lg"
                 color={b.net > 0.5 ? "green" : b.net < -0.5 ? "red" : "black"}
                 duration={100}
@@ -1623,7 +1624,7 @@ function OverviewTab({ trip }: { trip: any }) {
                     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>{meta.label}</Text>
                       <AnimatedSmartNum
-                        value={`${currencySymbol(currency)}${Math.round(cc.amount).toLocaleString("en-IN")}`}
+                        value={`${currencySymbol(currency)}${Math.round(cc.amount).toLocaleString(getDeviceLocale())}`}
                         size="md"
                         color={isDark ? "indigo" : "black"}
                         duration={100}
@@ -1631,7 +1632,7 @@ function OverviewTab({ trip }: { trip: any }) {
                     </View>
                     <HybridBar
                       percent={cc.percent}
-                      accent={isDark ? c.indigo : "#0A0A0A"}
+                      accent={c.indigo}
                       muted={isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}
                       width={200}
                       height={5}
@@ -1729,7 +1730,7 @@ function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
               </Text>
             </View>
             <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary, marginRight: 10 }}>
-              {currencySymbol(currency)}{Math.round(exp.amount).toLocaleString("en-IN")}
+              {currencySymbol(currency)}{Math.round(exp.amount).toLocaleString(getDeviceLocale())}
             </Text>
             <TouchableOpacity testID={`del-exp-${exp.id}`} onPress={() => onDelete(exp.id)} style={{ padding: 6 }}>
               <IcoTrash color={c.textMuted} size={18} />
@@ -1902,7 +1903,7 @@ function SettleTab({ trip, onChange }: { trip: any; onChange: () => void }) {
               {t.from_name} → {t.to_name}
             </Text>
             <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold", marginTop: 4 }}>
-              {currencySymbol(currency)}{Math.round(t.amount).toLocaleString("en-IN")}
+              {currencySymbol(currency)}{Math.round(t.amount).toLocaleString(getDeviceLocale())}
             </Text>
           </View>
           <TouchableOpacity
@@ -2326,7 +2327,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                     {/* Right side — changes per method, outside toggle */}
                     {splitMethod === "equal" && checked && (
                       <Text style={{ color: c.textMuted, fontSize: 13, fontVariant: ["tabular-nums"] as any }}>
-                        {sym}{equalAmt > 0 ? Math.round(equalAmt).toLocaleString("en-IN") : "0"}
+                        {sym}{equalAmt > 0 ? Math.round(equalAmt).toLocaleString(getDeviceLocale()) : "0"}
                       </Text>
                     )}
                     {splitMethod === "percent" && checked && (
@@ -2353,7 +2354,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                           />
                         </View>
                         {totalShrs > 0 && (
-                          <Text style={{ color: c.textMuted, fontSize: 11 }}>{sym}{Math.round(shrAmt).toLocaleString("en-IN")}</Text>
+                          <Text style={{ color: c.textMuted, fontSize: 11 }}>{sym}{Math.round(shrAmt).toLocaleString(getDeviceLocale())}</Text>
                         )}
                       </View>
                     )}
@@ -2380,17 +2381,17 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                     <Text style={{ color: c.textMuted, fontSize: 13 }}>Total entered</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "Manrope_700Bold" }}>
-                        {currencySymbol(currency)}{Math.round(customTotal).toLocaleString("en-IN")}
+                        {currencySymbol(currency)}{Math.round(customTotal).toLocaleString(getDeviceLocale())}
                       </Text>
                       <Text style={{ color: c.textMuted, fontSize: 13 }}>
-                        / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString("en-IN")}
+                        / {currencySymbol(currency)}{Math.round(parseFloat(amount || "0")).toLocaleString(getDeviceLocale())}
                       </Text>
                       {customTotal > 0 && customTotal === parseFloat(amount || "0") && <IcoCheck color={c.textPrimary} size={14} />}
                     </View>
                   </View>
                   {customTotal > 0 && customTotal !== parseFloat(amount || "0") && (
                     <Text style={{ color: c.textPrimary, fontSize: 12, textAlign: "center" }}>
-                      {customTotal > parseFloat(amount || "0") ? "⚠️ Over by" : "⚠️ Still need"} {currencySymbol(currency)}{Math.abs(Math.round(parseFloat(amount || "0") - customTotal)).toLocaleString("en-IN")}
+                      {customTotal > parseFloat(amount || "0") ? "⚠️ Over by" : "⚠️ Still need"} {currencySymbol(currency)}{Math.abs(Math.round(parseFloat(amount || "0") - customTotal)).toLocaleString(getDeviceLocale())}
                     </Text>
                   )}
                 </View>

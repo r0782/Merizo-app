@@ -7,6 +7,7 @@ import {
   View, Text, TouchableOpacity, TextInput, ActivityIndicator,
   Animated, StyleSheet, ViewStyle, TextStyle,
 } from "react-native";
+import { getDeviceLocale } from "../lib/currency";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PressScale — spring micro-interaction wrapper for any touchable
@@ -527,7 +528,7 @@ export function AmountDisplay({
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 2 }}>
       <Text style={{ fontFamily: type.family.medium, fontSize: type.size.md, color: color ?? c.textPrimary, marginTop: 6 }}>{symbol}</Text>
       <Text style={{ fontFamily: type.family.bold, fontSize: type.size[size], color: color ?? c.textPrimary, letterSpacing: type.tracking.tight }}>
-        {Math.abs(amount).toLocaleString("en-IN")}
+        {Math.abs(amount).toLocaleString(getDeviceLocale())}
       </Text>
     </View>
   );

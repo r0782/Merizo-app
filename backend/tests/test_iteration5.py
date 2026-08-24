@@ -11,16 +11,16 @@ import uuid
 import pytest
 import requests
 from datetime import datetime, timezone, timedelta
-from pymongo import MongoClient
+from supabase import create_client
 
 from conftest import BASE_URL, DEMO_EMAIL, DEMO_PASSWORD
 
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.environ.get("DB_NAME", "merizo")
 
-
-def _mongo_db():
-    return MongoClient(MONGO_URL)[DB_NAME]
+def _supabase():
+    url = os.environ["SUPABASE_URL"].rstrip("/")
+    if "/rest/v1" in url:
+        url = url.split("/rest/v1")[0]
+    return create_client(url, os.environ["SUPABASE_KEY"])
 
 
 def _find_trip(trips, name):
@@ -75,19 +75,19 @@ class TestRecurringBackdated:
         trip = r.json()
         trip_id = trip["id"]
         member_ids = [m["id"] for m in trip["members"]]
-        db = _mongo_db()
+        sb = _supabase()
         try:
             # Add a "previous" electricity bill directly and backdate it 40 days
-            old_ts = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
+            old_dt = datetime.now(timezone.utc) - timedelta(days=40)
             old_expense = {
-                "id": str(uuid.uuid4()),
-                "name": "Electricity Bill",
-                "amount": 1200, "currency": "INR", "amount_base": 1200, "fx_rate": 1.0,
-                "category": "home", "emoji": "🏠",
+                "id": str(uuid.uuid4()), "trip_id": trip_id,
+                "name": "Electricity Bill", "description": "Electricity Bill",
+                "amount": 1200, "currency": "INR",
+                "category": "home", "is_settlement": False,
                 "paid_by": member_ids[0], "split_among": member_ids,
-                "created_at": old_ts, "added_by": "seed",
+                "date": old_dt.strftime("%Y-%m-%d"), "created_at": old_dt.isoformat(),
             }
-            db.trips.update_one({"id": trip_id}, {"$push": {"expenses": old_expense}})
+            sb.table("expenses").insert(old_expense).execute()
 
             # Now add a duplicate-named expense — should trigger recurring_suggestion
             r = api_client.post(

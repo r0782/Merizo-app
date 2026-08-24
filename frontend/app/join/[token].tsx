@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
-  Platform, SafeAreaView,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
-import { currencySymbol } from "../../src/lib/tokens";
+import { ROUTES } from "../../src/lib/routes";
 
 export default function JoinTripPage() {
   const { c } = useTheme();
@@ -44,7 +44,7 @@ export default function JoinTripPage() {
 
   const join = async () => {
     if (!user) {
-      router.push(`/login?redirect=/join/${token}` as any);
+      router.push({ pathname: ROUTES.LOGIN, params: { redirect: `/join/${token}` } });
       return;
     }
     setJoining(true);
@@ -54,7 +54,7 @@ export default function JoinTripPage() {
       setAlreadyMember(!!r.data?.already_member);
       setJoined(true);
       setTimeout(() => {
-        router.replace(`/split/${tripInfo?.trip_id}` as any);
+        router.replace({ pathname: ROUTES.SPLIT_DETAIL, params: { id: tripInfo?.trip_id } });
       }, 1200);
     } catch (e: any) {
       const status = e?.response?.status;
@@ -65,8 +65,6 @@ export default function JoinTripPage() {
       setJoining(false);
     }
   };
-
-  const sym = currencySymbol(tripInfo?.currency || "INR");
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
@@ -123,7 +121,7 @@ export default function JoinTripPage() {
               {alreadyMember ? "Already a member" : "Joined!"}
             </Text>
             <Text style={{ fontSize: 15, color: c.textSecondary, textAlign: "center" }}>
-              You're in <Text style={{ fontWeight: "700", color: c.textPrimary }}>{tripInfo.trip_name}</Text>
+              You&apos;re in <Text style={{ fontWeight: "700", color: c.textPrimary }}>{tripInfo.trip_name}</Text>
             </Text>
             <ActivityIndicator size="small" color={c.textMuted} style={{ marginTop: 8 }} />
             <Text style={{ fontSize: 12, color: c.textMuted }}>Opening group…</Text>
@@ -132,7 +130,7 @@ export default function JoinTripPage() {
           // Main invite card
           <View style={{ width: "100%", alignItems: "center", gap: 8 }}>
             <Text style={{ fontSize: 13, color: c.textSecondary, fontWeight: "600", letterSpacing: 1.2 }}>
-              YOU'VE BEEN INVITED
+              YOU&apos;VE BEEN INVITED
             </Text>
             <Text style={{
               fontSize: 28, fontWeight: "800", color: c.textPrimary,
@@ -200,7 +198,7 @@ export default function JoinTripPage() {
 
             {!user && (
               <Text style={{ fontSize: 12, color: c.textMuted, textAlign: "center", marginTop: 4 }}>
-                You'll be taken back here after logging in
+                You&apos;ll be taken back here after logging in
               </Text>
             )}
           </View>

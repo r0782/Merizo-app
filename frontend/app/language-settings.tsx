@@ -26,7 +26,7 @@ function AnimRow({ children, index }: { children: React.ReactNode; index: number
       Animated.timing(fade,  { toValue: 1, duration: 260, delay, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(slide, { toValue: 0, duration: 240, delay, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-  }, [index]);
+  }, [index, fade, slide]);
 
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
@@ -62,7 +62,7 @@ export default function LanguageSettings() {
       await changeLanguage(lang.code);
       Alert.alert(
         lang.nativeName,
-        `Language saved. AI chat and voice features will now respond in ${lang.name}.\n\nRestart the app to apply this language to all UI text.`,
+        `Saved. Home, Chat and AI voice replies now use ${lang.name} right away — no restart needed.\n\nMost other screens aren't translated yet and will keep showing English until that work lands.`,
       );
     } finally {
       setSaving(false);
@@ -111,6 +111,18 @@ export default function LanguageSettings() {
             {currentLang?.nativeName || "—"}
           </Text>
         </View>
+      </View>
+
+      {/* ── Coverage notice ── */}
+      <View style={{
+        marginHorizontal: spacing["5"], marginTop: spacing["4"],
+        backgroundColor: c.surfaceAlt, borderRadius: radius.md,
+        paddingHorizontal: spacing["3"], paddingVertical: spacing["2"],
+        borderWidth: 1, borderColor: c.border,
+      }}>
+        <Text style={{ fontFamily: type.family.regular, fontSize: type.size.xs, color: c.textSecondary, lineHeight: 16 }}>
+          Applies immediately to Home, Chat and AI voice replies. Other screens are still English-only while translation work is in progress.
+        </Text>
       </View>
 
       {/* ── Search ── */}
@@ -235,7 +247,7 @@ export default function LanguageSettings() {
         ListEmptyComponent={
           <View style={{ alignItems: "center", paddingTop: 48 }}>
             <Text style={{ fontFamily: type.family.medium, fontSize: type.size.sm, color: c.textMuted }}>
-              No languages found for "{query}"
+              No languages found for &quot;{query}&quot;
             </Text>
           </View>
         }

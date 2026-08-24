@@ -1,11 +1,12 @@
-import { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Alert } from "react-native";
+import { useState, useCallback, useEffect } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Alert, Image } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../src/lib/theme";
+import { currencySymbol } from "../src/lib/tokens";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const STORAGE_KEY = "@merizo:recurring";
+import { STORAGE_KEYS } from "../src/lib/storage-keys";
+import { getDefaultCurrency } from "../src/lib/currency";
 
 export type Subscription = {
   name: string;
@@ -13,17 +14,53 @@ export type Subscription = {
   amount: number;
   period: string;
   color: string;
+  logoUrl?: string | null; // set when the name isn't in PLATFORM_DB — see logoUrlForName()
 };
 
 export async function loadRecurring(): Promise<Subscription[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.RECURRING);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
 async function saveRecurring(items: Subscription[]) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  await AsyncStorage.setItem(STORAGE_KEYS.RECURRING, JSON.stringify(items));
+}
+
+// ── Logo.dev fallback for anything not in PLATFORM_DB ───────────────────────
+// Token is the *publishable* key (safe for client-side use per Logo.dev's
+// docs — their secret key, used for the separate Search API, is not). Set
+// EXPO_PUBLIC_LOGO_DEV_TOKEN in your env; Expo only inlines vars with that
+// prefix into the client bundle, so nothing else here needs to change it.
+const LOGO_DEV_TOKEN = process.env.EXPO_PUBLIC_LOGO_DEV_TOKEN ?? "";
+
+function logoUrlForName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed || !LOGO_DEV_TOKEN) return null;
+  return `https://img.logo.dev/name/${encodeURIComponent(trimmed)}?token=${LOGO_DEV_TOKEN}&size=64`;
+}
+
+// Renders a fetched logo when there is one, falling back to the emoji if the
+// URL 404s (unrecognized name) or the request fails — never a broken-image icon.
+function SubscriptionIcon({ emoji, logoUrl, size = 22 }: { emoji: string; logoUrl?: string | null; size?: number }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoUrl]);
+
+  if (logoUrl && !logoFailed) {
+    return (
+      <Image
+        source={{ uri: logoUrl }}
+        style={{ width: size, height: size, borderRadius: 4 }}
+        resizeMode="contain"
+        onError={() => setLogoFailed(true)}
+      />
+    );
+  }
+  return <Text style={{ fontSize: size, width: size + 10, textAlign: "center" }}>{emoji}</Text>;
 }
 
 // ── Smart platform detection from name or amount ────────────────────────────
@@ -80,16 +117,25 @@ export default function RecurringScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const [saved, setSaved] = useState<Subscription[]>([]);
+  const [currency, setCurrency] = useState("INR");
   const [editItem, setEditItem] = useState<Subscription | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editName, setEditName] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState("");
   const [addAmount, setAddAmount] = useState("");
+  const [debouncedAddName, setDebouncedAddName] = useState("");
 
   useFocusEffect(useCallback(() => {
     loadRecurring().then(setSaved);
+    getDefaultCurrency().then(setCurrency).catch(() => {});
   }, []));
+
+  // Debounce the logo preview so we're not firing a request per keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedAddName(addName.trim()), 400);
+    return () => clearTimeout(handle);
+  }, [addName]);
 
   const deleteItem = async (name: string) => {
     const next = saved.filter(s => s.name !== name);
@@ -134,13 +180,14 @@ export default function RecurringScreen() {
     if (saved.some(s => s.name.toLowerCase() === name.toLowerCase())) {
       Alert.alert("Already added", `${name} is already in your list.`); return;
     }
-    const detected = detectPlatform(name, isNaN(amt) ? 0 : amt);
+    const detectedPlatform = detectPlatform(name, isNaN(amt) ? 0 : amt);
     const newSub: Subscription = {
       name,
-      emoji: detected?.emoji || "📌",
+      emoji: detectedPlatform?.emoji || "📌",
       amount: isNaN(amt) ? 0 : amt,
-      period: detected?.period || "monthly",
+      period: detectedPlatform?.period || "monthly",
       color: "#9A9A97",
+      logoUrl: detectedPlatform ? null : logoUrlForName(name),
     };
     const next = [...saved, newSub];
     setSaved(next);
@@ -149,6 +196,8 @@ export default function RecurringScreen() {
   };
 
   const detected = detectPlatform(addName, parseFloat(addAmount) || 0);
+  const previewLogoUrl = detected ? null : logoUrlForName(debouncedAddName);
+  const sym = currencySymbol(currency);
   const monthlyTotal = saved.reduce((s, b) => s + (b.amount || 0), 0);
 
   return (
@@ -171,7 +220,7 @@ export default function RecurringScreen() {
           <View style={{ marginHorizontal: 20, marginBottom: 20, borderWidth: 1, borderColor: c.border, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text style={{ fontSize: 12, color: c.textMuted, fontFamily: "Manrope_600SemiBold", letterSpacing: 1, textTransform: "uppercase" }}>Monthly total</Text>
             <Text style={{ fontSize: 22, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>
-              ₹{monthlyTotal.toLocaleString("en-IN")}
+              {sym}{monthlyTotal.toLocaleString()}
             </Text>
           </View>
         )}
@@ -191,11 +240,13 @@ export default function RecurringScreen() {
             <View style={{ borderWidth: 1, borderColor: c.border }}>
               {saved.map((sub, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.border }}>
-                  <Text style={{ fontSize: 22, width: 32, textAlign: "center" }}>{sub.emoji}</Text>
+                  <View style={{ width: 32, alignItems: "center" }}>
+                    <SubscriptionIcon emoji={sub.emoji} logoUrl={sub.logoUrl} />
+                  </View>
                   <TouchableOpacity style={{ flex: 1 }} onPress={() => openEdit(sub)}>
                     <Text style={{ fontSize: 14, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sub.name}</Text>
                     <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>
-                      {sub.amount > 0 ? `₹${sub.amount.toLocaleString("en-IN")}/month` : "Tap to set amount"} · {sub.period}
+                      {sub.amount > 0 ? `${sym}${sub.amount.toLocaleString()}/month` : "Tap to set amount"} · {sub.period}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => openEdit(sub)} style={{ padding: 8, marginRight: 2 }}>
@@ -231,7 +282,6 @@ export default function RecurringScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Name */}
             <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Name</Text>
             <TextInput
               value={addName}
@@ -242,8 +292,7 @@ export default function RecurringScreen() {
               autoFocus
             />
 
-            {/* Amount */}
-            <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Monthly amount (₹)</Text>
+            <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Monthly amount ({sym})</Text>
             <TextInput
               value={addAmount}
               onChangeText={setAddAmount}
@@ -253,12 +302,15 @@ export default function RecurringScreen() {
               style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, fontSize: 22, fontFamily: "Manrope_700Bold", color: c.textPrimary, marginBottom: 14 } as any}
             />
 
-            {/* Smart detection hint */}
-            {(addName.length > 0 || addAmount.length > 0) && detected && (
+            {addName.trim().length > 0 && (
               <View style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: 12, marginBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Text style={{ fontSize: 20 }}>{detected.emoji}</Text>
+                <SubscriptionIcon emoji={detected?.emoji || "📌"} logoUrl={previewLogoUrl} size={20} />
                 <Text style={{ fontSize: 12, color: c.textMuted, flex: 1 }}>
-                  Detected as <Text style={{ color: c.textPrimary, fontFamily: "Manrope_600SemiBold" }}>{addName.trim() || "subscription"}</Text> · {detected.period}
+                  {detected ? (
+                    <>Detected as <Text style={{ color: c.textPrimary, fontFamily: "Manrope_600SemiBold" }}>{addName.trim()}</Text> · {detected.period}</>
+                  ) : (
+                    <>Will be added as <Text style={{ color: c.textPrimary, fontFamily: "Manrope_600SemiBold" }}>{addName.trim()}</Text></>
+                  )}
                 </Text>
               </View>
             )}
@@ -276,7 +328,7 @@ export default function RecurringScreen() {
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border, padding: 24, paddingBottom: Platform.OS === "ios" ? 44 : 28 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Text style={{ fontSize: 24 }}>{editItem?.emoji}</Text>
+                <SubscriptionIcon emoji={editItem?.emoji || "📌"} logoUrl={editItem?.logoUrl} size={24} />
                 <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>Edit</Text>
               </View>
               <TouchableOpacity onPress={() => setEditItem(null)} style={{ width: 32, height: 32, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
@@ -289,7 +341,7 @@ export default function RecurringScreen() {
               onChangeText={setEditName}
               style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: c.textPrimary, marginBottom: 14 } as any}
             />
-            <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Monthly amount (₹)</Text>
+            <Text style={{ fontSize: 10, color: c.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Monthly amount ({sym})</Text>
             <TextInput
               value={editAmount}
               onChangeText={setEditAmount}

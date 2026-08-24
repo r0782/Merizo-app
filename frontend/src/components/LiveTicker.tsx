@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme";
 import { getExchangeRates, POPULAR_CURRENCIES } from "../lib/externalApis";
+import { getDeviceLocale } from "../lib/currency";
 
 function CurrencySheet({ item, base, baseSymbol, onClose }: any) {
   const { c, isDark } = useTheme();
@@ -41,7 +42,7 @@ function CurrencySheet({ item, base, baseSymbol, onClose }: any) {
           <View style={{ backgroundColor:"#111", borderRadius:16, padding:16, marginBottom:16 }}>
             <Text style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginBottom:6 }}>{item.code} result</Text>
             <Text style={{ fontSize:28, fontWeight:"500", color:"#fff", letterSpacing:-0.5 }}>
-              {item.symbol}{parseFloat(converted).toLocaleString("en-IN", { minimumFractionDigits:2 })}
+              {item.symbol}{parseFloat(converted).toLocaleString(getDeviceLocale(), { minimumFractionDigits:2 })}
             </Text>
           </View>
           <Text style={{ fontSize:11, color:c.textMuted, textAlign:"center" }}>Live rates · Frankfurter · European Central Bank</Text>

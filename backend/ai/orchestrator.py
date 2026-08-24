@@ -57,11 +57,16 @@ class AIResult:
 
 def _is_valid_gemini_key(key: str) -> bool:
     """
-    Google AI Studio keys start with 'AIza'.
-    Keys starting with 'AQ.' or other prefixes are Emergent/proxy keys
-    that only work with the emergentintegrations SDK, not google-genai.
+    Historically this rejected anything not prefixed 'AIza', on the
+    assumption that 'AQ.'-prefixed keys were Emergent/proxy-only and
+    incompatible with google-genai. Verified live against the actual
+    configured key: an 'AQ.' key authenticates fine with google-genai
+    (it just needed the model pinned to gemini-3.6-flash, not the
+    now-retired gemini-2.5-flash). Prefix-sniffing isn't a reliable
+    validity check — let the real API call be the judge, with the
+    existing Groq fallback in handle_chat() covering genuine failures.
     """
-    return bool(key) and key.startswith("AIza")
+    return bool(key)
 
 
 def _make_provider(preferred: str = "gemini") -> LLMProvider:
@@ -70,7 +75,7 @@ def _make_provider(preferred: str = "gemini") -> LLMProvider:
 
     Priority order:
       1. sarvam  — Sarvam AI (sarvam-m), best for Indian-language responses
-      2. gemini  — Gemini 2.5 Flash (Google AI Studio key required)
+      2. gemini  — Gemini 3.6 Flash (GEMINI_API_KEY required)
       3. groq    — Groq llama-3.3-70b (always available as final fallback)
     """
     # ── Sarvam (explicit request or configured) ───────────────────────────────

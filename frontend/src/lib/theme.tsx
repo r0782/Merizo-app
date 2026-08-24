@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { palette } from "./tokens";
+import { STORAGE_KEYS } from "./storage-keys";
 
 type ThemeColors = typeof palette.dark;
 type Mode = "light" | "dark";
@@ -15,7 +16,7 @@ interface ThemeCtx {
 }
 
 const Ctx    = createContext<ThemeCtx | null>(null);
-const KEY    = "merizo_theme";
+const KEY    = STORAGE_KEYS.THEME;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = useColorScheme();

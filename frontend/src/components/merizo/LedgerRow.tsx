@@ -7,6 +7,7 @@
 import { View, Text, TouchableOpacity } from "react-native";
 import { useTheme } from "../../lib/theme";
 import { type } from "../../lib/tokens";
+import { getDeviceLocale } from "../../lib/currency";
 
 interface LedgerRowProps {
   label:      string;
@@ -196,7 +197,7 @@ export function BalanceSplit({
           {leftLabel}
         </Text>
         <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.textPrimary, letterSpacing: -1 }}>
-          -{sym}{Math.abs(leftAmount).toLocaleString("en-IN")}
+          -{sym}{Math.abs(leftAmount).toLocaleString(getDeviceLocale())}
         </Text>
       </View>
       {/* Vertical separator */}
@@ -207,7 +208,7 @@ export function BalanceSplit({
           {rightLabel}
         </Text>
         <Text style={{ fontFamily: type.family.bold, fontSize: type.size.xl, color: c.textPrimary, letterSpacing: -1 }}>
-          +{sym}{Math.abs(rightAmount).toLocaleString("en-IN")}
+          +{sym}{Math.abs(rightAmount).toLocaleString(getDeviceLocale())}
         </Text>
       </View>
     </View>

@@ -22,6 +22,9 @@ LANGUAGE_INSTRUCTIONS: dict[str, str] = {
     "ml": "മലയാളത്തിൽ ഉത്തരം നൽകുക.",
     "bn": "বাংলায় উত্তর দিন।",
     "mr": "मराठीत उत्तर द्या.",
+    "gu": "ગુજરાતીમાં જવાબ આપો.",
+    "pa": "ਪੰਜਾਬੀ ਵਿੱਚ ਜਵਾਬ ਦਿਓ.",
+    "ur": "اردو میں جواب دیں۔",
     "es": "Responde en español.",
     "fr": "Réponds en français.",
     "ar": "أجب باللغة العربية.",
@@ -205,6 +208,38 @@ Rules:
 - suggested_name: a short human-friendly name like "Dinner at Hyderabad Biryani"
 - category: one of food, travel, entertainment, shopping, bills, other
 - date: the date from the receipt in YYYY-MM-DD format; use today if not visible
+- Do NOT wrap in markdown code blocks"""
+
+# Used when the receipt has already been OCR'd to plain text (e.g. by Google
+# Cloud Vision's DOCUMENT_TEXT_DETECTION, which handles handwriting as well as
+# print) — the model only has to structure the text, not read the image.
+BILL_SCAN_TEXT_PROMPT = """The following text was OCR'd from a receipt/bill (may include handwritten notes).
+Members who will split: {members}
+Currency: {currency}
+
+OCR text:
+\"\"\"
+{ocr_text}
+\"\"\"
+
+Return ONLY valid JSON with exactly these keys:
+{{
+  "vendor": "restaurant or shop name from the receipt",
+  "amount": 0.0,
+  "date": "YYYY-MM-DD",
+  "category": "food",
+  "items": [{{"name": "item name", "amount": 0.0, "quantity": 1}}],
+  "suggested_name": "short descriptive expense name",
+  "currency": "{currency}"
+}}
+
+Rules:
+- amount: the final total amount as a number (include tax/service charge if shown)
+- vendor: the merchant/restaurant/shop name printed on the receipt
+- suggested_name: a short human-friendly name like "Dinner at Hyderabad Biryani"
+- category: one of food, travel, entertainment, shopping, bills, other
+- date: the date from the receipt in YYYY-MM-DD format; use today if not visible
+- The OCR text may contain noise, misread characters, or handwriting artifacts — use best judgement
 - Do NOT wrap in markdown code blocks"""
 
 EXPLAIN_BALANCE_PROMPT = """You are a professional financial advisor. Analyse these group balances concisely.

@@ -15,6 +15,7 @@ import { toast } from "../../src/components/Toast";
 import { confirmAction } from "../../src/lib/confirm";
 import { QRCodeGenerator } from "../../src/components/QRCodeGenerator";
 import { type as t } from "../../src/lib/tokens";
+import { ROUTES } from "../../src/lib/routes";
 
 function IcoBack({ color = "", size = 18 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M19 12H5M5 12L12 19M5 12L12 5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" /></Svg>;
@@ -126,7 +127,7 @@ export default function InviteMembersScreen() {
           <IcoBack color={c.textPrimary} size={18} />
         </TouchableOpacity>
         <Text style={{ color: c.textPrimary, fontSize: 16, fontFamily: t.family.semibold }}>Invite Members</Text>
-        <TouchableOpacity onPress={() => router.push("/scan-qr" as any)} style={{ width: 36, height: 36, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+        <TouchableOpacity onPress={() => router.push(ROUTES.SCAN_QR)} style={{ width: 36, height: 36, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
           <IcoScan color={c.textPrimary} size={18} />
         </TouchableOpacity>
       </View>
