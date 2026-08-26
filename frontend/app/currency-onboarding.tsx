@@ -15,6 +15,7 @@ import { currencyOptions, type } from "../src/lib/tokens";
 import { STORAGE_KEYS } from "../src/lib/storage-keys";
 import { ROUTES } from "../src/lib/routes";
 import { detectLocaleCurrency } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 
 const ICON_STROKE_WIDTH = 1.5;
 
@@ -51,6 +52,7 @@ function ArrowIcon({ color }: { color: string }) {
 export default function CurrencyOnboarding() {
   const { c } = useTheme();
   const router = useRouter();
+  const { setCurrency: setAppCurrency } = useCurrency();
 
   // Automatically detect user's locale currency.
   // Falls back to the first available currency if detection
@@ -67,11 +69,9 @@ export default function CurrencyOnboarding() {
 
   const onFinish = async () => {
     try {
-      // Save the selected currency dynamically.
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.DEFAULT_CURRENCY,
-        selectedCurrency
-      );
+      // Updates both the context (so it's live immediately) and AsyncStorage
+      // (via the context's own setter) in one call.
+      setAppCurrency(selectedCurrency);
 
       await AsyncStorage.setItem(
         STORAGE_KEYS.ONBOARDING_DONE,

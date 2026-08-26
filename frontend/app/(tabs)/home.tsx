@@ -19,6 +19,7 @@ import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
 import { getDeviceLocale } from "../../src/lib/currency";
+import { useCurrency } from "../../src/lib/CurrencyContext";
 import { BalanceSplit } from "../../src/components/merizo/LedgerRow";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadRecurring, type Subscription } from "../recurring";
@@ -365,9 +366,10 @@ export default function HomeScreen() {
   const [trips,          setTrips]          = useState<any[]>([]);
   const [recentExp,      setRecentExp]      = useState<any[]>([]);
   const [totalOwed,      setTotalOwed]      = useState(0);
+  const { currency } = useCurrency();
+  const sym = currencySymbol(currency);
   const [totalOwing,     setTotalOwing]     = useState(0);
   const [totalSpent,     setTotalSpent]     = useState(0);
-  const [sym,            setSym]            = useState("₹");
   const [refreshing,     setRefreshing]     = useState(false);
   const [loading,        setLoading]        = useState(true);
   const [showAddExpense,  setShowAddExpense]  = useState(false);
@@ -375,10 +377,6 @@ export default function HomeScreen() {
   const [recurring,       setRecurring]       = useState<Subscription[]>([]);
   const [showAllGroups,   setShowAllGroups]   = useState(false);
   const [contacts,        setContacts]        = useState<{ name: string; groups: string[] }[]>([]);
-
-  useEffect(() => {
-    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
-  }, []);
 
   const load = useCallback(async () => {
     try {

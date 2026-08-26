@@ -2,14 +2,13 @@
  * Quick Split — landing page in B&W notebook style.
  * Routes to the app's AI chat, scan, or voice features.
  */
-import { useEffect, useState } from "react";
 import { Platform, View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Path, Circle } from "react-native-svg";
 import { useTheme } from "../src/lib/theme";
 import { currencySymbol, type } from "../src/lib/tokens";
 import { ROUTES } from "../src/lib/routes";
-import { getDefaultCurrency } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 
 function IcoBack({ color, size = 18 }: { color: string; size?: number }) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M19 12H5M5 12L12 19M5 12L12 5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
@@ -38,11 +37,8 @@ function examplesFor(sym: string) {
 export default function SimpleSplit() {
   const { c } = useTheme();
   const router = useRouter();
-  const [sym, setSym] = useState(currencySymbol("INR"));
-
-  useEffect(() => {
-    getDefaultCurrency().then((cur) => setSym(currencySymbol(cur))).catch(() => {});
-  }, []);
+  const { currency } = useCurrency();
+  const sym = currencySymbol(currency);
 
   const examples = examplesFor(sym);
 

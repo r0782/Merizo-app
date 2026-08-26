@@ -13,7 +13,8 @@ import Svg, { Path, Circle } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { categoryMeta, currencySymbol, type } from "../../src/lib/tokens";
-import { getDefaultCurrency, getDeviceLocale } from "../../src/lib/currency";
+import { getDeviceLocale } from "../../src/lib/currency";
+import { useCurrency } from "../../src/lib/CurrencyContext";
 import { ProGate, ProBadge } from "../../src/components/ProGate";
 import { LiveTicker } from "../../src/components/LiveTicker";
 import {
@@ -377,11 +378,7 @@ export default function InsightsScreen() {
   const [showBudget, setShowBudget] = useState(false);
   const [budgets, setBudgets] = useState<Record<string, number>>(DEFAULT_BUDGETS);
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
-  const [currency, setCurrency] = useState("INR");
-
-  useEffect(() => {
-    getDefaultCurrency().then(setCurrency).catch(() => {});
-  }, []);
+  const { currency } = useCurrency();
 
   const px = 20;
   const catBarW    = screenW - px * 2;

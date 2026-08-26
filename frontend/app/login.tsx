@@ -238,15 +238,6 @@ export default function LoginScreen() {
   // ── Main login screen ──────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      {/* Create account — top-right link */}
-      <TouchableOpacity
-        onPress={() => router.push(ROUTES.REGISTER)}
-        style={{ position: "absolute", top: Platform.OS === "ios" ? 60 : 40, right: 24, zIndex: 5, paddingVertical: 6, paddingHorizontal: 4 }}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600" }}>{t("auth.createAccount")}</Text>
-      </TouchableOpacity>
-
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 32, paddingTop: Platform.OS === "ios" ? 80 : 60, paddingBottom: 40 }}
         keyboardShouldPersistTaps="always"
@@ -254,10 +245,10 @@ export default function LoginScreen() {
       >
         <Wordmark c={c} />
 
-        <Text style={{ color: c.textPrimary, fontSize: 32, fontWeight: "700", marginTop: 40, marginBottom: 6, letterSpacing: -1 }}>
+        <Text style={{ color: c.textPrimary, fontSize: 32, fontWeight: "700", marginTop: 48, marginBottom: 8, letterSpacing: -1 }}>
           {t("auth.welcomeBack")}
         </Text>
-        <Text style={{ color: c.textSecondary, fontSize: 15, marginBottom: 40, lineHeight: 22 }}>
+        <Text style={{ color: c.textSecondary, fontSize: 15, marginBottom: 48, lineHeight: 22 }}>
           {t("auth.taglineSplit")}
         </Text>
 
@@ -269,7 +260,7 @@ export default function LoginScreen() {
           style={{
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
             backgroundColor: c.surface, borderRadius: 12, padding: 15,
-            borderWidth: 1, borderColor: c.border, marginBottom: 10,
+            borderWidth: 1, borderColor: c.border, marginBottom: 16,
           }}
         >
           <Text style={{ fontSize: 16 }}>G</Text>
@@ -277,7 +268,7 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {/* Divider */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 20 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 28 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
           <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>{t("common.or")}</Text>
           <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
@@ -310,11 +301,18 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </InputField>
 
-        <TouchableOpacity onPress={doForgotPassword} style={{ alignSelf: "flex-end", marginBottom: 24 }}>
+        <TouchableOpacity onPress={doForgotPassword} style={{ alignSelf: "flex-end", marginBottom: 32 }}>
           <Text style={{ color: c.textSecondary, fontSize: 13 }}>{t("auth.forgotPassword")}</Text>
         </TouchableOpacity>
 
         <PrimaryBtn onPress={doLogin} label={t("auth.signIn")} />
+
+        <TouchableOpacity onPress={() => router.push(ROUTES.REGISTER)} style={{ alignItems: "center", marginTop: 28 }}>
+          <Text style={{ color: c.textSecondary, fontSize: 14 }}>
+            {t("auth.newHere")}{" "}
+            <Text style={{ color: c.textPrimary, fontWeight: "600" }}>{t("auth.createAccount")}</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );

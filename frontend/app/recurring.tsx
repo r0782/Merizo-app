@@ -6,7 +6,7 @@ import { useTheme } from "../src/lib/theme";
 import { currencySymbol } from "../src/lib/tokens";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "../src/lib/storage-keys";
-import { getDefaultCurrency } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 
 export type Subscription = {
   name: string;
@@ -117,7 +117,7 @@ export default function RecurringScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const [saved, setSaved] = useState<Subscription[]>([]);
-  const [currency, setCurrency] = useState("INR");
+  const { currency } = useCurrency();
   const [editItem, setEditItem] = useState<Subscription | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editName, setEditName] = useState("");
@@ -128,7 +128,6 @@ export default function RecurringScreen() {
 
   useFocusEffect(useCallback(() => {
     loadRecurring().then(setSaved);
-    getDefaultCurrency().then(setCurrency).catch(() => {});
   }, []));
 
   // Debounce the logo preview so we're not firing a request per keystroke.

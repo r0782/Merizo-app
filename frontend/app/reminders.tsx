@@ -20,7 +20,8 @@ import { useTheme } from "../src/lib/theme";
 import { api } from "../src/lib/api";
 import { SmartNum } from "../src/components/DotNum";
 import { currencySymbol } from "../src/lib/tokens";
-import { getDefaultCurrency, getDeviceLocale } from "../src/lib/currency";
+import { getDeviceLocale } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 import { setNotifId, popNotifId } from "../src/lib/settings";
 import { confirmAction } from "../src/lib/confirm";
 
@@ -42,11 +43,7 @@ export default function RemindersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [permission, setPermission] = useState<boolean | null>(null);
-  const [currency, setCurrency] = useState("INR");
-
-  useEffect(() => {
-    getDefaultCurrency().then(setCurrency).catch(() => {});
-  }, []);
+  const { currency } = useCurrency();
 
   useEffect(() => {
     (async () => {

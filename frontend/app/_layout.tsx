@@ -16,6 +16,7 @@ import {
 } from "@expo-google-fonts/manrope";
 import { I18nextProvider } from "react-i18next";
 import { ThemeProvider, useTheme } from "../src/lib/theme";
+import { CurrencyProvider } from "../src/lib/CurrencyContext";
 import { AuthProvider } from "../src/lib/auth";
 import { startKeepAlive, stopKeepAlive } from "../src/lib/api";
 import i18n, { initI18n } from "../src/lib/i18n";
@@ -75,10 +76,12 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <AuthProvider>
-              <RootStack />
-              <ToastContainer />
-            </AuthProvider>
+            <CurrencyProvider>
+              <AuthProvider>
+                <RootStack />
+                <ToastContainer />
+              </AuthProvider>
+            </CurrencyProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

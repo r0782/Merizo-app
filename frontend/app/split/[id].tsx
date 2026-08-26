@@ -16,31 +16,25 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Svg, { Path, Circle as SvgCircle } from "react-native-svg";
-import { SkeletonGroupDetail, SkeletonExpenseCard, FadeIn } from "../../src/components/Skeleton";
+import { SkeletonGroupDetail } from "../../src/components/Skeleton";
 import { EmptyExpenses } from "../../src/components/EmptyStates";
 import { cache, CK, TTL } from "../../src/lib/cache";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { confirmAction } from "../../src/lib/confirm";
-import { GaugeDial, HybridBar, DonutRing } from "../../src/components/Charts";
-import { AnimatedSmartNum } from "../../src/components/AnimatedSmartNum";
+import { DonutRing } from "../../src/components/Charts";
 import {
-  resolveCover,
   categoryMeta,
   currencySymbol,
   currencyOptions,
   detectCategory,
 } from "../../src/lib/tokens";
 import { getDeviceLocale } from "../../src/lib/currency";
-import { SmartNum } from "../../src/components/DotNum";
 import { BalanceExplainer } from "../../src/components/ai/BalanceExplainer";
 import { ExpandingFAB } from "../../src/components/ExpandingFAB";
 import { VoiceExpenseSheet } from "../../src/components/VoiceExpenseSheet";
 import { ContactPickerButton } from "../../src/components/ContactPicker";
-import * as Print from "expo-print";
-import * as ImagePicker from "expo-image-picker";
-import * as Sharing from "expo-sharing";
 
 // Web fix: prevent scroll container from stealing focus from inputs
 if (typeof document !== "undefined") {
@@ -89,14 +83,8 @@ function IcoSettings({ color="", size=18 }: any) {
 function IcoTrash({ color="", size=18 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
 }
-function IcoSearch({ color="", size=16 }: any) {
-  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><SvgCircle cx="11" cy="11" r="8" stroke={ic(color)} strokeWidth={1.8}/><Path d="M21 21l-4.35-4.35" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round"/></Svg>;
-}
 function IcoClose({ color="", size=22 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M18 6L6 18M6 6l12 12" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round"/></Svg>;
-}
-function IcoDownload({ color="", size=18 }: any) {
-  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
 }
 function IcoLink({ color="", size=18 }: any) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={ic(color)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/></Svg>;
@@ -131,43 +119,6 @@ function openUPI(upiId: string, name: string, amount: number, note: string) {
   });
 }
 
-// ── Share summary - WhatsApp on mobile, web URL on browser, native share fallback ─
-async function shareGroupSummary(tripId: string, tripName: string, mode: "whatsapp" | "share" = "whatsapp") {
-  try {
-    const r = await api.get("/trips/" + tripId + "/share-summary");
-    const text = r.data.text;
-
-    if (Platform.OS === "web") {
-      if (mode === "whatsapp") {
-        // WhatsApp Web API
-        (window as any).open("https://api.whatsapp.com/send?text=" + encodeURIComponent(text), "_blank");
-      } else {
-        // Copy to clipboard + alert
-        try {
-          await (navigator as any).clipboard.writeText(text);
-          Alert.alert("Copied!", "Summary copied to clipboard. Paste it anywhere.");
-        } catch {
-          // Fallback: open in new tab
-          const blob = new Blob([text], { type: "text/plain" });
-          const url  = URL.createObjectURL(blob);
-          (window as any).open(url, "_blank");
-        }
-      }
-    } else {
-      // Native: try WhatsApp deep link first
-      const wa = "whatsapp://send?text=" + encodeURIComponent(text);
-      const canWA = await Linking.canOpenURL(wa);
-      if (canWA && mode === "whatsapp") {
-        await Linking.openURL(wa);
-      } else {
-        await Share.share({ message: text, title: tripName + " - Merizo Summary" });
-      }
-    }
-  } catch {
-    Alert.alert("Error", "Could not generate summary. Make sure you're connected.");
-  }
-}
-
 type Tab = "journal" | "settle" | "insights" | "members";
 
 export default function SplitDetailScreen() {
@@ -185,8 +136,6 @@ export default function SplitDetailScreen() {
   const [showMember, setShowMember] = useState(false);
   const [showSettings,  setShowSettings]  = useState(false);
   const [showVoice,     setShowVoice]     = useState(false);
-  const [reportData,    setReportData]    = useState<any>(null);
-  const [pdfLoading,    setPdfLoading]    = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -204,7 +153,7 @@ export default function SplitDetailScreen() {
       if (e?.response?.status === 401) router.replace("/login");
     }
     if (!silent) setLoading(false);
-  }, [tripId]);
+  }, [tripId, router]);
 
   const silentLoad = useCallback(() => { load(true); }, [load]);
 
@@ -383,7 +332,14 @@ export default function SplitDetailScreen() {
         </View>
 
         {tab === "journal"  && <LedgerTab   trip={trip} onChange={silentLoad} userId={user?.id || ""} onAddExpense={() => setShowAdd(true)} />}
-        {tab === "settle"   && <BalancesTab trip={trip} onChange={silentLoad} userId={user?.id || ""} />}
+        {tab === "settle"   && (
+          <>
+            <Text style={{ color: c.textMuted, fontSize: 12, marginHorizontal: 20, marginBottom: 12 }}>
+              {unsettledBalances(trip)}
+            </Text>
+            <BalancesTab trip={trip} onChange={silentLoad} userId={user?.id || ""} />
+          </>
+        )}
         {tab === "insights" && <InsightsTab trip={trip} />}
         {tab === "members"  && <MembersTab  trip={trip} isOwner={isOwner} onAdd={() => setShowMember(true)} onShare={onShareInvite} onUpdate={load} />}
       </ScrollView>
@@ -648,7 +604,6 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
   const expenses: any[] = trip.expenses || [];
   const currency = trip.currency || "INR";
   const sym = currencySymbol(currency);
-  const memberCount = (trip.members || []).length || 1;
 
   // Group by date
   const grouped: Record<string, any[]> = {};
@@ -739,6 +694,11 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
                     <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 2 }}>
                       {isYouPaid ? "✓ you paid" : `paid by ${payerName}`}
                     </Text>
+                    {!!exp.notes && (
+                      <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 2, fontStyle: "italic" }} numberOfLines={2}>
+                        {exp.notes}
+                      </Text>
+                    )}
                   </View>
                   <View style={{ alignItems: "flex-end", flexShrink: 0, marginLeft: 8 }}>
                     <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 17, color: c.textPrimary }}>
@@ -777,33 +737,7 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BALANCES TAB - who owes whom, human language with arrows
-// ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// INSIGHTS TAB - AI financial storytelling
-// ═══════════════════════════════════════════════════════════════════════════════
-// --- Expenses Tab ---
-// --- Members Tab ---
-// --- Members Tab ---
-// --- Settle Tab ---
-// --- Add Expense bottom sheet ---
-// --- Add Member sheet ---
-// --- Settings sheet ---
-// SETTLE TAB - human language + action cards
-// ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// INSIGHTS TAB - AI financial storytelling
-// ═══════════════════════════════════════════════════════════════════════════════
-// --- Expenses Tab ---
-// --- Members Tab ---
-// --- Members Tab ---
-// --- Settle Tab ---
-// --- Add Expense bottom sheet ---
-// --- Add Member sheet ---
-// --- Settings sheet ---
-// SETTLE TAB - ultra-clear human settlement instructions
-// ═══════════════════════════════════════════════════════════════════════════════
-// SETTLE TAB - My Tab · All · Leaderboard
+// BALANCES TAB - who owes whom, human language with arrows (My Tab · All · Leaderboard)
 // ═══════════════════════════════════════════════════════════════════════════════
 function BalancesTab({ trip, onChange, userId }: { trip: any; onChange: () => void; userId: string }) {
   const { c } = useTheme();
@@ -1288,7 +1222,7 @@ function InsightsTab({ trip }: { trip: any }) {
   });
 
   // Find pairs where both owe each other (cancellations)
-  const cancellations: Array<{ a: string; b: string; aToB: number; bToA: number }> = [];
+  const cancellations: { a: string; b: string; aToB: number; bToA: number }[] = [];
   const seen = new Set<string>();
   Object.keys(rawDebts).forEach(a => {
     Object.keys(rawDebts[a] || {}).forEach(b => {
@@ -1322,6 +1256,10 @@ function InsightsTab({ trip }: { trip: any }) {
           <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{balances.length} members</Text>
         </View>
       </View>
+
+      {/* AI Insights - Forecast / Place Facts / Food Insight / Personality (above the
+          category breakdown so it's visible without scrolling) */}
+      <AIOverviewSection trip={trip} />
 
       {/* ── Expense breakdown: what was paid and by whom ── */}
       {expenses.length > 0 && (
@@ -1535,215 +1473,6 @@ function InsightsTab({ trip }: { trip: any }) {
   );
 }
 
-function OverviewTab({ trip }: { trip: any }) {
-  const { c, isDark } = useTheme();
-  const total = trip.total_spent || 0;
-  const budget = trip.budget;
-  const pct = budget && budget > 0 ? Math.min(100, (total / budget) * 100) : 50;
-  const currency = trip.currency || "INR";
-
-  const cats = Object.entries(trip.by_category || {}).map(([k, v]: any) => ({
-    category: k,
-    amount: v as number,
-    percent: total > 0 ? ((v as number) / total) * 100 : 0,
-  })).sort((a: any, b: any) => b.amount - a.amount);
-
-  return (
-    <View style={{ padding: 24 }}>
-      <View style={{ alignItems: "center" }}>
-        {(() => {
-          const pctColor: "green" | "gold" | "red" | "black" = isDark
-            ? pct >= 80 ? "red" : pct >= 50 ? "gold" : "green"
-            : "black";
-          return (
-            <GaugeDial percent={pct} size={220}>
-              <SmartNum value={`${pct.toFixed(0)}%`} size="xl" color={pctColor} />
-              <View style={{ marginTop: 6 }}>
-                <AnimatedSmartNum
-                  value={`${currencySymbol(currency)}${Math.round(total).toLocaleString(getDeviceLocale())}`}
-                  size="md"
-                  color={isDark ? "indigo" : "black"}
-                  duration={100}
-                />
-              </View>
-            </GaugeDial>
-          );
-        })()}  
-        {budget && (
-          <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
-            Budget {currencySymbol(currency)}{budget.toLocaleString(getDeviceLocale())}
-          </Text>
-        )}
-      </View>
-
-      {/* Member balances */}
-      <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6, marginTop: 28 }}>
-        BALANCES
-      </Text>
-      <View style={{ marginTop: 12, gap: 10 }}>
-        {(trip.balances || []).map((b: any) => {
-          return (
-            <View key={b.member_id} style={[styles.balRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "700" }}>{b.name}</Text>
-                <Text style={{ color: c.textSecondary, fontSize: 11, marginTop: 2 }}>
-                  Paid {currencySymbol(currency)}{Math.round(b.paid).toLocaleString(getDeviceLocale())} · Share {currencySymbol(currency)}{Math.round(b.share).toLocaleString(getDeviceLocale())}
-                </Text>
-              </View>
-              <AnimatedSmartNum 
-                value={`${currencySymbol(currency)}${Math.round(Math.abs(b.net)).toLocaleString(getDeviceLocale())}`}
-                size="lg"
-                color={b.net > 0.5 ? "green" : b.net < -0.5 ? "red" : "black"}
-                duration={100}
-              />
-            </View>
-          );
-        })}
-      </View>
-
-      {/* AI Insights - Forecast / Place Facts / Food Insight / Personality (above categories so it's visible without scrolling) */}
-      <AIOverviewSection trip={trip} />
-
-      {/* Category breakdown */}
-      {cats.length > 0 && (
-        <>
-          <Text style={{ color: c.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1.6, marginTop: 28 }}>
-            CATEGORIES
-          </Text>
-          <View style={{ marginTop: 12, gap: 8 }}>
-            {cats.map((cc: any) => {
-              const meta = categoryMeta[cc.category] || categoryMeta.other;
-              return (
-                <View
-                  key={cc.category}
-                  style={[styles.balRow, { backgroundColor: c.surface, borderColor: c.border }]}
-                >
-                  <View style={[styles.catEmojiSm, { backgroundColor: meta.tint + "22" }]}>
-                    <Text style={{ fontSize: 16 }}>{meta.emoji}</Text>
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>{meta.label}</Text>
-                      <AnimatedSmartNum
-                        value={`${currencySymbol(currency)}${Math.round(cc.amount).toLocaleString(getDeviceLocale())}`}
-                        size="md"
-                        color={isDark ? "indigo" : "black"}
-                        duration={100}
-                      />
-                    </View>
-                    <HybridBar
-                      percent={cc.percent}
-                      accent={c.indigo}
-                      muted={isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}
-                      width={200}
-                      height={5}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-
-// --- Expenses Tab ---
-function ExpensesTab({ trip, onChange }: { trip: any; onChange: () => void }) {
-  const { c } = useTheme();
-  const [search, setSearch] = useState("");
-  const allExpenses = (trip.expenses || []).filter((e: any) => !e.is_settlement).slice().reverse();
-  const currency = trip.currency || "INR";
-  const memberMap = new Map((trip.members || []).map((m: any) => [m.id, m.name]));
-
-  const expenses = search.trim()
-    ? allExpenses.filter((e: any) =>
-        (e.name || e.description || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(e.amount).includes(search)
-      )
-    : allExpenses;
-
-  const onDelete = async (eid: string) => {
-    const ok = await confirmAction("Delete expense?", "This cannot be undone.", "Delete", true);
-    if (!ok) return;
-    try {
-      await api.delete(`/expenses/${eid}`);
-      onChange();
-    } catch {
-      Alert.alert("Error", "Could not delete");
-    }
-  };
-
-  const onExportCSV = async () => {
-    try {
-      const response = await api.get(`/trips/${trip.id}/export/csv`, { responseType: "text" });
-      await Share.share({ message: response.data, title: `${trip.name}-expenses.csv` });
-    } catch {
-      Alert.alert("Export", "Could not export expenses. Please try again.");
-    }
-  };
-
-  return (
-    <View style={{ paddingHorizontal: 24, paddingTop: 16, gap: 10 }}>
-      {/* Search + Export row */}
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 4 }}>
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, paddingHorizontal: 12, paddingVertical: 10 }}>
-          <IcoSearch color={c.textMuted} size={16} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search expenses…"
-            placeholderTextColor={c.textMuted}
-            style={{ flex: 1, color: c.textPrimary, fontSize: 13, marginLeft: 8 }}
-          />
-          {!!search && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Text style={{ color: c.textMuted, fontSize: 16, lineHeight: 18 }}>×</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity onPress={onExportCSV} style={{ width: 42, height: 42, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" }}>
-          <IcoDownload color={c.textPrimary} size={18} />
-        </TouchableOpacity>
-      </View>
-
-      {expenses.length === 0 ? (
-        <View style={{ padding: 32, alignItems: "center" }}>
-          <Text style={{ color: c.textMuted, fontSize: 14 }}>
-            {search ? "No matching expenses" : "No expenses yet"}
-          </Text>
-          {!search && <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "Manrope_600SemiBold", marginTop: 8 }}>Tap + to add one</Text>}
-        </View>
-      ) : (
-        expenses.map((exp: any) => (
-          <View key={exp.id} style={{ flexDirection: "row", alignItems: "center", padding: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, marginBottom: 1 }}>
-            <View style={{ width: 36, height: 36, borderWidth: 1, borderColor: c.border, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-              <Text style={{ fontSize: 18 }}>{exp.emoji || "💸"}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: c.textPrimary, fontSize: 13, fontFamily: "Manrope_600SemiBold" }}>
-                {exp.name || exp.description || "Expense"}
-              </Text>
-              <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 2 }}>
-                {String(memberMap.get(exp.paid_by) || "-")}
-                {exp.date ? ` · ${String(exp.date).slice(0, 10)}` : ""}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary, marginRight: 10 }}>
-              {currencySymbol(currency)}{Math.round(exp.amount).toLocaleString(getDeviceLocale())}
-            </Text>
-            <TouchableOpacity testID={`del-exp-${exp.id}`} onPress={() => onDelete(exp.id)} style={{ padding: 6 }}>
-              <IcoTrash color={c.textMuted} size={18} />
-            </TouchableOpacity>
-          </View>
-        ))
-      )}
-    </View>
-  );
-}
-
-// --- Members Tab ---
 // --- Members Tab ---
 function MembersTab({ trip, isOwner, onAdd, onShare, onUpdate }: { trip: any; isOwner: boolean; onAdd: () => void; onShare: () => void; onUpdate: () => Promise<void> }) {
   const { c } = useTheme();
@@ -1863,63 +1592,6 @@ function MembersTab({ trip, isOwner, onAdd, onShare, onUpdate }: { trip: any; is
   );
 }
 
-// --- Settle Tab ---
-function SettleTab({ trip, onChange }: { trip: any; onChange: () => void }) {
-  const { c } = useTheme();
-  const txns = trip.settlement_transactions || [];
-  const currency = trip.currency || "INR";
-
-  const markPaid = async (t: any) => {
-    try {
-      await api.post(`/trips/${trip.id}/settle`, {
-        from_member: t.from_id,
-        to_member: t.to_id,
-        amount: t.amount,
-      });
-      onChange();
-    } catch {
-      Alert.alert("Error", "Could not settle");
-    }
-  };
-
-  if (txns.length === 0) {
-    return (
-      <View style={{ padding: 40, alignItems: "center" }}>
-        <IcoCheck color={c.textPrimary} size={48} />
-        <Text style={{ color: c.textPrimary, fontFamily: "Manrope_700Bold", fontSize: 18, marginTop: 12 }}>All settled up!</Text>
-        <Text style={{ color: c.textMuted, fontSize: 13, marginTop: 6, textAlign: "center" }}>
-          No outstanding balances in this group.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ padding: 24, gap: 10 }}>
-      <Text style={{ color: c.textMuted, fontSize: 11, fontFamily: "Manrope_700Bold", letterSpacing: 1.6 }}>SUGGESTED SETTLEMENTS</Text>
-      {txns.map((t: any, i: number) => (
-        <View key={i} style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: 14 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.textPrimary, fontFamily: "Manrope_700Bold", fontSize: 14 }}>
-              {t.from_name} → {t.to_name}
-            </Text>
-            <Text style={{ color: c.textPrimary, fontSize: 18, fontFamily: "Manrope_700Bold", marginTop: 4 }}>
-              {currencySymbol(currency)}{Math.round(t.amount).toLocaleString(getDeviceLocale())}
-            </Text>
-          </View>
-          <TouchableOpacity
-            testID={`mark-paid-${i}`}
-            onPress={() => markPaid(t)}
-            style={{ backgroundColor: c.textPrimary, paddingHorizontal: 14, paddingVertical: 10 }}
-          >
-            <Text style={{ color: c.bg, fontSize: 12, fontFamily: "Manrope_700Bold" }}>Mark Paid</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 // --- Add Expense bottom sheet ---
 function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" }: any) {
   const { c } = useTheme();
@@ -1932,19 +1604,21 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
   const [percentAmounts, setPercentAmounts] = useState<Record<string, string>>({});
   const [shareAmounts, setShareAmounts] = useState<Record<string, string>>({});
 
-  // Reset to all members every time the sheet opens
-  React.useEffect(() => {
-    setSplitAmong(trip.members.map((m: any) => m.id));
-    setPaidBy(trip.members[0]?.id || "");
-    setName(""); setAmount(""); setManualCat(null); setCustomAmounts({}); setPercentAmounts({}); setShareAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod(initialSplitMethod === "custom" ? "custom" : "equal"); setAiQuick("");
-  }, []);
   const [submitting, setSubmitting] = useState(false);
   const [manualCat, setManualCat] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [recurring, setRecurring] = useState<"none"|"weekly"|"biweekly"|"monthly">("none");
   const [splitMethod, setSplitMethod] = useState<"equal"|"percent"|"shares"|"custom">(initialSplitMethod === "custom" ? "custom" : "equal");
-  const [aiQuick, setAiQuick] = useState("");
-  const [scanCount] = useState(3);
+
+  // Reset once, when the sheet first mounts — intentionally NOT re-run on
+  // trip.members/initialSplitMethod changes, which would wipe out whatever
+  // the user has already typed while the sheet is open.
+  React.useEffect(() => {
+    setSplitAmong(trip.members.map((m: any) => m.id));
+    setPaidBy(trip.members[0]?.id || "");
+    setName(""); setAmount(""); setManualCat(null); setCustomAmounts({}); setPercentAmounts({}); setShareAmounts({}); setNotes(""); setRecurring("none"); setSplitMethod(initialSplitMethod === "custom" ? "custom" : "equal");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-tag - runs as user types unless they manually picked
   const autoCat = manualCat || detectCategory(name);
@@ -2031,38 +1705,56 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
         emoji: meta.emoji,
         paid_by: paidBy,
         split_among: splitAmong,
+        notes: notes.trim() || undefined,
         ...(customSplits ? { split_type: "exact", custom_splits: customSplits } : {}),
       });
 
-      // Recurring expense detector toast (Home category)
-      const suggestion = r.data?.recurring_suggestion;
-      if (suggestion) {
-        Alert.alert(
-          "Looks like a recurring expense",
-          `Want to set a monthly reminder for "${suggestion.name}"?`,
-          [
-            { text: "No", style: "cancel" },
-            {
-              text: "Yes",
-              onPress: async () => {
-                try {
-                  const due = new Date();
-                  due.setMonth(due.getMonth() + 1);
-                  await api.post("/reminders", {
-                    title: `Recurring: ${suggestion.name}`,
-                    amount: amt,
-                    due_date: due.toISOString().slice(0, 10),
-                    trip_id: trip.id,
-                  });
-                } catch {}
+      if (recurring !== "none") {
+        // User explicitly picked a repeat cadence — set the reminder directly.
+        const due = new Date();
+        if (recurring === "weekly") due.setDate(due.getDate() + 7);
+        else if (recurring === "biweekly") due.setDate(due.getDate() + 14);
+        else due.setMonth(due.getMonth() + 1);
+        try {
+          await api.post("/reminders", {
+            title: `Recurring: ${name.trim()}`,
+            amount: amt,
+            due_date: due.toISOString().slice(0, 10),
+            trip_id: trip.id,
+          });
+        } catch {}
+      } else {
+        // Recurring expense detector toast (Home category) — only offered
+        // when the user didn't already pick a repeat cadence above.
+        const suggestion = r.data?.recurring_suggestion;
+        if (suggestion) {
+          Alert.alert(
+            "Looks like a recurring expense",
+            `Want to set a monthly reminder for "${suggestion.name}"?`,
+            [
+              { text: "No", style: "cancel" },
+              {
+                text: "Yes",
+                onPress: async () => {
+                  try {
+                    const due = new Date();
+                    due.setMonth(due.getMonth() + 1);
+                    await api.post("/reminders", {
+                      title: `Recurring: ${suggestion.name}`,
+                      amount: amt,
+                      due_date: due.toISOString().slice(0, 10),
+                      trip_id: trip.id,
+                    });
+                  } catch {}
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }
       }
 
       onAdded();
-    } catch (e: any) {
+    } catch {
       Alert.alert("Error", "Could not add expense");
     } finally {
       setSubmitting(false);
@@ -2417,6 +2109,62 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                   </View>
                 ) : null;
               })()}
+            </View>
+
+            {/* Notes (optional) */}
+            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+              <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>NOTES (OPTIONAL)</Text>
+              <TextInput
+                testID="add-exp-notes"
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Add a note…"
+                placeholderTextColor={c.textMuted}
+                multiline
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: c.surface,
+                    borderColor: c.border,
+                    borderWidth: 1,
+                    color: c.textPrimary,
+                    minHeight: 44,
+                    textAlignVertical: "top",
+                  },
+                ]}
+              />
+            </View>
+
+            {/* Repeat (optional recurring reminder) */}
+            <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+              <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>REPEAT</Text>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {([
+                  { id: "none" as const,     label: "None" },
+                  { id: "weekly" as const,   label: "Weekly" },
+                  { id: "biweekly" as const, label: "Biweekly" },
+                  { id: "monthly" as const,  label: "Monthly" },
+                ]).map(({ id, label }) => {
+                  const active = recurring === id;
+                  return (
+                    <TouchableOpacity
+                      key={id}
+                      testID={`add-exp-repeat-${id}`}
+                      onPress={() => setRecurring(id)}
+                      style={{
+                        flex: 1, alignItems: "center", paddingVertical: 8,
+                        borderWidth: 1,
+                        backgroundColor: active ? c.textPrimary : c.surface,
+                        borderColor: active ? c.textPrimary : c.border,
+                      }}
+                    >
+                      <Text style={{ color: active ? c.bg : c.textPrimary, fontSize: 11, fontWeight: "700" }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             <TouchableOpacity

@@ -9,10 +9,10 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Path, Circle, Line } from "react-native-svg";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../../src/lib/theme";
+import { useCurrency } from "../../src/lib/CurrencyContext";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
@@ -122,10 +122,10 @@ function ProfileSketchIcon({ size = 48, initial, c }: any) {
 export default function ProfileScreen() {
   const { c, isDark, toggle } = useTheme();
   const { user, logout, refresh, requestDeleteOtp, confirmDeleteAccount } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
 
-  const [currency,    setCurrency]    = useState("INR");
+  const { currency, setCurrency } = useCurrency();
   const [editProfile, setEditProfile] = useState(false);
   const [editName,    setEditName]    = useState(user?.name || "");
   const [notifications, setNotifications] = useState(true);
@@ -147,7 +147,6 @@ export default function ProfileScreen() {
   }, [deleteResendTimer]);
 
   useEffect(() => {
-    AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setCurrency(cur); }).catch(() => {});
     api.get("/trips").then(r => setTotalGroups((r.data || []).length)).catch(() => {});
   }, []);
 
@@ -162,7 +161,7 @@ export default function ProfileScreen() {
     // Alert.alert's multi-button form is a no-op on web (react-native-web
     // doesn't implement it) — confirmAction degrades to an immediate
     // confirm there and shows a real native Alert on iOS/Android.
-    const ok = await confirmAction("Sign out", "Are you sure?", "Sign out", true);
+    const ok = await confirmAction(t("profile.signOutConfirmTitle"), t("profile.signOutConfirmMessage"), t("profile.signOutConfirmTitle"), true);
     if (!ok) return;
     try { await logout(); } catch {}
     // Navigate outside tabs unconditionally
@@ -185,7 +184,7 @@ export default function ProfileScreen() {
       setDeleteOtpVisible(true);
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
-      Alert.alert("Error", typeof detail === "string" ? detail : "Could not send confirmation code. Try again.");
+      Alert.alert(t("common.error"), typeof detail === "string" ? detail : t("profile.sendCodeError"));
     } finally {
       setDeleteLoading(false);
     }
@@ -200,13 +199,13 @@ export default function ProfileScreen() {
       setDeleteResendTimer(60);
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
-      setDeleteError(typeof detail === "string" ? detail : "Could not resend code.");
+      setDeleteError(typeof detail === "string" ? detail : t("profile.resendCodeError"));
     }
   };
 
   const onSubmitDeleteOtp = async () => {
     setDeleteError("");
-    if (deleteOtp.length !== 6) { setDeleteError("Enter the 6-digit code"); return; }
+    if (deleteOtp.length !== 6) { setDeleteError(t("profile.enterCode")); return; }
     setDeleteLoading(true);
     try {
       await confirmDeleteAccount(deleteOtp);
@@ -214,7 +213,7 @@ export default function ProfileScreen() {
       router.replace("/login");
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
-      setDeleteError(typeof detail === "string" ? detail : "Invalid or expired code");
+      setDeleteError(typeof detail === "string" ? detail : t("profile.invalidCode"));
     } finally {
       setDeleteLoading(false);
     }
@@ -256,10 +255,10 @@ export default function ProfileScreen() {
         {/* ── Page heading ── */}
         <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
           <Text style={{ fontFamily: type.family.light, fontSize: 10, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
-            Account
+            {t("profile.accountLabel")}
           </Text>
           <Text style={{ fontFamily: type.family.bold, fontSize: 28, color: c.textPrimary, letterSpacing: -1 }}>
-            Profile
+            {t("profile.title")}
           </Text>
         </View>
 
@@ -280,7 +279,7 @@ export default function ProfileScreen() {
               {user?.email || ""}
             </Text>
             <Text style={{ fontFamily: type.family.light, fontSize: 11, color: c.textMuted, marginTop: 4 }}>
-              {totalGroups} group{totalGroups !== 1 ? "s" : ""} · tap to edit
+              {t("profile.groupsTapEdit", { count: totalGroups })}
             </Text>
           </View>
           <Svg width={16} height={16} viewBox="0 0 16 16">
@@ -291,18 +290,18 @@ export default function ProfileScreen() {
         <View style={{ height: 1, backgroundColor: c.border, opacity: 0.3, marginHorizontal: 20 }} />
 
         {/* ── Preferences ── */}
-        <SectionLabel label="Preferences" />
-        <ProfileRow icon={icons.currency} label="Currency" sub={`${sym} · ${currency}`} onPress={() => setShowCurrencyPicker(true)} c={c} />
+        <SectionLabel label={t("profile.sectionPreferences")} />
+        <ProfileRow icon={icons.currency} label={t("common.currency")} sub={`${sym} · ${currency}`} onPress={() => setShowCurrencyPicker(true)} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.language} label="Language" sub={langMeta.nativeName} onPress={() => router.push("/language-settings")} c={c} />
+        <ProfileRow icon={icons.language} label={t("common.language")} sub={langMeta.nativeName} onPress={() => router.push("/language-settings")} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.ai} label="AI Settings" sub="Voice, provider, TTS" onPress={() => router.push("/ai-settings")} c={c} />
+        <ProfileRow icon={icons.ai} label={t("profile.aiSettings")} sub={t("profile.aiSettingsSub")} onPress={() => router.push("/ai-settings")} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.theme}   label={isDark ? "Light Mode" : "Dark Mode"} onPress={toggle} c={c} right={null} />
+        <ProfileRow icon={icons.theme}   label={isDark ? t("profile.lightMode") : t("profile.darkMode")} onPress={toggle} c={c} right={null} />
         <InkDivider c={c} />
         <ProfileRow
           icon={icons.bell}
-          label="Notifications"
+          label={t("profile.notifications")}
           onPress={() => {}}
           c={c}
           right={
@@ -317,13 +316,13 @@ export default function ProfileScreen() {
         />
 
         {/* ── Features ── */}
-        <SectionLabel label="Features" />
-        <ProfileRow icon={icons.chart}  label="Spending Analytics" sub="Charts & insights" onPress={() => router.push("/(tabs)/insights")} c={c} />
+        <SectionLabel label={t("profile.sectionFeatures")} />
+        <ProfileRow icon={icons.chart}  label={t("profile.spendingAnalytics")} sub={t("profile.spendingAnalyticsSub")} onPress={() => router.push("/(tabs)/insights")} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.repeat} label="Recurring Expenses" sub="Subscriptions" onPress={() => router.push("/recurring")} c={c} />
+        <ProfileRow icon={icons.repeat} label={t("profile.recurringExpenses")} sub={t("profile.recurringExpensesSub")} onPress={() => router.push("/recurring")} c={c} />
 
         {/* ── QR & Profile Link ── */}
-        <SectionLabel label="My QR Code" />
+        <SectionLabel label={t("profile.sectionQrCode")} />
         <View style={{ paddingHorizontal: 20, paddingBottom: 24, alignItems: "center", gap: 16 }}>
           {/* QR visual */}
           <View style={{ borderWidth: 1, borderColor: c.border, padding: 12, backgroundColor: c.bg }}>
@@ -332,7 +331,7 @@ export default function ProfileScreen() {
           {/* Profile link */}
           <View style={{ alignItems: "center", gap: 4 }}>
             <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase" }}>
-              Profile Link
+              {t("profile.profileLink")}
             </Text>
             <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textSecondary, letterSpacing: 0.3 }}>
               merizo.app/u/{(user?.id || "").slice(0, 8) || "you"}
@@ -342,15 +341,15 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: "row", gap: 10 }}>
             <TouchableOpacity
               onPress={() => Share.share({
-                message: `Add me on Merizo! merizo.app/u/${(user?.id || "").slice(0, 8)}`,
-                title: "Merizo Profile",
+                message: t("profile.shareMessage", { id: (user?.id || "").slice(0, 8) }),
+                title: t("profile.title"),
               })}
               style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
             >
               <Svg width={14} height={14} viewBox="0 0 14 14">
                 <Path d="M 2 7 L 7 2 L 12 7 M 7 2 L 7 12" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Share Link</Text>
+              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>{t("profile.shareLink")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push("/scan-qr" as any)}
@@ -363,27 +362,27 @@ export default function ProfileScreen() {
                 <Path d="M 10 12 L 12 12 L 12 10" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
                 <Line x1={2} y1={7} x2={12} y2={7} stroke={c.textPrimary} strokeWidth={0.8} opacity={0.4} />
               </Svg>
-              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>Scan QR</Text>
+              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>{t("profile.scanQr")}</Text>
             </TouchableOpacity>
           </View>
         </View>
         <View style={{ height: 1, backgroundColor: c.border, opacity: 0.15, marginHorizontal: 20, marginBottom: 8 }} />
 
         {/* ── Support ── */}
-        <SectionLabel label="Support" />
-        <ProfileRow icon={icons.question} label="Help & FAQ" onPress={() => Linking.openURL("https://merizo-app.onrender.com")} c={c} />
+        <SectionLabel label={t("profile.sectionSupport")} />
+        <ProfileRow icon={icons.question} label={t("profile.helpFaq")} onPress={() => Linking.openURL("https://merizo-app.onrender.com")} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.mail} label="Contact Us" sub="support@merizo.app" onPress={() => Linking.openURL("mailto:support@merizo.app")} c={c} />
+        <ProfileRow icon={icons.mail} label={t("profile.contactUs")} sub="support@merizo.app" onPress={() => Linking.openURL("mailto:support@merizo.app")} c={c} />
 
         {/* ── Data ── */}
-        <SectionLabel label="Data" />
-        <ProfileRow icon={icons.download} label="Export Data" sub="Download expense history" onPress={() => Alert.alert("Export", "This feature is coming soon.")} c={c} />
+        <SectionLabel label={t("profile.sectionData")} />
+        <ProfileRow icon={icons.download} label={t("profile.exportData")} sub={t("profile.exportDataSub")} onPress={() => Alert.alert(t("profile.exportAlertTitle"), t("profile.exportAlertMessage"))} c={c} />
 
         {/* ── Account actions ── */}
-        <SectionLabel label="Account" />
-        <ProfileRow icon={icons.logout} label="Sign Out" onPress={onSignOut} c={c} danger />
+        <SectionLabel label={t("profile.accountLabel")} />
+        <ProfileRow icon={icons.logout} label={t("profile.signOut")} onPress={onSignOut} c={c} danger />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.trash} label="Delete Account" onPress={onDeleteAccount} c={c} danger />
+        <ProfileRow icon={icons.trash} label={t("profile.deleteAccount")} onPress={onDeleteAccount} c={c} danger />
 
         {/* ── Footer ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 8 }}>
@@ -398,12 +397,12 @@ export default function ProfileScreen() {
         <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
             <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 20, letterSpacing: -0.3 }}>
-              Select Currency
+              {t("profile.selectCurrency")}
             </Text>
             {CURRENCIES.map(cur => (
               <TouchableOpacity
                 key={cur}
-                onPress={() => { setCurrency(cur); AsyncStorage.setItem("merizo_currency", cur).catch(() => {}); setShowCurrencyPicker(false); }}
+                onPress={() => { setCurrency(cur); setShowCurrencyPicker(false); }}
                 style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, opacity: currency === cur ? 1 : 0.7 }}
               >
                 <Text style={{ fontFamily: currency === cur ? type.family.semibold : type.family.regular, fontSize: type.size.base, color: c.textPrimary }}>
@@ -428,15 +427,15 @@ export default function ProfileScreen() {
         >
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
             <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 20, letterSpacing: -0.3 }}>
-              Edit Profile
+              {t("profile.editProfile")}
             </Text>
             <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-              Name
+              {t("profile.nameLabel")}
             </Text>
             <TextInput
               value={editName}
               onChangeText={setEditName}
-              placeholder="Your name"
+              placeholder={t("profile.namePlaceholder")}
               placeholderTextColor={c.textMuted}
               style={{
                 borderWidth: 1, borderColor: c.border,
@@ -451,12 +450,12 @@ export default function ProfileScreen() {
                   await api.patch("/auth/profile", { name: editName });
                   await refresh();
                   setEditProfile(false);
-                } catch { Alert.alert("Error", "Could not update profile."); }
+                } catch { Alert.alert(t("common.error"), t("profile.updateProfileError")); }
               }}
               style={{ borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
             >
               <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>
-                Save
+                {t("common.save")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -468,10 +467,10 @@ export default function ProfileScreen() {
         <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "center", alignItems: "center", padding: 24 }}>
           <View style={{ width: "100%", maxWidth: 360, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border, padding: 24 }}>
             <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 10, letterSpacing: -0.3 }}>
-              Delete your account?
+              {t("profile.deleteConfirmTitle")}
             </Text>
             <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, lineHeight: 20, marginBottom: 24 }}>
-              This permanently deletes your Merizo account and cannot be undone. We&apos;ll email a confirmation code to {user?.email || "your email"} before anything is removed.
+              {t("profile.deleteConfirmBody", { email: user?.email || "your email" })}
             </Text>
             <View style={{ flexDirection: "row", gap: 12 }}>
               <TouchableOpacity
@@ -479,7 +478,7 @@ export default function ProfileScreen() {
                 onPress={() => setDeleteConfirmVisible(false)}
                 style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
               >
-                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>No, keep it</Text>
+                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>{t("profile.keepAccount")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 testID="delete-account-confirm"
@@ -489,7 +488,7 @@ export default function ProfileScreen() {
               >
                 {deleteLoading
                   ? <ActivityIndicator color={c.bg} />
-                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>Yes, delete</Text>
+                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>{t("profile.confirmDelete")}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -505,10 +504,10 @@ export default function ProfileScreen() {
         >
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
             <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 8, letterSpacing: -0.3 }}>
-              Confirm deletion
+              {t("profile.confirmDeletionTitle")}
             </Text>
             <Text style={{ fontFamily: type.family.regular, fontSize: 13, color: c.textSecondary, lineHeight: 19, marginBottom: 20 }}>
-              Enter the 6-digit code we sent to {user?.email}.
+              {t("profile.otpSentTo", { email: user?.email })}
             </Text>
             <TextInput
               testID="delete-otp-input"
@@ -537,7 +536,7 @@ export default function ProfileScreen() {
                 onPress={() => { setDeleteOtpVisible(false); setDeleteOtp(""); setDeleteError(""); }}
                 style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
               >
-                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>Cancel</Text>
+                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>{t("common.cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 testID="delete-otp-submit"
@@ -547,13 +546,13 @@ export default function ProfileScreen() {
               >
                 {deleteLoading
                   ? <ActivityIndicator color={c.bg} />
-                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>Delete account</Text>
+                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>{t("profile.deleteAccountButton")}</Text>
                 }
               </TouchableOpacity>
             </View>
             <TouchableOpacity testID="delete-otp-resend" disabled={deleteResendTimer > 0} onPress={onResendDeleteOtp} style={{ alignItems: "center" }}>
               <Text style={{ fontFamily: type.family.regular, fontSize: 13, color: deleteResendTimer > 0 ? c.textMuted : c.textPrimary }}>
-                {deleteResendTimer > 0 ? `Resend code in ${deleteResendTimer}s` : "Resend code"}
+                {deleteResendTimer > 0 ? t("profile.resendIn", { s: deleteResendTimer }) : t("profile.resendCode")}
               </Text>
             </TouchableOpacity>
           </View>

@@ -15,7 +15,8 @@ import { useAuth } from "../src/lib/auth";
 import { api } from "../src/lib/api";
 import { categoryMeta, currencySymbol, type } from "../src/lib/tokens";
 import { ROUTES } from "../src/lib/routes";
-import { getDefaultCurrency, getDeviceLocale } from "../src/lib/currency";
+import { getDeviceLocale } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 
 // ── Back arrow SVG ────────────────────────────────────────────────────────────
 function BackArrow({ color }: { color: string }) {
@@ -249,14 +250,13 @@ export default function ScanBillScreen() {
   const [adding,         setAdding]         = useState(false);
   const [editAmount,     setEditAmount]     = useState("");
   const [editName,       setEditName]       = useState("");
-  const [defaultCurrency, setDefaultCurrency] = useState("INR");
+  const { currency: defaultCurrency } = useCurrency();
 
   useEffect(() => {
     api.get("/trips").then((r) => {
       setTrips(r.data || []);
       if (!selectedTripId && r.data?.[0]) setSelectedTripId(r.data[0].id);
     }).catch(() => {});
-    getDefaultCurrency().then(setDefaultCurrency).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
   }, []);
 

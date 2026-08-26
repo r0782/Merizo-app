@@ -1056,12 +1056,14 @@ async def add_expense(trip_id: str, request: Request, current_user: dict = Depen
     split = data.get("split_among") or trip.get("members") or []
     name = sanitize_string(data.get("name") or data.get("description") or "Expense", max_len=200)
     category = data.get("category","other")
+    notes = data.get("notes")
     eid = str(uuid.uuid4())
     doc = {"id": eid, "trip_id": trip_id, "paid_by": pid,
            "paid_by_name": (payer or {}).get("name", current_user.get("name","")),
            "split_among": split,
            "description": name,
            "name": name,
+           "notes": sanitize_string(str(notes), max_len=500) if notes else None,
            "amount": float(data.get("amount",0)), "currency": data.get("currency", trip.get("currency","INR")),
            "category": category, "is_settlement": False,
            "date": data.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),

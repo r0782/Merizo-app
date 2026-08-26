@@ -7,12 +7,11 @@ import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated, Easing,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../src/lib/theme";
 import { api } from "../../src/lib/api";
 import { currencySymbol, categoryMeta, type } from "../../src/lib/tokens";
 import { getDeviceLocale } from "../../src/lib/currency";
-import { STORAGE_KEYS } from "../../src/lib/storage-keys";
+import { useCurrency } from "../../src/lib/CurrencyContext";
 
 // ── Row entrance animation ────────────────────────────────────────────────────
 function AnimRow({ children, index }: { children: React.ReactNode; index: number }) {
@@ -110,15 +109,12 @@ function groupByDate(items: any[]) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ActivityScreen() {
   const { c } = useTheme();
+  const { currency } = useCurrency();
+  const sym = currencySymbol(currency);
   const [expenses,    setExpenses]    = useState<any[]>([]);
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
-  const [sym, setSym] = useState("₹");
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEYS.DEFAULT_CURRENCY).then(cur => { if (cur) setSym(currencySymbol(cur)); }).catch(() => {});
-  }, []);
 
   const load = useCallback(async () => {
     try {

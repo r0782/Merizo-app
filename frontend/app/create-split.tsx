@@ -27,7 +27,7 @@ import {
 } from "../src/lib/tokens";
 import { STORAGE_KEYS } from "../src/lib/storage-keys";
 import { ROUTES } from "../src/lib/routes";
-import { getDefaultCurrency } from "../src/lib/currency";
+import { useCurrency } from "../src/lib/CurrencyContext";
 
 export default function CreateSplitScreen() {
   const { c } = useTheme();
@@ -47,7 +47,11 @@ export default function CreateSplitScreen() {
   const [memberInput, setMemberInput] = useState("");
   const [members, setMembers] = useState<string[]>([]);
 
-  const [currency, setCurrency] = useState("INR");
+  const { currency: defaultCurrency } = useCurrency();
+  // Editable per-trip choice, seeded from the user's app-wide default —
+  // deliberately NOT kept in sync afterward, since the user may pick a
+  // different currency for this specific trip.
+  const [currency, setCurrency] = useState(defaultCurrency);
   const [coverOverride, setCoverOverride] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +61,6 @@ export default function CreateSplitScreen() {
     AsyncStorage.getItem(STORAGE_KEYS.CONTACTS_CACHE).then(v => {
       if (v) setCachedContacts(JSON.parse(v));
     }).catch(() => {});
-    getDefaultCurrency().then(setCurrency).catch(() => {});
   }, []);
 
   const cover = useMemo(
