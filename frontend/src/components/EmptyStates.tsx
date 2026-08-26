@@ -32,7 +32,7 @@ function FloatingOrb({ size = 80, icon }: { size?: number; icon?: React.ReactNod
         ]),
       ])
     ).start();
-  }, []);
+  }, [float, scale]);
 
   return (
     <Animated.View

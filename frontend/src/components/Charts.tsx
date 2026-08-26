@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing, TouchableOpacity } from "react-native";
-import Svg, { Circle, Line, Path, Defs, LinearGradient, Stop, Rect } from "react-native-svg";
+import Svg, { Circle, Line, Path, Defs, LinearGradient, Stop } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 import { type } from "../lib/tokens";
 
@@ -43,7 +43,7 @@ export function GaugeDial({
           const x2 = cx + r * Math.cos(angle);
           const y2 = cy + r * Math.sin(angle);
           const lit = i < filled;
-          const litColor = "#0A0A0A";
+          const litColor = c.ink;
           const offColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
           return (
             <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
@@ -170,7 +170,7 @@ export function SketchBudgetBar({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [pct]);
+  }, [pct, anim]);
 
   const fillW = anim.interpolate({
     inputRange: [0, 1],
@@ -230,6 +230,8 @@ export function SketchAreaChart({
   const { c } = useTheme();
   const lineColor = color || c.ink;
   const clipW = useRef(new Animated.Value(0)).current;
+  // Unique per instance so multiple charts on screen don't share one <Defs> id.
+  const gradientId = useRef(`sketchAreaFade${Math.random().toString(36).slice(2)}`).current;
 
   useEffect(() => {
     clipW.setValue(0);
@@ -240,7 +242,7 @@ export function SketchAreaChart({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [data, chartWidth]);
+  }, [data, chartWidth, clipW]);
 
   if (!data.length) return null;
 
@@ -271,6 +273,13 @@ export function SketchAreaChart({
     <View>
       <Animated.View style={{ width: clipW, overflow: "hidden", height }}>
         <Svg width={chartWidth} height={height}>
+          <Defs>
+            {/* Ink fades to transparent toward the baseline — monochrome, no color */}
+            <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={lineColor} stopOpacity={0.16} />
+              <Stop offset="1" stopColor={lineColor} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
           {/* Grid guides — very faint, inherit line color */}
           {guides.map((f, i) => (
             <Line key={i}
@@ -282,8 +291,8 @@ export function SketchAreaChart({
               strokeDasharray="3,6"
             />
           ))}
-          {/* Area fill — very subtle */}
-          <Path d={areaPath} fill={lineColor} fillOpacity={0.05} />
+          {/* Area fill — fades from ink toward the baseline */}
+          <Path d={areaPath} fill={`url(#${gradientId})`} />
           {/* Line */}
           <Path d={linePath} stroke={lineColor} strokeWidth={2}
             strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -374,13 +383,18 @@ export function SketchDonutLegend({
       <View style={{ flex: 1, gap: 0 }}>
         {top5.map((cc, i) => {
           const shade = SHADES[i] || SHADES[SHADES.length - 1];
+          const fullLabel = CAT_LABELS[cc.category] || cc.category;
           return (
-            <View key={cc.category} style={{
-              flexDirection: "row", alignItems: "center", gap: 8,
-              paddingVertical: 5,
-              borderBottomWidth: i < top5.length - 1 ? 1 : 0,
-              borderBottomColor: `${c.border}12`,
-            }}>
+            <View
+              key={cc.category}
+              accessibilityRole="text"
+              accessibilityLabel={`${fullLabel}: ${Math.round(cc.percent)}%, ${sym}${Math.round(cc.amount)}`}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                paddingVertical: 5,
+                borderBottomWidth: i < top5.length - 1 ? 1 : 0,
+                borderBottomColor: `${c.border}12`,
+              }}>
               <View style={{ width: 6, height: 6, backgroundColor: shade, flexShrink: 0 }} />
               <Text style={{ flex: 1, fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary }} numberOfLines={1}>
                 {CAT_SHORT[cc.category] || cc.category}
@@ -418,11 +432,15 @@ export function AIInsightCard({
   const fade = useRef(new Animated.Value(0)).current;
   const slideX = useRef(new Animated.Value(-8)).current;
 
+  // Entrance stagger computed once from the index this card mounted with —
+  // intentionally NOT re-run if index changes later (e.g. list reorder),
+  // which would otherwise replay the animation.
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fade,   { toValue: 1, duration: 360, delay: 60 + index * 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(slideX, { toValue: 0, duration: 340, delay: 60 + index * 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const arrow = trendDir === "up" ? "↑" : trendDir === "down" ? "↓" : "→";
