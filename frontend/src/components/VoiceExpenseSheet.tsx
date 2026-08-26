@@ -277,7 +277,7 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: c.border, maxHeight: "92%", paddingHorizontal: 20, paddingTop: 20 }}>
 
@@ -307,7 +307,7 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
                   ].map((ex, i) => (
                     <TouchableOpacity key={i} onPress={() => { setTranscript(ex); doParse(ex); }}
                       style={{ paddingVertical: 8, borderBottomWidth: i < 2 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ color: c.textSecondary, fontSize: 12, fontStyle: "italic" }}>"{ex}"</Text>
+                      <Text style={{ color: c.textSecondary, fontSize: 12, fontStyle: "italic" }}>&quot;{ex}&quot;</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

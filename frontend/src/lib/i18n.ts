@@ -12,23 +12,22 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NativeModules, Platform } from "react-native";
+import * as Localization from "expo-localization";
 
 // ── Locale resources (imported statically for offline + instant load) ─────────
 import en from "../locales/en.json";
 import hi from "../locales/hi.json";
 import te from "../locales/te.json";
-
-// These are created by the background agent; import with fallback to en
-let ta = en, kn = en, ml = en, mr = en, bn = en, gu = en, pa = en, ur = en;
-try { ta = require("../locales/ta.json"); } catch {}
-try { kn = require("../locales/kn.json"); } catch {}
-try { ml = require("../locales/ml.json"); } catch {}
-try { mr = require("../locales/mr.json"); } catch {}
-try { bn = require("../locales/bn.json"); } catch {}
-try { gu = require("../locales/gu.json"); } catch {}
-try { pa = require("../locales/pa.json"); } catch {}
-try { ur = require("../locales/ur.json"); } catch {}
+import ta from "../locales/ta.json";
+import kn from "../locales/kn.json";
+import ml from "../locales/ml.json";
+import mr from "../locales/mr.json";
+import bn from "../locales/bn.json";
+import gu from "../locales/gu.json";
+import pa from "../locales/pa.json";
+import ur from "../locales/ur.json";
+import or from "../locales/or.json";
+import as from "../locales/as.json";
 
 export const RESOURCES = {
   en: { translation: en },
@@ -42,6 +41,8 @@ export const RESOURCES = {
   gu: { translation: gu },
   pa: { translation: pa },
   ur: { translation: ur },
+  or: { translation: or },
+  as: { translation: as },
 };
 
 // ── Supported language metadata ───────────────────────────────────────────────
@@ -65,20 +66,18 @@ export const SUPPORTED_LANGUAGES: LanguageMeta[] = [
   { code: "gu", name: "Gujarati",   nativeName: "ગુજરાતી",     rtl: false, region: "gu-IN" },
   { code: "pa", name: "Punjabi",    nativeName: "ਪੰਜਾਬੀ",      rtl: false, region: "pa-IN" },
   { code: "ur", name: "Urdu",       nativeName: "اردو",        rtl: true,  region: "ur-IN" },
+  { code: "or", name: "Odia",       nativeName: "ଓଡ଼ିଆ",       rtl: false, region: "or-IN" },
+  { code: "as", name: "Assamese",   nativeName: "অসমীয়া",     rtl: false, region: "as-IN" },
 ];
 
 export const LANG_STORAGE_KEY = "merizo_language";
 
 // ── Device language detection ─────────────────────────────────────────────────
+// Android language = Telugu → expo-localization → "te" → te.json → whole UI.
+// Falls back to "en" if the device locale isn't one of our supported codes.
 function getDeviceLanguage(): string {
   try {
-    const locale: string =
-      Platform.OS === "ios"
-        ? NativeModules.SettingsManager?.settings?.AppleLocale ||
-          NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] ||
-          "en"
-        : NativeModules.I18nManager?.localeIdentifier || "en";
-    const code = locale.split(/[-_]/)[0].toLowerCase();
+    const code = Localization.getLocales()[0]?.languageCode?.toLowerCase() || "en";
     return SUPPORTED_LANGUAGES.some(l => l.code === code) ? code : "en";
   } catch {
     return "en";

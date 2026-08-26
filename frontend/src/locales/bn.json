@@ -87,7 +87,12 @@
     "sentTo": "{{email}}-এ প্রেরণ করা হয়েছে।",
     "verify": "যাচাই",
     "didntReceiveIt": "পাঠায়নি?",
-    "resend": "পুনঃপ্রেরণ"
+    "resend": "পুনঃপ্রেরণ",
+    "alreadyHaveAccount": "আগে থেকেই অ্যাকাউন্ট আছে? লগ ইন করুন",
+    "noAccount": "অ্যাকাউন্ট নেই? সাইন আপ করুন",
+    "phoneRequired": "ফোন নম্বর প্রয়োজন",
+    "nameRequired": "নাম প্রয়োজন",
+    "invalidPhone": "সঠিক ১০-সংখ্যার নম্বর দিন"
   },
   "home": {
     "netBalance": "নেট ব্যালেন্স",
@@ -144,7 +149,12 @@
     "catHome": "গৃহ",
     "catShopping": "কেনাকাটা",
     "catEntertainment": "বিনোদন",
-    "catOther": "অন্যান্য"
+    "catOther": "অন্যান্য",
+    "subscriptions": "সাবস্ক্রিপশন",
+    "activeGroupsHint": "সক্রিয় গ্রুপ — যা খুশি জিজ্ঞাসা করুন",
+    "balanceDetail": "ব্যালেন্স বিবরণ",
+    "youOweMore": "আপনি যা পাবেন তার চেয়ে বেশি দেনা আছেন",
+    "owedMore": "লোকেরা আপনাকে যা পাওনা তার চেয়ে বেশি দিতে হবে"
   },
   "groups": {
     "title": "গ্রুপসমূহ",
@@ -159,7 +169,32 @@
     "noExpenses": "কোনো খরচ নেই",
     "totalSpent": "মোট খরচ",
     "deleteGroup": "গ্রুপ মুছুন",
-    "deleteGroupConfirm": "এই গ্রুপ মুছবেন? এটি পূর্বাবস্থায় ফেরানো যাবে না।"
+    "deleteGroupConfirm": "এই গ্রুপ মুছবেন? এটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "inviteLink": "আমন্ত্রণ লিঙ্ক",
+    "copyLink": "আমন্ত্রণ লিঙ্ক কপি করুন",
+    "linkCopied": "আমন্ত্রণ লিঙ্ক কপি হয়েছে!",
+    "journal": "জার্নাল",
+    "addFirst": "প্রথম খরচ যোগ করুন",
+    "perPerson": "প্রতি ব্যক্তি",
+    "settled": "মিটমাট হয়েছে ✓",
+    "youOwe": "আপনি দেনা",
+    "owesYou": "আপনাকে পাওনা",
+    "yourBalance": "আপনার ব্যালেন্স",
+    "settleUp": "মিটমাট করুন",
+    "expenseCount": "{{count}}টি খরচ",
+    "expenseCount_plural": "{{count}}টি খরচ",
+    "memberCount": "{{count}} জন সদস্য",
+    "memberCount_plural": "{{count}} জন সদস্য",
+    "leaveGroup": "গ্রুপ ছাড়ুন",
+    "currency": "মুদ্রা",
+    "category": "বিভাগ",
+    "categories": {
+      "trip": "ভ্রমণ",
+      "home": "বাড়ি",
+      "office": "অফিস",
+      "friends": "বন্ধু",
+      "other": "অন্যান্য"
+    }
   },
   "expenses": {
     "addExpense": "খরচ যোগ করুন",
@@ -172,19 +207,74 @@
     "deleteExpense": "খরচ মুছুন",
     "deleteConfirm": "এই খরচ মুছবেন?",
     "noExpenses": "কোনো খরচ নেই",
-    "expense": "ব্যয়"
+    "expense": "ব্যয়",
+    "editExpense": "খরচ সম্পাদনা করুন",
+    "splitEqually": "সমান ভাগ করুন",
+    "addNote": "নোট যোগ করুন",
+    "voiceExpense": "ভয়েস খরচ",
+    "scanBill": "বিল স্ক্যান করুন",
+    "editConfirm": "পরিবর্তন সংরক্ষণ করবেন?",
+    "categories": {
+      "food": "খাবার",
+      "travel": "ভ্রমণ",
+      "entertainment": "বিনোদন",
+      "utilities": "বিল ও ইউটিলিটি",
+      "shopping": "কেনাকাটা",
+      "health": "স্বাস্থ্য",
+      "accommodation": "থাকার ব্যবস্থা",
+      "trip": "ট্রিপ",
+      "other": "অন্যান্য"
+    },
+    "splitType": {
+      "equal": "সমান ভাগ",
+      "exact": "সঠিক পরিমাণ",
+      "percent": "শতাংশ অনুযায়ী"
+    },
+    "addFirstExpense": "প্রথম খরচ যোগ করুন",
+    "settlementPayment": "নিষ্পত্তি পেমেন্ট"
   },
   "settle": {
     "title": "মেটান",
     "noSettlements": "সবাই মিটিয়ে দিয়েছে!",
-    "allSquare": "সবাই সমান"
+    "allSquare": "সবাই সমান",
+    "settleAll": "সব মিটমাট করুন",
+    "markSettled": "মিটমাট হয়েছে চিহ্নিত করুন",
+    "pending": "বাকি পেমেন্ট",
+    "history": "নিষ্পত্তি ইতিহাস",
+    "explainEveryRupee": "প্রতিটি {{currency}} ব্যাখ্যা করুন",
+    "moneyFlow": "টাকার প্রবাহ",
+    "whyThisPayment": "কেন এই পেমেন্ট",
+    "noPayments": "কোনো পেমেন্ট প্রয়োজন নেই",
+    "recordPayment": "পেমেন্ট রেকর্ড করুন"
   },
   "insights": {
     "title": "অন্তর্দৃষ্টি",
     "totalSpending": "মোট খরচ",
     "byCategory": "বিভাগ অনুযায়ী",
     "noExpenses": "কোনো খরচ নেই",
-    "monthlyBudget": "মাসিক বাজেট"
+    "monthlyBudget": "মাসিক বাজেট",
+    "setBudget": "বাজেট নির্ধারণ করুন",
+    "thisPeriod": "সব গ্রুপ জুড়ে এই সময়ে",
+    "addToSee": "খরচের বিবরণ দেখতে খরচ যোগ করুন",
+    "aiInsights": "AI অন্তর্দৃষ্টি",
+    "monthlyTrends": "মাসিক প্রবণতা",
+    "spendingBreakdown": "খরচের বিভাজন",
+    "budget": {
+      "setTitle": "মাসিক বাজেট নির্ধারণ করুন",
+      "food": "খাবার",
+      "travel": "ভ্রমণ",
+      "entertainment": "বিনোদন",
+      "shopping": "কেনাকাটা",
+      "bills": "বিল ও ইউটিলিটি",
+      "overBudget": "অতিরিক্ত",
+      "save": "বাজেট সংরক্ষণ করুন"
+    },
+    "period": {
+      "1M": "১মা",
+      "3M": "৩মা",
+      "6M": "৬মা",
+      "1Y": "১বছর"
+    }
   },
   "chat": {
     "title": "মেরিজো AI",
@@ -210,14 +300,53 @@
     "promptWhoOwesInGroup": "{{name}}-এ সবচেয়ে বেশি কার ঋণ?",
     "promptRecentExpenses": "{{name}}-এ সাম্প্রতিক ব্যয়গুলি দেখান।",
     "promptAddExpense": "{{name}}-এ একটি ব্যয় যোগ করুন।",
-    "promptSummarise": "সংক্ষিপ্তসার করুন {{name}}"
+    "promptSummarise": "সংক্ষিপ্তসার করুন {{name}}",
+    "suggestions": {
+      "createGroup": "একটি গোয়া ট্রিপ গ্রুপ তৈরি করুন",
+      "showGroups": "আমার সব গ্রুপ দেখান",
+      "monthlySpend": "এই মাসে আমার খরচ কত?",
+      "whoOwes": "আমাকে সবচেয়ে বেশি কে পাওনা?"
+    },
+    "contextGroup": "প্রসঙ্গ: {{name}}",
+    "clearContext": "মুছুন",
+    "actions": {
+      "expense_added": "খরচ যোগ হয়েছে",
+      "group_created": "গ্রুপ তৈরি হয়েছে",
+      "group_renamed": "গ্রুপের নাম পরিবর্তিত",
+      "member_added": "সদস্য যোগ হয়েছে",
+      "member_removed": "সদস্য সরানো হয়েছে",
+      "debt_settled": "মিটমাট হয়েছে",
+      "expenses_listed": "খরচসমূহ",
+      "balance_shown": "ব্যালেন্স",
+      "group_summarized": "সারাংশ",
+      "error": "কিছু ভুল হয়েছে"
+    },
+    "tts": {
+      "speak": "বলুন",
+      "stop": "থামুন",
+      "replay": "আবার শুনুন",
+      "mute": "নিঃশব্দ করুন",
+      "unmute": "শব্দ চালু করুন"
+    },
+    "errorNoMic": "মাইক্রোফোন অনুমতি প্রত্যাখ্যাত",
+    "errorVoice": "ভয়েস শনাক্তকরণ ব্যর্থ হয়েছে। আবার চেষ্টা করুন।"
   },
   "profile": {
     "title": "প্রোফাইল",
     "language": "অ্যাপের ভাষা",
     "aiSettings": "AI সেটিংস",
     "logout": "লগ আউট",
-    "version": "সংস্করণ"
+    "version": "সংস্করণ",
+    "editProfile": "প্রোফাইল সম্পাদনা করুন",
+    "notifications": "বিজ্ঞপ্তি",
+    "privacy": "গোপনীয়তা ও নিরাপত্তা",
+    "help": "সহায়তা",
+    "about": "মেরিজো সম্পর্কে",
+    "deleteAccount": "অ্যাকাউন্ট মুছুন",
+    "memberSince": "সদস্য হয়েছেন",
+    "totalGroups": "গ্রুপ",
+    "totalExpenses": "খরচ",
+    "amountSplit": "বিভক্ত পরিমাণ"
   },
   "language": {
     "title": "অ্যাপের ভাষা",
@@ -225,13 +354,110 @@
     "search": "ভাষা খুঁজুন…",
     "selected": "নির্বাচিত",
     "saveSuccess": "ভাষা পরিবর্তন হয়েছে: {{language}}",
-    "previewText": "মেরিজো — স্মার্ট খরচ ভাগাভাগি"
+    "previewText": "মেরিজো — স্মার্ট খরচ ভাগাভাগি",
+    "autoDetect": "স্বয়ংক্রিয়ভাবে সনাক্ত",
+    "preview": "প্রিভিউ টেক্সট",
+    "languages": {
+      "en": "English",
+      "hi": "হিন্দি — हिंदी",
+      "te": "তেলুগু — తెలుగు",
+      "ta": "তামিল — தமிழ்",
+      "kn": "কন্নড় — ಕನ್ನಡ",
+      "ml": "মালয়ালম — മലയാളം",
+      "mr": "মারাঠি — मराठी",
+      "bn": "বাংলা",
+      "gu": "গুজরাটি — ગુજરાતી",
+      "pa": "পাঞ্জাবি — ਪੰਜਾਬੀ",
+      "ur": "উর্দু — اردو",
+      "or": "ওড়িয়া — ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    },
+    "nativeNames": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "తెలుగు",
+      "ta": "தமிழ்",
+      "kn": "ಕನ್ನಡ",
+      "ml": "മലയാളം",
+      "mr": "मराठी",
+      "bn": "বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    }
   },
   "errors": {
     "noInternet": "ইন্টারনেট সংযোগ নেই",
     "serverDown": "সার্ভার পাওয়া যাচ্ছে না।",
     "speechFailed": "ভয়েস রিকগনিশন ব্যর্থ। আবার চেষ্টা করুন।",
     "tryAgain": "আবার চেষ্টা করুন",
-    "generic": "কিছু একটা ভুল হয়েছে।"
+    "generic": "কিছু একটা ভুল হয়েছে।",
+    "rateLimited": "অনেক বেশি অনুরোধ। একটু অপেক্ষা করুন।",
+    "translationFailed": "অনুবাদ ব্যর্থ হয়েছে।",
+    "unsupportedLanguage": "এই ভাষা এখনো সম্পূর্ণভাবে সমর্থিত নয়।",
+    "micPermission": "ভয়েস ইনপুটের জন্য মাইক্রোফোন অনুমতি প্রয়োজন।",
+    "invalidResponse": "একটি অপ্রত্যাশিত প্রতিক্রিয়া পাওয়া গেছে।",
+    "timeout": "অনুরোধের সময় শেষ। আবার চেষ্টা করুন।",
+    "networkError": "নেটওয়ার্ক ত্রুটি। আপনার সংযোগ পরীক্ষা করুন।",
+    "authRequired": "চালিয়ে যেতে লগ ইন করুন।",
+    "notFound": "পাওয়া যায়নি।"
+  },
+  "aiSettings": {
+    "title": "AI সেটিংস",
+    "enableAi": "AI সহায়ক সক্রিয় করুন",
+    "enableAiDesc": "স্মার্ট পরামর্শ পান ও কাজ স্বয়ংক্রিয় করুন",
+    "enableVoice": "ভয়েস ইনপুট সক্রিয় করুন",
+    "enableVoiceDesc": "খরচ যোগ করতে ও গ্রুপ পরিচালনা করতে কথা বলুন",
+    "voiceOutput": "AI ভয়েস উত্তর",
+    "voiceOutputDesc": "AI-এর উত্তর শুনুন",
+    "responseLanguage": "AI উত্তরের ভাষা",
+    "responseLanguageDesc": "AI উত্তরের জন্য ভাষা",
+    "voiceSpeed": "ভয়েসের গতি",
+    "voiceSpeedSlow": "ধীর",
+    "voiceSpeedNormal": "স্বাভাবিক",
+    "voiceSpeedFast": "দ্রুত",
+    "speechLanguage": "স্পিচ রিকগনিশন ভাষা",
+    "resetConversation": "কথোপকথন রিসেট করুন",
+    "resetConfirm": "সব চ্যাট ইতিহাস মুছবেন?",
+    "privacy": "গোপনীয়তা সেটিংস",
+    "provider": "AI প্রদানকারী",
+    "providerDesc": "ব্যবহার করার জন্য AI মডেল নির্বাচন করুন",
+    "sarvam": "Sarvam AI (ভারতীয় ভাষার জন্য প্রস্তাবিত)",
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq llama-3.3-70b"
+  },
+  "onboarding": {
+    "step1Title": "অনায়াসে খরচ ভাগ করুন",
+    "step1Desc": "কয়েক সেকেন্ডে খরচ যোগ করুন এবং বন্ধু ও পরিবারের সাথে ন্যায্যভাবে ভাগ করুন।",
+    "step2Title": "স্মার্টভাবে মিটমাট করুন",
+    "step2Desc": "আমাদের AI মিটমাট করতে প্রয়োজনীয় পেমেন্টের সংখ্যা কমিয়ে দেয়।",
+    "step3Title": "AI-চালিত অন্তর্দৃষ্টি",
+    "step3Desc": "সুন্দর ভিজ্যুয়ালাইজেশনের মাধ্যমে আপনার খরচের ধরন বুঝুন।",
+    "getStarted": "শুরু করুন",
+    "currencyTitle": "আপনার মুদ্রা নির্বাচন করুন",
+    "currencySubtitle": "এটি আপনার ডিফল্ট মুদ্রা হবে"
+  },
+  "activity": {
+    "title": "কার্যকলাপ",
+    "noActivity": "এখনো কোনো কার্যকলাপ নেই",
+    "recentExpenses": "সাম্প্রতিক খরচ"
+  },
+  "recurring": {
+    "title": "পুনরাবৃত্ত",
+    "addRecurring": "পুনরাবৃত্ত খরচ যোগ করুন",
+    "monthly": "মাসিক",
+    "weekly": "সাপ্তাহিক",
+    "yearly": "বার্ষিক",
+    "noRecurring": "কোনো পুনরাবৃত্ত খরচ নেই"
+  },
+  "scan": {
+    "title": "বিল স্ক্যান করুন",
+    "tapToScan": "ছবি তুলতে ট্যাপ করুন",
+    "scanning": "স্ক্যান হচ্ছে…",
+    "reviewItems": "আইটেম পর্যালোচনা করুন",
+    "total": "মোট",
+    "addToGroup": "গ্রুপে যোগ করুন"
   }
 }

@@ -1,0 +1,7 @@
+# Minimal, currently-green correctness gate for CI: syntax errors, undefined
+# names, and other genuine bugs — not a style/formatting opinion. Widen the
+# `select` list later if the team wants to opt into more (E, F, I, etc.).
+exclude = ["venv"]
+
+[lint]
+select = ["E9", "F63", "F7", "F82"]

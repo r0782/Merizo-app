@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -69,7 +69,24 @@ export default function LoginScreen() {
       await loginWithToken(r.data.access_token, r.data.user);
       goAfterLogin();
     } catch (e: any) {
-      Alert.alert("Login failed", e?.response?.data?.detail || "Check your credentials");
+      const detail = e?.response?.data?.detail;
+      if (detail && typeof detail === "object" && detail.code === "EMAIL_NOT_VERIFIED") {
+        const unverifiedEmail = detail.email || email.trim().toLowerCase();
+        try { await api.post("/auth/resend-register-otp", { email: unverifiedEmail }); } catch {}
+        router.push({ pathname: ROUTES.REGISTER_VERIFY, params: { email: unverifiedEmail } });
+        return;
+      }
+      if (!e?.response) {
+        // No response at all — the request never reached the server (wrong
+        // API URL, backend down, or "localhost" pointing at the device itself
+        // instead of the dev machine when running outside a web browser).
+        Alert.alert(
+          "Can't reach the server",
+          "Check your internet connection and that the backend URL (EXPO_PUBLIC_BACKEND_URL) is reachable from this device."
+        );
+        return;
+      }
+      Alert.alert("Login failed", typeof detail === "string" ? detail : "Check your credentials");
     } finally { setLoading(false); }
   };
 
@@ -154,7 +171,7 @@ export default function LoginScreen() {
   // ── OTP verify screen ──────────────────────────────────────────────────────
   if (screen === "verify_email") {
     return (
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
           <BackBtn to="email_otp" />
           <Wordmark c={c} />
@@ -194,7 +211,7 @@ export default function LoginScreen() {
   // ── Email OTP screen ───────────────────────────────────────────────────────
   if (screen === "email_otp") {
     return (
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 32, paddingTop: Platform.OS === "ios" ? 64 : 48, justifyContent: "center" }} keyboardShouldPersistTaps="always">
           <BackBtn to="main" />
           <Wordmark c={c} />
@@ -220,7 +237,16 @@ export default function LoginScreen() {
 
   // ── Main login screen ──────────────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      {/* Create account — top-right link */}
+      <TouchableOpacity
+        onPress={() => router.push(ROUTES.REGISTER)}
+        style={{ position: "absolute", top: Platform.OS === "ios" ? 60 : 40, right: 24, zIndex: 5, paddingVertical: 6, paddingHorizontal: 4 }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Text style={{ color: c.textPrimary, fontSize: 14, fontWeight: "600" }}>{t("auth.createAccount")}</Text>
+      </TouchableOpacity>
+
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 32, paddingTop: Platform.OS === "ios" ? 80 : 60, paddingBottom: 40 }}
         keyboardShouldPersistTaps="always"
@@ -234,6 +260,28 @@ export default function LoginScreen() {
         <Text style={{ color: c.textSecondary, fontSize: 15, marginBottom: 40, lineHeight: 22 }}>
           {t("auth.taglineSplit")}
         </Text>
+
+        {/* Google */}
+        <TouchableOpacity
+          onPress={doGoogle}
+          disabled={loading}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+            backgroundColor: c.surface, borderRadius: 12, padding: 15,
+            borderWidth: 1, borderColor: c.border, marginBottom: 10,
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>G</Text>
+          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>{t("auth.continueWithGoogle")}</Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 20 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+          <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>{t("common.or")}</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+        </View>
 
         {/* Email */}
         <InputField icon="mail-outline" c={c}>
@@ -267,35 +315,6 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <PrimaryBtn onPress={doLogin} label={t("auth.signIn")} />
-
-        {/* Divider */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginVertical: 28 }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-          <Text style={{ color: c.textMuted, fontSize: 12, letterSpacing: 0.5 }}>{t("common.or")}</Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-        </View>
-
-        {/* Google */}
-        <TouchableOpacity
-          onPress={doGoogle}
-          disabled={loading}
-          activeOpacity={0.8}
-          style={{
-            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-            backgroundColor: c.surface, borderRadius: 12, padding: 15,
-            borderWidth: 1, borderColor: c.border, marginBottom: 10,
-          }}
-        >
-          <Text style={{ fontSize: 16 }}>G</Text>
-          <Text style={{ color: c.textPrimary, fontSize: 15, fontWeight: "500" }}>{t("auth.continueWithGoogle")}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push(ROUTES.REGISTER)} style={{ alignItems: "center", marginTop: 22 }}>
-          <Text style={{ color: c.textSecondary, fontSize: 14 }}>
-            {t("auth.newHere")}{" "}
-            <Text style={{ color: c.textPrimary, fontWeight: "600" }}>{t("auth.createAccount")}</Text>
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -304,13 +323,11 @@ export default function LoginScreen() {
 function Wordmark({ c }: { c: any }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <View style={{
-        width: 36, height: 36, borderRadius: 10,
-        backgroundColor: c.textPrimary,
-        alignItems: "center", justifyContent: "center",
-      }}>
-        <Text style={{ color: c.bg, fontSize: 18, fontWeight: "800" }}>M</Text>
-      </View>
+      <Image
+        source={require("../assets/images/logo-icon.png")}
+        style={{ width: 36, height: 36 }}
+        resizeMode="contain"
+      />
       <Text style={{ color: c.textPrimary, fontSize: 20, fontWeight: "700", letterSpacing: -0.5 }}>
         Merizo
       </Text>

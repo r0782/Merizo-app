@@ -5,9 +5,12 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import json, uuid, json, logging, secrets, asyncio, hashlib, base64, random, string, csv, io, time
+import smtplib
+from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import bcrypt, jwt, httpx
+import dns.resolver
 from core.security import (
     check_rate_limit, check_account_locked, record_failed_login,
     clear_failed_attempts, validate_email, validate_password,
@@ -127,6 +130,94 @@ def create_token(uid, email):
 
 FAST2SMS_KEY     = os.getenv("FAST2SMS_API_KEY", "")
 MAILBOXLAYER_KEY = os.getenv("MAILBOXLAYER_KEY", "")
+GOOGLE_API_KEY   = os.getenv("GOOGLE_API_KEY", "")  # reserved for future Google Cloud API use
+
+# ── SMTP (email OTP for registration + account deletion) ─────────────────────
+SMTP_HOST     = os.getenv("SMTP_HOST", "")
+SMTP_PORT     = int(os.getenv("SMTP_PORT") or 587)
+SMTP_USER     = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+EMAIL_FROM    = os.getenv("EMAIL_FROM", SMTP_USER)
+
+def _send_email_sync(to_email: str, subject: str, body: str) -> bool:
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        return False
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = EMAIL_FROM
+    msg["To"] = to_email
+    try:
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+                s.login(SMTP_USER, SMTP_PASSWORD)
+                s.sendmail(EMAIL_FROM, [to_email], msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASSWORD)
+                s.sendmail(EMAIL_FROM, [to_email], msg.as_string())
+        return True
+    except Exception as e:
+        logger.warning(f"SMTP send failed for ***{to_email[-12:]}: {e}")
+        return False
+
+async def send_email(to_email: str, subject: str, body: str) -> bool:
+    return await asyncio.to_thread(_send_email_sync, to_email, subject, body)
+
+# ── Email OTP (registration verification + account deletion) ─────────────────
+email_otp_store: dict = {}        # "{purpose}:{email}" → {code, expires, attempts}
+_email_otp_send_log: dict = {}    # email → [send_timestamps]  (per-email rate limit)
+
+EMAIL_OTP_TTL_MINUTES   = 10
+MAX_EMAIL_OTP_PER_HOUR  = 5
+
+EMAIL_OTP_SUBJECTS = {
+    "register": "Verify your Merizo account",
+    "delete":   "Confirm your Merizo account deletion",
+}
+EMAIL_OTP_BODIES = {
+    "register": "Your Merizo verification code is {code}. It expires in 10 minutes.\n\n"
+                 "If you didn't create a Merizo account, you can ignore this email.",
+    "delete":   "Your Merizo account deletion code is {code}. It expires in 10 minutes.\n\n"
+                 "Enter this code in the app to permanently delete your account. "
+                 "If you didn't request this, ignore this email and your account will stay safe.",
+}
+
+async def _issue_email_otp(email: str, purpose: str):
+    """Generate, store, and email a 6-digit OTP for the given purpose ('register' | 'delete')."""
+    now = time.time()
+    _email_otp_send_log[email] = [t for t in _email_otp_send_log.get(email, []) if now - t < 3600]
+    if len(_email_otp_send_log[email]) >= MAX_EMAIL_OTP_PER_HOUR:
+        raise HTTPException(429, "Too many verification emails sent. Please try again in a while.")
+    _email_otp_send_log[email].append(now)
+
+    code = "".join(random.choices(string.digits, k=6))
+    email_otp_store[f"{purpose}:{email}"] = {
+        "code": code,
+        "expires": datetime.now(timezone.utc) + timedelta(minutes=EMAIL_OTP_TTL_MINUTES),
+        "attempts": 0,
+    }
+    sent = await send_email(email, EMAIL_OTP_SUBJECTS[purpose], EMAIL_OTP_BODIES[purpose].format(code=code))
+    if not sent:
+        # Dev / SMTP-not-configured fallback — never log raw codes in production without masking
+        logger.info(f"Email OTP ({purpose}) for ***{email[-12:]}: {code}")
+
+def _verify_email_otp(email: str, purpose: str, otp: str):
+    key = f"{purpose}:{email}"
+    entry = email_otp_store.get(key)
+    if not entry:
+        raise HTTPException(400, "Code not found or already used — please request a new one")
+    if datetime.now(timezone.utc) > entry["expires"]:
+        email_otp_store.pop(key, None)
+        raise HTTPException(400, "Code expired — please request a new one")
+    entry["attempts"] += 1
+    if entry["attempts"] > 3:
+        email_otp_store.pop(key, None)
+        raise HTTPException(400, "Too many incorrect attempts — please request a new code")
+    if entry["code"] != otp:
+        remaining = 3 - entry["attempts"] + 1
+        raise HTTPException(400, f"Invalid code — {max(remaining, 0)} attempt{'s' if remaining != 1 else ''} remaining")
+    email_otp_store.pop(key, None)   # consumed — single use
 
 async def check_email_deliverable(email: str):
     """Reject disposable or undeliverable addresses via Mailboxlayer."""
@@ -147,6 +238,37 @@ async def check_email_deliverable(email: str):
         raise
     except Exception:
         pass  # network error — fail open so registration still works
+
+# Google doesn't expose an API-key-only endpoint that verifies an arbitrary
+# email address (Gmail API is per-mailbox and needs that user's OAuth
+# consent). A real, free, standard way to verify an address is actually
+# routed through Google's mail servers is a DNS MX-record lookup — no key
+# needed. This also catches typo'd/nonexistent domains for every provider.
+_GOOGLE_MX_SUFFIXES = ("google.com", "googlemail.com")
+
+def _resolve_mx_sync(domain: str):
+    """Returns (mx_hosts, conclusive). conclusive=False means the DNS lookup
+    itself failed (network/resolver issue) — caller should fail open then."""
+    try:
+        answers = dns.resolver.resolve(domain, "MX", lifetime=5)
+        return [str(r.exchange).rstrip(".").lower() for r in answers], True
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return [], True
+    except Exception:
+        return [], False
+
+async def verify_email_domain(email: str):
+    """Reject addresses whose domain can't receive mail, and for
+    gmail.com/googlemail.com specifically confirm the MX records really
+    point at Google's mail servers (catches spoofed/lookalike domains)."""
+    domain = email.rsplit("@", 1)[-1].lower()
+    mx_hosts, conclusive = await asyncio.to_thread(_resolve_mx_sync, domain)
+    if not conclusive:
+        return  # DNS itself failed — fail open, don't block registration
+    if not mx_hosts:
+        raise HTTPException(422, "This email domain can't receive mail — check for a typo")
+    if domain in ("gmail.com", "googlemail.com") and not any(h.endswith(_GOOGLE_MX_SUFFIXES) for h in mx_hosts):
+        raise HTTPException(422, "This doesn't look like a real Gmail address")
 
 app = FastAPI(title="Merizo API")
 api = APIRouter(prefix="/api")
@@ -182,6 +304,9 @@ async def get_current_user(request: Request,
 # ── Models ────────────────────────────────────────────────────────────────────
 class LoginRequest(BaseModel): email: str; password: str
 class RegisterRequest(BaseModel): email: str; password: str; name: str
+class VerifyRegisterOTPRequest(BaseModel): email: str; otp: str
+class ResendRegisterOTPRequest(BaseModel): email: str
+class ConfirmDeleteRequest(BaseModel): otp: str
 class Trip(BaseModel):
     name: str; description: Optional[str] = None; currency: str = "INR"
     category: Optional[str] = "trip"; group_type: Optional[str] = None
@@ -254,6 +379,11 @@ async def social_login(req: SocialLoginReq):
     if not identifier:
         raise HTTPException(400, "No email or phone from auth provider")
 
+    # Supabase reports which provider authenticated this user (e.g. "google",
+    # "email" for OTP magic-link/code, "phone"). Falls back sensibly if absent.
+    app_meta = getattr(sb_user, "app_metadata", None) or {}
+    provider = app_meta.get("provider") or ("phone" if (sb_user.phone or req.phone) else "email")
+
     # Get or create user in our database
     user = None
     if sb_user.email or req.email:
@@ -265,6 +395,8 @@ async def social_login(req: SocialLoginReq):
             await sb_insert("users", {
                 "id": uid, "email": em, "name": name,
                 "password_hash": hash_pw(str(uuid.uuid4())),  # random, login via OTP
+                "email_verified": True,   # Supabase already verified this identity
+                "auth_provider": provider,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
             user = await sb_one("users", email=em)
@@ -278,12 +410,22 @@ async def social_login(req: SocialLoginReq):
             await sb_insert("users", {
                 "id": uid, "email": em, "name": name, "phone": ph,
                 "password_hash": hash_pw(str(uuid.uuid4())),
+                "email_verified": True,
+                "auth_provider": provider,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
             user = await sb_one("users", phone=ph)
 
     if not user:
         raise HTTPException(500, "Could not create user")
+
+    # An existing password account (possibly still unverified) that just proved
+    # ownership of the same email via Supabase — reflect that: mark it verified
+    # and record the provider so the account shows both password + social login.
+    if user.get("email_verified") is False or user.get("auth_provider") != provider:
+        await sb_update("users", {"email_verified": True, "auth_provider": provider}, id=user["id"])
+        user["email_verified"] = True
+        user["auth_provider"] = provider
 
     token = create_token(user["id"], user.get("email", ""))
     return {
@@ -308,6 +450,15 @@ async def login(req: LoginRequest, request: Request):
         record_failed_login(email, client_ip)
         raise HTTPException(401, "Invalid email or password")
 
+    # Accounts created before email verification existed (or via Google/OTP
+    # sign-in) have no email_verified field — treat missing/True as verified.
+    if user.get("email_verified") is False:
+        raise HTTPException(403, {
+            "code": "EMAIL_NOT_VERIFIED",
+            "message": "Please verify your email before signing in.",
+            "email": email,
+        })
+
     clear_failed_attempts(email)
     token = create_token(user["id"], user["email"])
     register_session(user["id"], token)
@@ -316,6 +467,8 @@ async def login(req: LoginRequest, request: Request):
 
 @api.post("/auth/register")
 async def register(req: RegisterRequest, request: Request):
+    """Create the account, then email a 6-digit code that must be verified
+    (see /auth/verify-register-otp) before the account can sign in."""
     client_ip = get_client_ip(request)
     check_rate_limit(client_ip, "register")
 
@@ -324,19 +477,60 @@ async def register(req: RegisterRequest, request: Request):
     name     = sanitize_name(req.name)
 
     await check_email_deliverable(email)
+    await verify_email_domain(email)
 
-    if await sb_one("users", email=email):
-        raise HTTPException(400, "Email already registered")
+    existing = await sb_one("users", email=email)
+    if existing:
+        if existing.get("email_verified") is not False:
+            raise HTTPException(400, "Email already registered")
+        # Unverified account from an earlier attempt — refresh it and resend the code
+        await sb_update("users", {"name": name, "password_hash": hash_pw(req.password)}, id=existing["id"])
+    else:
+        uid = str(uuid.uuid4())
+        doc = {"id": uid, "email": email, "name": name,
+               "password_hash": hash_pw(req.password), "email_verified": False,
+               "created_at": datetime.now(timezone.utc).isoformat()}
+        await sb_insert("users", doc)
 
-    uid = str(uuid.uuid4())
-    doc = {"id": uid, "email": email, "name": name,
-           "password_hash": hash_pw(req.password),
-           "created_at": datetime.now(timezone.utc).isoformat()}
-    await sb_insert("users", doc)
-    token = create_token(uid, email)
-    register_session(uid, token)
+    await _issue_email_otp(email, "register")
+    audit("REGISTER_OTP_SENT", email=email, ip=client_ip)
+    return {"pending_verification": True, "email": email,
+            "message": "We've sent a 6-digit verification code to your email."}
+
+@api.post("/auth/verify-register-otp")
+async def verify_register_otp(req: VerifyRegisterOTPRequest, request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "verify-register-otp")
+
+    email = validate_email(req.email)
+    _verify_email_otp(email, "register", req.otp.strip())
+
+    user = await sb_one("users", email=email)
+    if not user:
+        raise HTTPException(400, "Account not found — please register again")
+
+    await sb_update("users", {"email_verified": True}, id=user["id"])
+    clear_failed_attempts(email)
+    token = create_token(user["id"], user["email"])
+    register_session(user["id"], token)
+    audit("EMAIL_VERIFIED", user_id=user["id"], email=email, ip=client_ip)
     return {"access_token": token, "token_type": "bearer",
-            "user": {"id": uid, "email": email, "name": name}}
+            "user": {"id": user["id"], "email": user["email"], "name": user.get("name", "")}}
+
+@api.post("/auth/resend-register-otp")
+async def resend_register_otp(req: ResendRegisterOTPRequest, request: Request):
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "resend-register-otp")
+
+    email = validate_email(req.email)
+    user = await sb_one("users", email=email)
+    if not user:
+        raise HTTPException(404, "Account not found")
+    if user.get("email_verified") is not False:
+        raise HTTPException(400, "This email is already verified — please sign in")
+
+    await _issue_email_otp(email, "register")
+    return {"message": "Verification code resent"}
 
 @api.post("/auth/demo-login")
 async def demo_login(request: Request):
@@ -364,6 +558,30 @@ async def update_profile(request: Request, current_user: dict = Depends(get_curr
 @api.get("/auth/me")
 async def me(current_user: dict = Depends(get_current_user)):
     return {k: current_user.get(k) for k in ("id","email","name","upi_id","avatar_url")}
+
+@api.post("/auth/account/request-delete-otp")
+async def request_delete_otp(request: Request, current_user: dict = Depends(get_current_user)):
+    """Email a 6-digit code to the signed-in user's own address to confirm account deletion."""
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "delete-otp")
+    email = current_user["email"]
+    await _issue_email_otp(email, "delete")
+    audit("DELETE_OTP_SENT", user_id=current_user["id"], email=email, ip=client_ip)
+    return {"message": "We've sent a 6-digit confirmation code to your email."}
+
+@api.post("/auth/account/confirm-delete")
+async def confirm_delete_account(req: ConfirmDeleteRequest, request: Request,
+                                  current_user: dict = Depends(get_current_user)):
+    """Verify the emailed code, then permanently delete the signed-in user's account."""
+    client_ip = get_client_ip(request)
+    check_rate_limit(client_ip, "verify-delete-otp")
+    email = current_user["email"]
+    _verify_email_otp(email, "delete", req.otp.strip())
+
+    await sb_delete("users", id=current_user["id"])
+    invalidate_all_sessions(current_user["id"])
+    audit("ACCOUNT_DELETED", user_id=current_user["id"], email=email, ip=client_ip)
+    return {"message": "Your account has been permanently deleted."}
 
 # OTP endpoints
 @app.post("/api/auth/send-otp")

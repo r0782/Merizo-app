@@ -316,7 +316,7 @@ function AddReminderSheet({ onClose, onAdded }: any) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: c.bg, borderColor: c.border }]}>
         <View style={styles.sheetHandle}>

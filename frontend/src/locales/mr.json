@@ -87,7 +87,12 @@
     "sentTo": "{{email}} वर पाठविलेले",
     "verify": "सत्यापन",
     "didntReceiveIt": "ते मिळाले नाही का?",
-    "resend": "पुन्हा पाठवा"
+    "resend": "पुन्हा पाठवा",
+    "alreadyHaveAccount": "आधीच खाते आहे? लॉग इन करा",
+    "noAccount": "खाते नाही? साइन अप करा",
+    "phoneRequired": "फोन नंबर आवश्यक आहे",
+    "nameRequired": "नाव आवश्यक आहे",
+    "invalidPhone": "वैध 10-अंकी नंबर टाका"
   },
   "home": {
     "netBalance": "निव्वळ शिल्लक",
@@ -144,7 +149,12 @@
     "catHome": "मुखपृष्ठ",
     "catShopping": "खरेदी",
     "catEntertainment": "मनोरंजन",
-    "catOther": "अन्य"
+    "catOther": "अन्य",
+    "subscriptions": "सबस्क्रिप्शन",
+    "activeGroupsHint": "सक्रिय गट — काहीही विचारा",
+    "balanceDetail": "बॅलन्स तपशील",
+    "youOweMore": "तुम्हाला मिळण्यापेक्षा तुम्ही जास्त देणे आहात",
+    "owedMore": "लोक तुम्ही देता त्यापेक्षा जास्त तुम्हाला देणे आहेत"
   },
   "groups": {
     "title": "गट",
@@ -159,7 +169,32 @@
     "noExpenses": "खर्च नाही",
     "totalSpent": "एकूण खर्च",
     "deleteGroup": "गट हटवा",
-    "deleteGroupConfirm": "हा गट हटवायचा आहे का? हे पूर्ववत करता येणार नाही."
+    "deleteGroupConfirm": "हा गट हटवायचा आहे का? हे पूर्ववत करता येणार नाही.",
+    "inviteLink": "आमंत्रण लिंक",
+    "copyLink": "आमंत्रण लिंक कॉपी करा",
+    "linkCopied": "आमंत्रण लिंक कॉपी झाली!",
+    "journal": "जर्नल",
+    "addFirst": "तुमचा पहिला खर्च जोडा",
+    "perPerson": "प्रति व्यक्ती",
+    "settled": "सेटल झाले ✓",
+    "youOwe": "तुम्ही देणे आहात",
+    "owesYou": "तुम्हाला देणे आहे",
+    "yourBalance": "तुमचा बॅलन्स",
+    "settleUp": "सेटल करा",
+    "expenseCount": "{{count}} खर्च",
+    "expenseCount_plural": "{{count}} खर्च",
+    "memberCount": "{{count}} सदस्य",
+    "memberCount_plural": "{{count}} सदस्य",
+    "leaveGroup": "गट सोडा",
+    "currency": "चलन",
+    "category": "श्रेणी",
+    "categories": {
+      "trip": "सहल",
+      "home": "घर",
+      "office": "कार्यालय",
+      "friends": "मित्र",
+      "other": "इतर"
+    }
   },
   "expenses": {
     "addExpense": "खर्च जोडा",
@@ -172,19 +207,74 @@
     "deleteExpense": "खर्च हटवा",
     "deleteConfirm": "हा खर्च हटवायचा आहे का?",
     "noExpenses": "खर्च नाही",
-    "expense": "खर्च"
+    "expense": "खर्च",
+    "editExpense": "खर्च संपादित करा",
+    "splitEqually": "समान वाटून घ्या",
+    "addNote": "टीप जोडा",
+    "voiceExpense": "आवाज खर्च",
+    "scanBill": "बिल स्कॅन करा",
+    "editConfirm": "बदल जतन करायचे?",
+    "categories": {
+      "food": "अन्न",
+      "travel": "प्रवास",
+      "entertainment": "मनोरंजन",
+      "utilities": "बिल आणि उपयोगिता",
+      "shopping": "खरेदी",
+      "health": "आरोग्य",
+      "accommodation": "निवास",
+      "trip": "ट्रिप",
+      "other": "इतर"
+    },
+    "splitType": {
+      "equal": "समान वाटून घ्या",
+      "exact": "अचूक रक्कम",
+      "percent": "टक्केवारीनुसार"
+    },
+    "addFirstExpense": "तुमचा पहिला खर्च जोडा",
+    "settlementPayment": "सेटलमेंट पेमेंट"
   },
   "settle": {
     "title": "निकाल काढा",
     "noSettlements": "सर्व निकाल झाले!",
-    "allSquare": "सर्व समान"
+    "allSquare": "सर्व समान",
+    "settleAll": "सर्व सेटल करा",
+    "markSettled": "सेटल म्हणून चिन्हांकित करा",
+    "pending": "प्रलंबित पेमेंट",
+    "history": "सेटलमेंट इतिहास",
+    "explainEveryRupee": "प्रत्येक {{currency}} स्पष्ट करा",
+    "moneyFlow": "पैशांचा प्रवाह",
+    "whyThisPayment": "हे पेमेंट का",
+    "noPayments": "कोणतेही पेमेंट आवश्यक नाही",
+    "recordPayment": "पेमेंट नोंदवा"
   },
   "insights": {
     "title": "अंतर्दृष्टी",
     "totalSpending": "एकूण खर्च",
     "byCategory": "श्रेणीनुसार",
     "noExpenses": "खर्च नाही",
-    "monthlyBudget": "मासिक बजेट"
+    "monthlyBudget": "मासिक बजेट",
+    "setBudget": "बजेट सेट करा",
+    "thisPeriod": "सर्व गटांमध्ये या कालावधीत",
+    "addToSee": "खर्चाचे विभाजन पाहण्यासाठी खर्च जोडा",
+    "aiInsights": "AI अंतर्दृष्टी",
+    "monthlyTrends": "मासिक ट्रेंड",
+    "spendingBreakdown": "खर्चाचे विभाजन",
+    "budget": {
+      "setTitle": "मासिक बजेट सेट करा",
+      "food": "अन्न",
+      "travel": "प्रवास",
+      "entertainment": "मनोरंजन",
+      "shopping": "खरेदी",
+      "bills": "बिल आणि उपयोगिता",
+      "overBudget": "जास्त",
+      "save": "बजेट जतन करा"
+    },
+    "period": {
+      "1M": "1म",
+      "3M": "3म",
+      "6M": "6म",
+      "1Y": "1व"
+    }
   },
   "chat": {
     "title": "मेरिझो AI",
@@ -210,14 +300,53 @@
     "promptWhoOwesInGroup": "{{name}} मध्ये सर्वात जास्त कोण देणे लागतो?",
     "promptRecentExpenses": "{{name}} मध्ये अलीकडील खर्च दर्शवा.",
     "promptAddExpense": "{{name}} मध्ये खर्च जोडा.",
-    "promptSummarise": "सारांशित करा {{name}}"
+    "promptSummarise": "सारांशित करा {{name}}",
+    "suggestions": {
+      "createGroup": "गोवा ट्रिप गट तयार करा",
+      "showGroups": "माझे सर्व गट दाखवा",
+      "monthlySpend": "या महिन्यात माझा खर्च किती आहे?",
+      "whoOwes": "मला सर्वात जास्त कोण देणे आहे?"
+    },
+    "contextGroup": "संदर्भ: {{name}}",
+    "clearContext": "साफ करा",
+    "actions": {
+      "expense_added": "खर्च जोडला",
+      "group_created": "गट तयार झाला",
+      "group_renamed": "गटाचे नाव बदलले",
+      "member_added": "सदस्य जोडला",
+      "member_removed": "सदस्य काढला",
+      "debt_settled": "सेटल झाले",
+      "expenses_listed": "खर्च",
+      "balance_shown": "बॅलन्स",
+      "group_summarized": "सारांश",
+      "error": "काहीतरी चूक झाली"
+    },
+    "tts": {
+      "speak": "बोला",
+      "stop": "थांबा",
+      "replay": "पुन्हा ऐका",
+      "mute": "म्यूट करा",
+      "unmute": "अनम्यूट करा"
+    },
+    "errorNoMic": "मायक्रोफोन परवानगी नाकारली",
+    "errorVoice": "आवाज ओळख अयशस्वी. पुन्हा प्रयत्न करा."
   },
   "profile": {
     "title": "प्रोफाइल",
     "language": "अॅप भाषा",
     "aiSettings": "AI सेटिंग्ज",
     "logout": "लॉग आउट",
-    "version": "आवृत्ती"
+    "version": "आवृत्ती",
+    "editProfile": "प्रोफाइल संपादित करा",
+    "notifications": "सूचना",
+    "privacy": "गोपनीयता आणि सुरक्षा",
+    "help": "मदत आणि समर्थन",
+    "about": "मेरिझो बद्दल",
+    "deleteAccount": "खाते हटवा",
+    "memberSince": "सदस्य झाले",
+    "totalGroups": "गट",
+    "totalExpenses": "खर्च",
+    "amountSplit": "विभागलेली रक्कम"
   },
   "language": {
     "title": "अॅप भाषा",
@@ -225,13 +354,110 @@
     "search": "भाषा शोधा…",
     "selected": "निवडलेली",
     "saveSuccess": "भाषा बदलली: {{language}}",
-    "previewText": "मेरिझो — स्मार्ट खर्च विभागणी"
+    "previewText": "मेरिझो — स्मार्ट खर्च विभागणी",
+    "autoDetect": "स्वयं-शोध",
+    "preview": "पूर्वावलोकन मजकूर",
+    "languages": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "तेलुगू — తెలుగు",
+      "ta": "तमिळ — தமிழ்",
+      "kn": "कन्नड — ಕನ್ನಡ",
+      "ml": "मल्याळम — മലയാളം",
+      "mr": "मराठी",
+      "bn": "बंगाली — বাংলা",
+      "gu": "गुजराती — ગુજરાતી",
+      "pa": "पंजाबी — ਪੰਜਾਬੀ",
+      "ur": "उर्दू — اردو",
+      "or": "ओडिया — ଓଡ଼ିଆ",
+      "as": "आसामी — অসমীয়া"
+    },
+    "nativeNames": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "తెలుగు",
+      "ta": "தமிழ்",
+      "kn": "ಕನ್ನಡ",
+      "ml": "മലയാളം",
+      "mr": "मराठी",
+      "bn": "বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    }
   },
   "errors": {
     "noInternet": "इंटरनेट कनेक्शन नाही",
     "serverDown": "सर्व्हर उपलब्ध नाही.",
     "speechFailed": "आवाज ओळख अयशस्वी. पुन्हा प्रयत्न करा.",
     "tryAgain": "पुन्हा प्रयत्न करा",
-    "generic": "काहीतरी चुकले."
+    "generic": "काहीतरी चुकले.",
+    "rateLimited": "खूप जास्त विनंत्या. कृपया थोडा वेळ थांबा.",
+    "translationFailed": "भाषांतर अयशस्वी झाले.",
+    "unsupportedLanguage": "ही भाषा अद्याप पूर्णपणे समर्थित नाही.",
+    "micPermission": "व्हॉइस इनपुटसाठी मायक्रोफोन परवानगी आवश्यक आहे.",
+    "invalidResponse": "अनपेक्षित प्रतिसाद मिळाला.",
+    "timeout": "विनंतीची वेळ संपली. पुन्हा प्रयत्न करा.",
+    "networkError": "नेटवर्क त्रुटी. तुमचे कनेक्शन तपासा.",
+    "authRequired": "सुरू ठेवण्यासाठी कृपया लॉग इन करा.",
+    "notFound": "सापडले नाही."
+  },
+  "aiSettings": {
+    "title": "AI सेटिंग्ज",
+    "enableAi": "AI सहाय्यक सक्षम करा",
+    "enableAiDesc": "स्मार्ट सूचना मिळवा आणि कामे स्वयंचलित करा",
+    "enableVoice": "व्हॉइस इनपुट सक्षम करा",
+    "enableVoiceDesc": "खर्च जोडण्यासाठी आणि गट व्यवस्थापित करण्यासाठी बोला",
+    "voiceOutput": "AI व्हॉइस उत्तरे",
+    "voiceOutputDesc": "AI प्रतिसाद मोठ्याने ऐका",
+    "responseLanguage": "AI प्रतिसाद भाषा",
+    "responseLanguageDesc": "AI उत्तरांसाठी भाषा",
+    "voiceSpeed": "व्हॉइस गती",
+    "voiceSpeedSlow": "हळू",
+    "voiceSpeedNormal": "सामान्य",
+    "voiceSpeedFast": "जलद",
+    "speechLanguage": "स्पीच रेकग्निशन भाषा",
+    "resetConversation": "संभाषण रीसेट करा",
+    "resetConfirm": "सर्व चॅट इतिहास साफ करायचा?",
+    "privacy": "गोपनीयता सेटिंग्ज",
+    "provider": "AI प्रदाता",
+    "providerDesc": "वापरण्यासाठी AI मॉडेल निवडा",
+    "sarvam": "Sarvam AI (भारतीय भाषांसाठी शिफारस केलेले)",
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq llama-3.3-70b"
+  },
+  "onboarding": {
+    "step1Title": "सहजपणे खर्च वाटून घ्या",
+    "step1Desc": "सेकंदात खर्च जोडा आणि मित्र व कुटुंबासह न्याय्यपणे वाटून घ्या.",
+    "step2Title": "हुशारीने सेटल करा",
+    "step2Desc": "आमचे AI सेटल करण्यासाठी आवश्यक पेमेंट्सची संख्या कमी करते.",
+    "step3Title": "AI-चालित अंतर्दृष्टी",
+    "step3Desc": "सुंदर व्हिज्युअलायझेशनसह तुमचे खर्च नमुने समजून घ्या.",
+    "getStarted": "सुरू करा",
+    "currencyTitle": "तुमचे चलन निवडा",
+    "currencySubtitle": "हे तुमचे डिफॉल्ट चलन असेल"
+  },
+  "activity": {
+    "title": "क्रियाकलाप",
+    "noActivity": "अद्याप कोणतीही क्रियाकलाप नाही",
+    "recentExpenses": "अलीकडील खर्च"
+  },
+  "recurring": {
+    "title": "आवर्ती",
+    "addRecurring": "आवर्ती खर्च जोडा",
+    "monthly": "मासिक",
+    "weekly": "साप्ताहिक",
+    "yearly": "वार्षिक",
+    "noRecurring": "कोणतेही आवर्ती खर्च नाहीत"
+  },
+  "scan": {
+    "title": "बिल स्कॅन करा",
+    "tapToScan": "फोटो घेण्यासाठी टॅप करा",
+    "scanning": "स्कॅन होत आहे…",
+    "reviewItems": "आयटम पुनरावलोकन करा",
+    "total": "एकूण",
+    "addToGroup": "गटात जोडा"
   }
 }

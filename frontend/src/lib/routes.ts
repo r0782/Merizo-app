@@ -12,5 +12,6 @@ export const ROUTES = {
   REGISTER: "/register",
   LOGIN_OTP: "/login-otp",
   LOGIN_VERIFY: "/login-verify",
+  REGISTER_VERIFY: "/register-verify",
   CURRENCY_ONBOARDING: "/currency-onboarding",
 } as const;

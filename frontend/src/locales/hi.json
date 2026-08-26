@@ -192,7 +192,9 @@
       "office": "कार्यालय",
       "friends": "दोस्त",
       "other": "अन्य"
-    }
+    },
+    "expenseCount_plural": "{{count}} खर्च",
+    "memberCount_plural": "{{count}} सदस्य"
   },
   "expenses": {
     "addExpense": "खर्च जोड़ें",
@@ -224,7 +226,12 @@
     "noExpenses": "अभी कोई खर्च नहीं",
     "addFirstExpense": "पहला खर्च जोड़ें",
     "settlementPayment": "सेटलमेंट भुगतान",
-    "expense": "खर्च"
+    "expense": "खर्च",
+    "splitType": {
+      "equal": "बराबर बांटें",
+      "exact": "सटीक राशि",
+      "percent": "प्रतिशत अनुसार"
+    }
   },
   "settle": {
     "title": "सेटल करें",
@@ -257,6 +264,16 @@
       "3M": "3म",
       "6M": "6म",
       "1Y": "1व"
+    },
+    "budget": {
+      "setTitle": "मासिक बजट सेट करें",
+      "food": "खाना-पीना",
+      "travel": "यात्रा",
+      "entertainment": "मनोरंजन",
+      "shopping": "खरीदारी",
+      "bills": "बिल और उपयोगिता",
+      "overBudget": "अधिक",
+      "save": "बजट सहेजें"
     }
   },
   "chat": {
@@ -300,7 +317,19 @@
     "promptWhoOwesInGroup": "{{name}} में सबसे अधिक किसका ऋण है?",
     "promptRecentExpenses": "{{name}} में हाल के खर्च दिखाएँ।",
     "promptAddExpense": "{{name}} में एक व्यय जोड़ दीजिए।",
-    "promptSummarise": "{{name}} का सारांश दीजिए।"
+    "promptSummarise": "{{name}} का सारांश दीजिए।",
+    "actions": {
+      "expense_added": "खर्च जोड़ा गया",
+      "group_created": "ग्रुप बनाया गया",
+      "group_renamed": "ग्रुप का नाम बदला गया",
+      "member_added": "सदस्य जोड़ा गया",
+      "member_removed": "सदस्य हटाया गया",
+      "debt_settled": "सेटल हो गया",
+      "expenses_listed": "खर्च",
+      "balance_shown": "बैलेंस",
+      "group_summarized": "सारांश",
+      "error": "कुछ गलत हो गया"
+    }
   },
   "profile": {
     "title": "प्रोफ़ाइल",
@@ -325,7 +354,39 @@
     "search": "भाषा खोजें…",
     "selected": "चुनी गई",
     "saveSuccess": "भाषा बदल गई: {{language}}",
-    "previewText": "मेरिज़ो — स्मार्ट खर्च बंटवारा"
+    "previewText": "मेरिज़ो — स्मार्ट खर्च बंटवारा",
+    "autoDetect": "स्वतः पहचान",
+    "preview": "पूर्वावलोकन पाठ",
+    "languages": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "तेलुगु — తెలుగు",
+      "ta": "तमिल — தமிழ்",
+      "kn": "कन्नड़ — ಕನ್ನಡ",
+      "ml": "मलयालम — മലയാളം",
+      "mr": "मराठी — मराठी",
+      "bn": "बंगाली — বাংলা",
+      "gu": "गुजराती — ગુજરાતી",
+      "pa": "पंजाबी — ਪੰਜਾਬੀ",
+      "ur": "उर्दू — اردو",
+      "or": "ओड़िया — ଓଡ଼ିଆ",
+      "as": "असमिया — অসমীয়া"
+    },
+    "nativeNames": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "తెలుగు",
+      "ta": "தமிழ்",
+      "kn": "ಕನ್ನಡ",
+      "ml": "മലയാളം",
+      "mr": "मराठी",
+      "bn": "বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    }
   },
   "errors": {
     "noInternet": "इंटरनेट कनेक्शन नहीं",
@@ -335,6 +396,68 @@
     "micPermission": "आवाज़ इनपुट के लिए माइक्रोफ़ोन की अनुमति आवश्यक है।",
     "timeout": "अनुरोध समय समाप्त। पुनः प्रयास करें।",
     "tryAgain": "पुनः प्रयास करें",
-    "generic": "कुछ गलत हो गया।"
+    "generic": "कुछ गलत हो गया।",
+    "translationFailed": "अनुवाद विफल रहा।",
+    "unsupportedLanguage": "यह भाषा अभी पूरी तरह समर्थित नहीं है।",
+    "invalidResponse": "अप्रत्याशित प्रतिक्रिया मिली।",
+    "networkError": "नेटवर्क त्रुटि। अपना कनेक्शन जांचें।",
+    "authRequired": "जारी रखने के लिए कृपया लॉग इन करें।",
+    "notFound": "नहीं मिला।"
+  },
+  "aiSettings": {
+    "title": "AI सेटिंग्स",
+    "enableAi": "AI सहायक सक्षम करें",
+    "enableAiDesc": "स्मार्ट सुझाव पाएं और कार्यों को स्वचालित करें",
+    "enableVoice": "आवाज़ इनपुट सक्षम करें",
+    "enableVoiceDesc": "खर्च जोड़ने और ग्रुप प्रबंधित करने के लिए बोलें",
+    "voiceOutput": "AI आवाज़ जवाब",
+    "voiceOutputDesc": "AI के जवाब सुनें",
+    "responseLanguage": "AI जवाब भाषा",
+    "responseLanguageDesc": "AI जवाबों के लिए भाषा",
+    "voiceSpeed": "आवाज़ की गति",
+    "voiceSpeedSlow": "धीमी",
+    "voiceSpeedNormal": "सामान्य",
+    "voiceSpeedFast": "तेज़",
+    "speechLanguage": "स्पीच पहचान भाषा",
+    "resetConversation": "बातचीत रीसेट करें",
+    "resetConfirm": "सभी चैट इतिहास साफ़ करें?",
+    "privacy": "गोपनीयता सेटिंग्स",
+    "provider": "AI प्रदाता",
+    "providerDesc": "उपयोग करने के लिए AI मॉडल चुनें",
+    "sarvam": "Sarvam AI (भारतीय भाषाओं के लिए अनुशंसित)",
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq llama-3.3-70b"
+  },
+  "onboarding": {
+    "step1Title": "आसानी से खर्च बांटें",
+    "step1Desc": "सेकंडों में खर्च जोड़ें और दोस्तों व परिवार के साथ निष्पक्ष रूप से बांटें।",
+    "step2Title": "समझदारी से सेटल करें",
+    "step2Desc": "हमारा AI सेटल करने के लिए आवश्यक भुगतानों की संख्या कम कर देता है।",
+    "step3Title": "AI-संचालित अंतर्दृष्टि",
+    "step3Desc": "सुंदर विज़ुअलाइज़ेशन के साथ अपने खर्च के पैटर्न को समझें।",
+    "getStarted": "शुरू करें",
+    "currencyTitle": "अपनी मुद्रा चुनें",
+    "currencySubtitle": "यह आपकी डिफ़ॉल्ट मुद्रा होगी"
+  },
+  "activity": {
+    "title": "गतिविधि",
+    "noActivity": "अभी तक कोई गतिविधि नहीं",
+    "recentExpenses": "हाल के खर्च"
+  },
+  "recurring": {
+    "title": "आवर्ती",
+    "addRecurring": "आवर्ती खर्च जोड़ें",
+    "monthly": "मासिक",
+    "weekly": "साप्ताहिक",
+    "yearly": "वार्षिक",
+    "noRecurring": "कोई आवर्ती खर्च नहीं"
+  },
+  "scan": {
+    "title": "बिल स्कैन करें",
+    "tapToScan": "फोटो लेने के लिए टैप करें",
+    "scanning": "स्कैन हो रहा है…",
+    "reviewItems": "आइटम देखें",
+    "total": "कुल",
+    "addToGroup": "ग्रुप में जोड़ें"
   }
 }

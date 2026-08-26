@@ -87,7 +87,12 @@
     "sentTo": "{{email}} پر بھیجا گیا۔",
     "verify": "تصدیق کریں۔",
     "didntReceiveIt": "کیا آپ کو یہ نہیں ملا؟",
-    "resend": "دوبارہ بھیجیں"
+    "resend": "دوبارہ بھیجیں",
+    "alreadyHaveAccount": "پہلے سے اکاؤنٹ ہے؟ لاگ ان کریں",
+    "noAccount": "اکاؤنٹ نہیں ہے؟ سائن اپ کریں",
+    "phoneRequired": "فون نمبر ضروری ہے",
+    "nameRequired": "نام ضروری ہے",
+    "invalidPhone": "درست 10 ہندسوں کا نمبر درج کریں"
   },
   "home": {
     "netBalance": "خالص بیلنس",
@@ -144,7 +149,12 @@
     "catHome": "گھر",
     "catShopping": "خریداری",
     "catEntertainment": "تفریح",
-    "catOther": "دیگر"
+    "catOther": "دیگر",
+    "subscriptions": "سبسکرپشنز",
+    "activeGroupsHint": "فعال گروپس — کچھ بھی پوچھیں",
+    "balanceDetail": "بیلنس کی تفصیل",
+    "youOweMore": "آپ کو ملنے والی رقم سے زیادہ آپ کو دینا ہے",
+    "owedMore": "لوگوں کو آپ سے زیادہ آپ کو دینا ہے"
   },
   "groups": {
     "title": "گروپس",
@@ -159,7 +169,32 @@
     "noExpenses": "کوئی خرچ نہیں",
     "totalSpent": "کل خرچ",
     "deleteGroup": "گروپ حذف کریں",
-    "deleteGroupConfirm": "یہ گروپ حذف کریں؟ یہ واپس نہیں ہو سکتا۔"
+    "deleteGroupConfirm": "یہ گروپ حذف کریں؟ یہ واپس نہیں ہو سکتا۔",
+    "inviteLink": "دعوتی لنک",
+    "copyLink": "دعوتی لنک کاپی کریں",
+    "linkCopied": "دعوتی لنک کاپی ہو گیا!",
+    "journal": "جرنل",
+    "addFirst": "اپنا پہلا خرچہ شامل کریں",
+    "perPerson": "فی شخص",
+    "settled": "طے ہو گیا ✓",
+    "youOwe": "آپ کو دینا ہے",
+    "owesYou": "آپ کو ملنا ہے",
+    "yourBalance": "آپ کا بیلنس",
+    "settleUp": "طے کریں",
+    "expenseCount": "{{count}} خرچہ",
+    "expenseCount_plural": "{{count}} اخراجات",
+    "memberCount": "{{count}} رکن",
+    "memberCount_plural": "{{count}} اراکین",
+    "leaveGroup": "گروپ چھوڑیں",
+    "currency": "کرنسی",
+    "category": "زمرہ",
+    "categories": {
+      "trip": "سفر",
+      "home": "گھر",
+      "office": "دفتر",
+      "friends": "دوست",
+      "other": "دیگر"
+    }
   },
   "expenses": {
     "addExpense": "خرچ شامل کریں",
@@ -172,19 +207,74 @@
     "deleteExpense": "خرچ حذف کریں",
     "deleteConfirm": "یہ خرچ حذف کریں؟",
     "noExpenses": "کوئی خرچ نہیں",
-    "expense": "اخراجات"
+    "expense": "اخراجات",
+    "editExpense": "خرچہ ترمیم کریں",
+    "splitEqually": "برابر تقسیم کریں",
+    "addNote": "نوٹ شامل کریں",
+    "voiceExpense": "صوتی خرچہ",
+    "scanBill": "بل اسکین کریں",
+    "editConfirm": "تبدیلیاں محفوظ کریں؟",
+    "categories": {
+      "food": "خوراک",
+      "travel": "سفر",
+      "entertainment": "تفریح",
+      "utilities": "بل اور یوٹیلیٹی",
+      "shopping": "خریداری",
+      "health": "صحت",
+      "accommodation": "رہائش",
+      "trip": "ٹرپ",
+      "other": "دیگر"
+    },
+    "splitType": {
+      "equal": "برابر تقسیم کریں",
+      "exact": "درست رقومات",
+      "percent": "فیصد کے مطابق"
+    },
+    "addFirstExpense": "اپنا پہلا خرچہ شامل کریں",
+    "settlementPayment": "تصفیہ ادائیگی"
   },
   "settle": {
     "title": "طے کریں",
     "noSettlements": "سب طے ہو گئے!",
-    "allSquare": "سب برابر"
+    "allSquare": "سب برابر",
+    "settleAll": "سب طے کریں",
+    "markSettled": "طے شدہ نشان زد کریں",
+    "pending": "زیر التواء ادائیگیاں",
+    "history": "تصفیہ کی تاریخ",
+    "explainEveryRupee": "ہر {{currency}} کی وضاحت کریں",
+    "moneyFlow": "رقم کا بہاؤ",
+    "whyThisPayment": "یہ ادائیگی کیوں",
+    "noPayments": "کوئی ادائیگی درکار نہیں",
+    "recordPayment": "ادائیگی ریکارڈ کریں"
   },
   "insights": {
     "title": "بصیرت",
     "totalSpending": "کل خرچ",
     "byCategory": "زمرہ کے مطابق",
     "noExpenses": "کوئی خرچ نہیں",
-    "monthlyBudget": "ماہانہ بجٹ"
+    "monthlyBudget": "ماہانہ بجٹ",
+    "setBudget": "بجٹ مقرر کریں",
+    "thisPeriod": "تمام گروپس میں اس مدت کے دوران",
+    "addToSee": "خرچ کی تقسیم دیکھنے کے لیے اخراجات شامل کریں",
+    "aiInsights": "AI بصیرت",
+    "monthlyTrends": "ماہانہ رجحانات",
+    "spendingBreakdown": "خرچ کی تقسیم",
+    "budget": {
+      "setTitle": "ماہانہ بجٹ مقرر کریں",
+      "food": "خوراک",
+      "travel": "سفر",
+      "entertainment": "تفریح",
+      "shopping": "خریداری",
+      "bills": "بل اور یوٹیلیٹی",
+      "overBudget": "زائد",
+      "save": "بجٹ محفوظ کریں"
+    },
+    "period": {
+      "1M": "1م",
+      "3M": "3م",
+      "6M": "6م",
+      "1Y": "1س"
+    }
   },
   "chat": {
     "title": "میریزو AI",
@@ -210,14 +300,53 @@
     "promptWhoOwesInGroup": "{{name}} میں سب سے زیادہ قرض کس پر ہے؟",
     "promptRecentExpenses": "{{name}} میں حالیہ اخراجات دکھائیں۔",
     "promptAddExpense": "{{name}} میں ایک خرچہ شامل کریں۔",
-    "promptSummarise": "{{name}} کا خلاصہ کریں۔"
+    "promptSummarise": "{{name}} کا خلاصہ کریں۔",
+    "suggestions": {
+      "createGroup": "گوا ٹرپ گروپ بنائیں",
+      "showGroups": "میرے تمام گروپس دکھائیں",
+      "monthlySpend": "اس مہینے میرا خرچہ کتنا ہے؟",
+      "whoOwes": "مجھے سب سے زیادہ کون دینا ہے؟"
+    },
+    "contextGroup": "سیاق: {{name}}",
+    "clearContext": "صاف کریں",
+    "actions": {
+      "expense_added": "خرچہ شامل ہوا",
+      "group_created": "گروپ بن گیا",
+      "group_renamed": "گروپ کا نام بدل گیا",
+      "member_added": "رکن شامل ہوا",
+      "member_removed": "رکن ہٹا دیا گیا",
+      "debt_settled": "طے ہو گیا",
+      "expenses_listed": "اخراجات",
+      "balance_shown": "بیلنس",
+      "group_summarized": "خلاصہ",
+      "error": "کچھ غلط ہو گیا"
+    },
+    "tts": {
+      "speak": "بولیں",
+      "stop": "روکیں",
+      "replay": "دوبارہ سنیں",
+      "mute": "خاموش کریں",
+      "unmute": "آواز بحال کریں"
+    },
+    "errorNoMic": "مائیکروفون کی اجازت مسترد",
+    "errorVoice": "صوتی شناخت ناکام ہو گئی۔ دوبارہ کوشش کریں۔"
   },
   "profile": {
     "title": "پروفائل",
     "language": "ایپ کی زبان",
     "aiSettings": "AI ترتیبات",
     "logout": "لاگ آؤٹ",
-    "version": "ورژن"
+    "version": "ورژن",
+    "editProfile": "پروفائل ترمیم کریں",
+    "notifications": "اطلاعات",
+    "privacy": "رازداری اور تحفظ",
+    "help": "مدد اور معاونت",
+    "about": "میریزو کے بارے میں",
+    "deleteAccount": "اکاؤنٹ حذف کریں",
+    "memberSince": "رکن بنے",
+    "totalGroups": "گروپس",
+    "totalExpenses": "اخراجات",
+    "amountSplit": "تقسیم شدہ رقم"
   },
   "language": {
     "title": "ایپ کی زبان",
@@ -225,13 +354,110 @@
     "search": "زبان تلاش کریں…",
     "selected": "منتخب",
     "saveSuccess": "زبان تبدیل: {{language}}",
-    "previewText": "میریزو — ذہین اخراجات کی تقسیم"
+    "previewText": "میریزو — ذہین اخراجات کی تقسیم",
+    "autoDetect": "خودکار شناخت",
+    "preview": "پیش منظر متن",
+    "languages": {
+      "en": "English",
+      "hi": "ہندی — हिंदी",
+      "te": "تیلگو — తెలుగు",
+      "ta": "تمل — தமிழ்",
+      "kn": "کنڑ — ಕನ್ನಡ",
+      "ml": "ملیالم — മലയാളം",
+      "mr": "مراٹھی — मराठी",
+      "bn": "بنگالی — বাংলা",
+      "gu": "گجراتی — ગુજરાતી",
+      "pa": "پنجابی — ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "اڑیہ — ଓଡ଼ିଆ",
+      "as": "آسامی — অসমীয়া"
+    },
+    "nativeNames": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "తెలుగు",
+      "ta": "தமிழ்",
+      "kn": "ಕನ್ನಡ",
+      "ml": "മലയാളം",
+      "mr": "मराठी",
+      "bn": "বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    }
   },
   "errors": {
     "noInternet": "انٹرنیٹ کنیکشن نہیں",
     "serverDown": "سرور دستیاب نہیں۔",
     "speechFailed": "آواز کی پہچان ناکام۔ دوبارہ کوشش کریں۔",
     "tryAgain": "دوبارہ کوشش کریں",
-    "generic": "کچھ غلط ہو گیا۔"
+    "generic": "کچھ غلط ہو گیا۔",
+    "rateLimited": "بہت زیادہ درخواستیں۔ براہ کرم تھوڑا انتظار کریں۔",
+    "translationFailed": "ترجمہ ناکام ہو گیا۔",
+    "unsupportedLanguage": "یہ زبان ابھی مکمل طور پر معاون نہیں ہے۔",
+    "micPermission": "صوتی ان پٹ کے لیے مائیکروفون کی اجازت درکار ہے۔",
+    "invalidResponse": "غیر متوقع جواب موصول ہوا۔",
+    "timeout": "درخواست کا وقت ختم ہو گیا۔ دوبارہ کوشش کریں۔",
+    "networkError": "نیٹ ورک کی خرابی۔ اپنا کنکشن چیک کریں۔",
+    "authRequired": "جاری رکھنے کے لیے براہ کرم لاگ ان کریں۔",
+    "notFound": "نہیں ملا۔"
+  },
+  "aiSettings": {
+    "title": "AI ترتیبات",
+    "enableAi": "AI اسسٹنٹ فعال کریں",
+    "enableAiDesc": "سمارٹ تجاویز حاصل کریں اور کام خودکار بنائیں",
+    "enableVoice": "صوتی ان پٹ فعال کریں",
+    "enableVoiceDesc": "اخراجات شامل کرنے اور گروپس منظم کرنے کے لیے بولیں",
+    "voiceOutput": "AI صوتی جوابات",
+    "voiceOutputDesc": "AI کے جوابات سنیں",
+    "responseLanguage": "AI جواب کی زبان",
+    "responseLanguageDesc": "AI جوابات کے لیے زبان",
+    "voiceSpeed": "صوتی رفتار",
+    "voiceSpeedSlow": "آہستہ",
+    "voiceSpeedNormal": "معمولی",
+    "voiceSpeedFast": "تیز",
+    "speechLanguage": "اسپیچ ریکگنیشن زبان",
+    "resetConversation": "گفتگو دوبارہ ترتیب دیں",
+    "resetConfirm": "تمام چیٹ کی تاریخ صاف کریں؟",
+    "privacy": "رازداری کی ترتیبات",
+    "provider": "AI فراہم کنندہ",
+    "providerDesc": "استعمال کے لیے AI ماڈل منتخب کریں",
+    "sarvam": "Sarvam AI (بھارتی زبانوں کے لیے تجویز کردہ)",
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq llama-3.3-70b"
+  },
+  "onboarding": {
+    "step1Title": "بغیر کسی مشکل کے اخراجات تقسیم کریں",
+    "step1Desc": "سیکنڈوں میں اخراجات شامل کریں اور دوستوں اور خاندان کے ساتھ منصفانہ طور پر تقسیم کریں۔",
+    "step2Title": "ہوشیاری سے طے کریں",
+    "step2Desc": "ہمارا AI طے کرنے کے لیے درکار ادائیگیوں کی تعداد کم کرتا ہے۔",
+    "step3Title": "AI سے چلنے والی بصیرت",
+    "step3Desc": "خوبصورت بصری نمائش کے ساتھ اپنے خرچ کے انداز کو سمجھیں۔",
+    "getStarted": "شروع کریں",
+    "currencyTitle": "اپنی کرنسی منتخب کریں",
+    "currencySubtitle": "یہ آپ کی طے شدہ کرنسی ہوگی"
+  },
+  "activity": {
+    "title": "سرگرمی",
+    "noActivity": "ابھی تک کوئی سرگرمی نہیں",
+    "recentExpenses": "حالیہ اخراجات"
+  },
+  "recurring": {
+    "title": "دہرائے جانے والے",
+    "addRecurring": "دہرایا جانے والا خرچہ شامل کریں",
+    "monthly": "ماہانہ",
+    "weekly": "ہفتہ وار",
+    "yearly": "سالانہ",
+    "noRecurring": "کوئی دہرائے جانے والے اخراجات نہیں"
+  },
+  "scan": {
+    "title": "بل اسکین کریں",
+    "tapToScan": "تصویر لینے کے لیے ٹیپ کریں",
+    "scanning": "اسکین ہو رہا ہے…",
+    "reviewItems": "اشیاء کا جائزہ لیں",
+    "total": "کل",
+    "addToGroup": "گروپ میں شامل کریں"
   }
 }

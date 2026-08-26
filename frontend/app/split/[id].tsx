@@ -37,6 +37,7 @@ import { SmartNum } from "../../src/components/DotNum";
 import { BalanceExplainer } from "../../src/components/ai/BalanceExplainer";
 import { ExpandingFAB } from "../../src/components/ExpandingFAB";
 import { VoiceExpenseSheet } from "../../src/components/VoiceExpenseSheet";
+import { ContactPickerButton } from "../../src/components/ContactPicker";
 import * as Print from "expo-print";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
@@ -1364,7 +1365,7 @@ function InsightsTab({ trip }: { trip: any }) {
       {/* ── Who paid vs who owes ── */}
       <View style={cardStyle}>
         <View style={headerStyle}>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>👤 Each person's position</Text>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>👤 Each person&apos;s position</Text>
           <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Paid vs their fair share of all expenses</Text>
         </View>
         {balances.map((b: any, i: number) => {
@@ -2086,7 +2087,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
 
 
   return (
-    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: c.bg, borderColor: c.border }]}>
         <View style={styles.sheetHandle}>
@@ -2439,6 +2440,7 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
   const { c } = useTheme();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [addingContacts, setAddingContacts] = useState(false);
 
   const onSubmit = async () => {
     if (!name.trim()) return;
@@ -2453,8 +2455,26 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
     }
   };
 
+  const onSelectContacts = async (contacts: string[]) => {
+    const existingNames = new Set((trip.members || []).map((m: any) => m.name.toLowerCase()));
+    const toAdd = Array.from(new Set(contacts.map(n => n.trim()).filter(Boolean)))
+      .filter(n => !existingNames.has(n.toLowerCase()));
+    if (toAdd.length === 0) return;
+    setAddingContacts(true);
+    try {
+      for (const n of toAdd) {
+        await api.post(`/trips/${trip.id}/members`, { name: n });
+      }
+      onAdded();
+    } catch {
+      Alert.alert("Error", "Could not add one or more members");
+    } finally {
+      setAddingContacts(false);
+    }
+  };
+
   return (
-    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: c.bg, borderColor: c.border, maxHeight: 480 }]}>
         <View style={styles.sheetHandle}>
@@ -2478,6 +2498,22 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
           >
             {submitting ? <ActivityIndicator color={c.bg} /> : <Text style={{ color: c.bg, fontSize: 15, fontFamily: "Manrope_700Bold" }}>Add</Text>}
           </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 18, marginBottom: 4 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+            <Text style={{ color: c.textMuted, fontSize: 11, fontWeight: "600" }}>OR</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+          </View>
+
+          {/* Add from device contacts */}
+          {addingContacts ? (
+            <View style={{ paddingVertical: 12, alignItems: "center" }}>
+              <ActivityIndicator color={c.textPrimary} />
+            </View>
+          ) : (
+            <ContactPickerButton testID="add-member-from-contacts" onSelectContacts={onSelectContacts} />
+          )}
 
           <View style={{ marginTop: 22, gap: 8 }}>
             <Text style={{ color: c.textMuted, fontSize: 11, fontFamily: "Manrope_700Bold", letterSpacing: 1 }}>CURRENT MEMBERS</Text>

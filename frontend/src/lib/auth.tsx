@@ -6,7 +6,11 @@ type AuthCtx = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<{ email: string }>;
+  verifyRegistrationOtp: (email: string, otp: string) => Promise<void>;
+  resendRegistrationOtp: (email: string) => Promise<void>;
+  requestDeleteOtp: () => Promise<void>;
+  confirmDeleteAccount: (otp: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   loginWithToken: (token: string, user?: User) => Promise<void>;
@@ -61,9 +65,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
+    // No token yet — the account stays unverified until the emailed OTP is confirmed.
     const r = await api.post("/auth/register", { email, password, name });
+    return { email: r.data.email as string };
+  }, []);
+
+  const verifyRegistrationOtp = useCallback(async (email: string, otp: string) => {
+    const r = await api.post("/auth/verify-register-otp", { email, otp });
     await setToken(r.data.access_token);
     setUser(r.data.user);
+  }, []);
+
+  const resendRegistrationOtp = useCallback(async (email: string) => {
+    await api.post("/auth/resend-register-otp", { email });
+  }, []);
+
+  const requestDeleteOtp = useCallback(async () => {
+    await api.post("/auth/account/request-delete-otp");
+  }, []);
+
+  const confirmDeleteAccount = useCallback(async (otp: string) => {
+    await api.post("/auth/account/confirm-delete", { otp });
+    await setToken(null);
+    setUser(null);
   }, []);
 
   const logout = useCallback(async () => {
@@ -99,6 +123,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login,
         register,
+        verifyRegistrationOtp,
+        resendRegistrationOtp,
+        requestDeleteOtp,
+        confirmDeleteAccount,
         logout,
         refresh,
         loginWithToken,

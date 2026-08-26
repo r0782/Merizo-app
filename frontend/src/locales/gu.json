@@ -87,7 +87,12 @@
     "sentTo": "{{email}} પર મોકલવામાં આવ્યું છે.",
     "verify": "ચકાસણી",
     "didntReceiveIt": "તમને તે પ્રાપ્ત થયો નહીં?",
-    "resend": "ફરીથી મોકલવું"
+    "resend": "ફરીથી મોકલવું",
+    "alreadyHaveAccount": "પહેલેથી ખાતું છે? લોગ ઇન કરો",
+    "noAccount": "ખાતું નથી? સાઇન અપ કરો",
+    "phoneRequired": "ફોન નંબર જરૂરી છે",
+    "nameRequired": "નામ જરૂરી છે",
+    "invalidPhone": "માન્ય 10-અંકનો નંબર દાખલ કરો"
   },
   "home": {
     "netBalance": "નેટ બૅલેન્સ",
@@ -144,7 +149,12 @@
     "catHome": "ગૃહ",
     "catShopping": "ખરીદી",
     "catEntertainment": "મનોરંજન",
-    "catOther": "અન્ય"
+    "catOther": "અન્ય",
+    "subscriptions": "સબ્સ્ક્રિપ્શન",
+    "activeGroupsHint": "સક્રિય ગ્રુપ — કંઈપણ પૂછો",
+    "balanceDetail": "બેલેન્સ વિગત",
+    "youOweMore": "તમારે મળવાનું છે તેના કરતાં વધુ ચૂકવવાનું છે",
+    "owedMore": "લોકો તમને જેટલું ચૂકવવાના છે તેના કરતાં તમારે વધુ ચૂકવવાનું છે"
   },
   "groups": {
     "title": "ગ્રૂપ",
@@ -159,7 +169,32 @@
     "noExpenses": "ખર્ચ નથી",
     "totalSpent": "કુલ ખર્ચ",
     "deleteGroup": "ગ્રૂપ કાઢો",
-    "deleteGroupConfirm": "આ ગ્રૂપ કાઢવો? આ પૂર્વવત્ ન થઈ શકે."
+    "deleteGroupConfirm": "આ ગ્રૂપ કાઢવો? આ પૂર્વવત્ ન થઈ શકે.",
+    "inviteLink": "આમંત્રણ લિંક",
+    "copyLink": "આમંત્રણ લિંક કૉપિ કરો",
+    "linkCopied": "આમંત્રણ લિંક કૉપિ થઈ ગઈ!",
+    "journal": "જર્નલ",
+    "addFirst": "તમારો પહેલો ખર્ચ ઉમેરો",
+    "perPerson": "વ્યક્તિ દીઠ",
+    "settled": "સેટલ થયું ✓",
+    "youOwe": "તમારે ચૂકવવાનું છે",
+    "owesYou": "તમને ચૂકવવાનું છે",
+    "yourBalance": "તમારું બેલેન્સ",
+    "settleUp": "સેટલ કરો",
+    "expenseCount": "{{count}} ખર્ચ",
+    "expenseCount_plural": "{{count}} ખર્ચ",
+    "memberCount": "{{count}} સભ્ય",
+    "memberCount_plural": "{{count}} સભ્યો",
+    "leaveGroup": "ગ્રુપ છોડો",
+    "currency": "ચલણ",
+    "category": "શ્રેણી",
+    "categories": {
+      "trip": "પ્રવાસ",
+      "home": "ઘર",
+      "office": "ઓફિસ",
+      "friends": "મિત્રો",
+      "other": "અન્ય"
+    }
   },
   "expenses": {
     "addExpense": "ખર્ચ ઉમેરો",
@@ -172,19 +207,74 @@
     "deleteExpense": "ખર્ચ કાઢો",
     "deleteConfirm": "આ ખર્ચ કાઢવો?",
     "noExpenses": "ખર્ચ નથી",
-    "expense": "ખર્ચ"
+    "expense": "ખર્ચ",
+    "editExpense": "ખર્ચ સંપાદિત કરો",
+    "splitEqually": "સરખા ભાગે વહેંચો",
+    "addNote": "નોંધ ઉમેરો",
+    "voiceExpense": "વૉઇસ ખર્ચ",
+    "scanBill": "બિલ સ્કેન કરો",
+    "editConfirm": "ફેરફારો સાચવીએ?",
+    "categories": {
+      "food": "ખોરાક",
+      "travel": "પ્રવાસ",
+      "entertainment": "મનોરંજન",
+      "utilities": "બિલ અને યુટિલિટી",
+      "shopping": "શોપિંગ",
+      "health": "આરોગ્ય",
+      "accommodation": "રહેઠાણ",
+      "trip": "ટ્રિપ",
+      "other": "અન્ય"
+    },
+    "splitType": {
+      "equal": "સરખા ભાગે વહેંચો",
+      "exact": "ચોક્કસ રકમ",
+      "percent": "ટકાવારી પ્રમાણે"
+    },
+    "addFirstExpense": "તમારો પહેલો ખર્ચ ઉમેરો",
+    "settlementPayment": "સેટલમેન્ટ ચુકવણી"
   },
   "settle": {
     "title": "ચૂકતો",
     "noSettlements": "બધા ચૂકતો!",
-    "allSquare": "બધા સમાન"
+    "allSquare": "બધા સમાન",
+    "settleAll": "બધું સેટલ કરો",
+    "markSettled": "સેટલ તરીકે માર્ક કરો",
+    "pending": "બાકી ચુકવણી",
+    "history": "સેટલમેન્ટ ઇતિહાસ",
+    "explainEveryRupee": "દરેક {{currency}} સમજાવો",
+    "moneyFlow": "પૈસાનો પ્રવાહ",
+    "whyThisPayment": "આ ચુકવણી શા માટે",
+    "noPayments": "કોઈ ચુકવણી જરૂરી નથી",
+    "recordPayment": "ચુકવણી નોંધો"
   },
   "insights": {
     "title": "આંતરદૃષ્ટિ",
     "totalSpending": "કુલ ખર્ચ",
     "byCategory": "શ્રેણી પ્રમાણે",
     "noExpenses": "ખર્ચ નથી",
-    "monthlyBudget": "માસિક બજેટ"
+    "monthlyBudget": "માસિક બજેટ",
+    "setBudget": "બજેટ સેટ કરો",
+    "thisPeriod": "બધા ગ્રુપમાં આ સમયગાળામાં",
+    "addToSee": "ખર્ચનું વિભાજન જોવા માટે ખર્ચ ઉમેરો",
+    "aiInsights": "AI ઇનસાઇટ્સ",
+    "monthlyTrends": "માસિક વલણો",
+    "spendingBreakdown": "ખર્ચનું વિભાજન",
+    "budget": {
+      "setTitle": "માસિક બજેટ સેટ કરો",
+      "food": "ખોરાક",
+      "travel": "પ્રવાસ",
+      "entertainment": "મનોરંજન",
+      "shopping": "શોપિંગ",
+      "bills": "બિલ અને યુટિલિટી",
+      "overBudget": "વધારે",
+      "save": "બજેટ સાચવો"
+    },
+    "period": {
+      "1M": "1મ",
+      "3M": "3મ",
+      "6M": "6મ",
+      "1Y": "1વ"
+    }
   },
   "chat": {
     "title": "મેરિઝો AI",
@@ -210,14 +300,53 @@
     "promptWhoOwesInGroup": "{{name}} માં સૌથી વધુ કોણે ચૂકવવાનું છે?",
     "promptRecentExpenses": "{{name}} માં તાજેતરના ખર્ચાઓ બતાવો.",
     "promptAddExpense": "{{name}} નો ખર્ચ ઉમેરો.",
-    "promptSummarise": "{{name}} નો સારાંશ આપો."
+    "promptSummarise": "{{name}} નો સારાંશ આપો.",
+    "suggestions": {
+      "createGroup": "ગોવા ટ્રિપ ગ્રુપ બનાવો",
+      "showGroups": "મારા બધા ગ્રુપ બતાવો",
+      "monthlySpend": "આ મહિને મારો ખર્ચ કેટલો છે?",
+      "whoOwes": "મને સૌથી વધુ કોણ ચૂકવવાનું છે?"
+    },
+    "contextGroup": "સંદર્ભ: {{name}}",
+    "clearContext": "સાફ કરો",
+    "actions": {
+      "expense_added": "ખર્ચ ઉમેરાયો",
+      "group_created": "ગ્રુપ બન્યું",
+      "group_renamed": "ગ્રુપનું નામ બદલાયું",
+      "member_added": "સભ્ય ઉમેરાયો",
+      "member_removed": "સભ્ય દૂર કરાયો",
+      "debt_settled": "સેટલ થયું",
+      "expenses_listed": "ખર્ચ",
+      "balance_shown": "બેલેન્સ",
+      "group_summarized": "સારાંશ",
+      "error": "કંઈક ખોટું થયું"
+    },
+    "tts": {
+      "speak": "બોલો",
+      "stop": "રોકો",
+      "replay": "ફરી સાંભળો",
+      "mute": "મ્યૂટ કરો",
+      "unmute": "અનમ્યૂટ કરો"
+    },
+    "errorNoMic": "માઇક્રોફોન પરવાનગી નકારાઈ",
+    "errorVoice": "વૉઇસ ઓળખ નિષ્ફળ. ફરી પ્રયાસ કરો."
   },
   "profile": {
     "title": "પ્રોફાઇલ",
     "language": "એપ ભાષા",
     "aiSettings": "AI સેટિંગ્સ",
     "logout": "લૉગ આઉટ",
-    "version": "આવૃત્તિ"
+    "version": "આવૃત્તિ",
+    "editProfile": "પ્રોફાઇલ સંપાદિત કરો",
+    "notifications": "સૂચનાઓ",
+    "privacy": "ગોપનીયતા અને સુરક્ષા",
+    "help": "મદદ અને સપોર્ટ",
+    "about": "મેરિઝો વિશે",
+    "deleteAccount": "ખાતું કાઢી નાખો",
+    "memberSince": "સભ્ય બન્યા",
+    "totalGroups": "ગ્રુપ",
+    "totalExpenses": "ખર્ચ",
+    "amountSplit": "વહેંચાયેલી રકમ"
   },
   "language": {
     "title": "એપ ભાષા",
@@ -225,13 +354,110 @@
     "search": "ભાષા શોધો…",
     "selected": "પસંદ",
     "saveSuccess": "ભાષા બદલી: {{language}}",
-    "previewText": "મેરિઝો — સ્માર્ટ ખર્ચ વિભાજન"
+    "previewText": "મેરિઝો — સ્માર્ટ ખર્ચ વિભાજન",
+    "autoDetect": "ઓટો-ડિટેક્ટ",
+    "preview": "પ્રિવ્યૂ ટેક્સ્ટ",
+    "languages": {
+      "en": "English",
+      "hi": "હિન્દી — हिंदी",
+      "te": "તેલુગુ — తెలుగు",
+      "ta": "તમિલ — தமிழ்",
+      "kn": "કન્નડ — ಕನ್ನಡ",
+      "ml": "મલયાલમ — മലയാളം",
+      "mr": "મરાઠી — मराठी",
+      "bn": "બંગાળી — বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "પંજાબી — ਪੰਜਾਬੀ",
+      "ur": "ઉર્દૂ — اردو",
+      "or": "ઉડિયા — ଓଡ଼ିଆ",
+      "as": "આસામી — অসমীয়া"
+    },
+    "nativeNames": {
+      "en": "English",
+      "hi": "हिंदी",
+      "te": "తెలుగు",
+      "ta": "தமிழ்",
+      "kn": "ಕನ್ನಡ",
+      "ml": "മലയാളം",
+      "mr": "मराठी",
+      "bn": "বাংলা",
+      "gu": "ગુજરાતી",
+      "pa": "ਪੰਜਾਬੀ",
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
+    }
   },
   "errors": {
     "noInternet": "ઇન્ટરનેટ કનેક્શન નથી",
     "serverDown": "સર્વર ઉપલબ્ધ નથી.",
     "speechFailed": "વૉઇસ ઓળખ નિષ્ફળ. ફરી પ્રયાસ કરો.",
     "tryAgain": "ફરી પ્રયાસ કરો",
-    "generic": "કંઈક ખોટું થઈ ગયું."
+    "generic": "કંઈક ખોટું થઈ ગયું.",
+    "rateLimited": "ઘણી બધી વિનંતીઓ. થોડી રાહ જુઓ.",
+    "translationFailed": "અનુવાદ નિષ્ફળ થયો.",
+    "unsupportedLanguage": "આ ભાષા હજુ સંપૂર્ણ રીતે સપોર્ટેડ નથી.",
+    "micPermission": "વૉઇસ ઇનપુટ માટે માઇક્રોફોન પરવાનગી જરૂરી છે.",
+    "invalidResponse": "અનપેક્ષિત પ્રતિસાદ મળ્યો.",
+    "timeout": "વિનંતીનો સમય પૂરો થયો. ફરી પ્રયાસ કરો.",
+    "networkError": "નેટવર્ક ભૂલ. તમારું જોડાણ તપાસો.",
+    "authRequired": "ચાલુ રાખવા લોગ ઇન કરો.",
+    "notFound": "મળ્યું નથી."
+  },
+  "aiSettings": {
+    "title": "AI સેટિંગ્સ",
+    "enableAi": "AI સહાયક સક્રિય કરો",
+    "enableAiDesc": "સ્માર્ટ સૂચનો મેળવો અને કાર્યો ઓટોમેટ કરો",
+    "enableVoice": "વૉઇસ ઇનપુટ સક્રિય કરો",
+    "enableVoiceDesc": "ખર્ચ ઉમેરવા અને ગ્રુપ મેનેજ કરવા બોલો",
+    "voiceOutput": "AI વૉઇસ જવાબો",
+    "voiceOutputDesc": "AI ના જવાબો સાંભળો",
+    "responseLanguage": "AI જવાબની ભાષા",
+    "responseLanguageDesc": "AI જવાબો માટેની ભાષા",
+    "voiceSpeed": "વૉઇસ ઝડપ",
+    "voiceSpeedSlow": "ધીમું",
+    "voiceSpeedNormal": "સામાન્ય",
+    "voiceSpeedFast": "ઝડપી",
+    "speechLanguage": "સ્પીચ રેકગ્નિશન ભાષા",
+    "resetConversation": "વાતચીત રીસેટ કરો",
+    "resetConfirm": "બધો ચેટ ઇતિહાસ સાફ કરીએ?",
+    "privacy": "ગોપનીયતા સેટિંગ્સ",
+    "provider": "AI પ્રોવાઇડર",
+    "providerDesc": "ઉપયોગ કરવા માટે AI મોડેલ પસંદ કરો",
+    "sarvam": "Sarvam AI (ભારતીય ભાષાઓ માટે ભલામણ કરેલ)",
+    "gemini": "Gemini 2.5 Flash",
+    "groq": "Groq llama-3.3-70b"
+  },
+  "onboarding": {
+    "step1Title": "સહેલાઈથી ખર્ચ વહેંચો",
+    "step1Desc": "સેકંડોમાં ખર્ચ ઉમેરો અને મિત્રો અને પરિવાર સાથે ન્યાયી રીતે વહેંચો.",
+    "step2Title": "સ્માર્ટ રીતે સેટલ કરો",
+    "step2Desc": "અમારું AI સેટલ કરવા માટે જરૂરી ચુકવણીઓની સંખ્યા ઘટાડે છે.",
+    "step3Title": "AI-સંચાલિત ઇનસાઇટ્સ",
+    "step3Desc": "સુંદર વિઝ્યુલાઇઝેશન સાથે તમારી ખર્ચ પેટર્ન સમજો.",
+    "getStarted": "શરૂ કરો",
+    "currencyTitle": "તમારું ચલણ પસંદ કરો",
+    "currencySubtitle": "આ તમારું ડિફોલ્ટ ચલણ હશે"
+  },
+  "activity": {
+    "title": "પ્રવૃત્તિ",
+    "noActivity": "હજુ સુધી કોઈ પ્રવૃત્તિ નથી",
+    "recentExpenses": "તાજેતરના ખર્ચ"
+  },
+  "recurring": {
+    "title": "પુનરાવર્તિત",
+    "addRecurring": "પુનરાવર્તિત ખર્ચ ઉમેરો",
+    "monthly": "માસિક",
+    "weekly": "સાપ્તાહિક",
+    "yearly": "વાર્ષિક",
+    "noRecurring": "કોઈ પુનરાવર્તિત ખર્ચ નથી"
+  },
+  "scan": {
+    "title": "બિલ સ્કેન કરો",
+    "tapToScan": "ફોટો લેવા ટેપ કરો",
+    "scanning": "સ્કેન થઈ રહ્યું છે…",
+    "reviewItems": "વસ્તુઓ સમીક્ષો",
+    "total": "કુલ",
+    "addToGroup": "ગ્રુપમાં ઉમેરો"
   }
 }

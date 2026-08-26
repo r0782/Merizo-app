@@ -368,7 +368,9 @@
       "bn": "Bengali — বাংলা",
       "gu": "Gujarati — ગુજરાતી",
       "pa": "Punjabi — ਪੰਜਾਬੀ",
-      "ur": "Urdu — اردو"
+      "ur": "Urdu — اردو",
+      "or": "Odia — ଓଡ଼ିଆ",
+      "as": "Assamese — অসমীয়া"
     },
     "nativeNames": {
       "en": "English",
@@ -381,7 +383,9 @@
       "bn": "বাংলা",
       "gu": "ગુજરાતી",
       "pa": "ਪੰਜਾਬੀ",
-      "ur": "اردو"
+      "ur": "اردو",
+      "or": "ଓଡ଼ିଆ",
+      "as": "অসমীয়া"
     }
   },
   "aiSettings": {

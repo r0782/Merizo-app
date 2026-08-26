@@ -5,7 +5,8 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  Platform, Linking, Modal, TextInput, Switch, Share,
+  Platform, Linking, Modal, TextInput, Switch, Share, ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -120,7 +121,7 @@ function ProfileSketchIcon({ size = 48, initial, c }: any) {
 
 export default function ProfileScreen() {
   const { c, isDark, toggle } = useTheme();
-  const { user, logout, refresh } = useAuth();
+  const { user, logout, refresh, requestDeleteOtp, confirmDeleteAccount } = useAuth();
   const { i18n } = useTranslation();
   const router = useRouter();
 
@@ -130,6 +131,20 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState(true);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [totalGroups, setTotalGroups] = useState(0);
+
+  // ── Delete account: confirm → email OTP → permanent delete ─────────────────
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteOtpVisible,     setDeleteOtpVisible]     = useState(false);
+  const [deleteOtp,            setDeleteOtp]            = useState("");
+  const [deleteLoading,        setDeleteLoading]        = useState(false);
+  const [deleteError,          setDeleteError]          = useState("");
+  const [deleteResendTimer,    setDeleteResendTimer]    = useState(0);
+
+  useEffect(() => {
+    if (deleteResendTimer <= 0) return;
+    const t = setTimeout(() => setDeleteResendTimer(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [deleteResendTimer]);
 
   useEffect(() => {
     AsyncStorage.getItem("merizo_currency").then(cur => { if (cur) setCurrency(cur); }).catch(() => {});
@@ -154,13 +169,55 @@ export default function ProfileScreen() {
     router.replace("/login");
   };
 
-  const onDeleteAccount = async () => {
-    const ok = await confirmAction(
-      "Delete account",
-      "Email support@merizo.app to permanently delete your account.",
-      "Email Support"
-    );
-    if (ok) Linking.openURL("mailto:support@merizo.app?subject=Delete%20my%20account");
+  const onDeleteAccount = () => {
+    setDeleteError("");
+    setDeleteConfirmVisible(true);
+  };
+
+  const onDeleteConfirmed = async () => {
+    setDeleteConfirmVisible(false);
+    setDeleteLoading(true);
+    try {
+      await requestDeleteOtp();
+      setDeleteOtp("");
+      setDeleteError("");
+      setDeleteResendTimer(60);
+      setDeleteOtpVisible(true);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      Alert.alert("Error", typeof detail === "string" ? detail : "Could not send confirmation code. Try again.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const onResendDeleteOtp = async () => {
+    if (deleteResendTimer > 0) return;
+    setDeleteError("");
+    try {
+      await requestDeleteOtp();
+      setDeleteOtp("");
+      setDeleteResendTimer(60);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      setDeleteError(typeof detail === "string" ? detail : "Could not resend code.");
+    }
+  };
+
+  const onSubmitDeleteOtp = async () => {
+    setDeleteError("");
+    if (deleteOtp.length !== 6) { setDeleteError("Enter the 6-digit code"); return; }
+    setDeleteLoading(true);
+    try {
+      await confirmDeleteAccount(deleteOtp);
+      setDeleteOtpVisible(false);
+      router.replace("/login");
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      setDeleteError(typeof detail === "string" ? detail : "Invalid or expired code");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   // Simple inline SVG icons
@@ -365,7 +422,10 @@ export default function ProfileScreen() {
 
       {/* ── Edit Profile Modal ── */}
       <Modal visible={editProfile} transparent animationType="slide" onRequestClose={() => setEditProfile(false)}>
-        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}
+        >
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
             <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 20, letterSpacing: -0.3 }}>
               Edit Profile
@@ -400,7 +460,104 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Delete Account: Step 1 — Are you sure? ── */}
+      <Modal visible={deleteConfirmVisible} transparent animationType="fade" onRequestClose={() => setDeleteConfirmVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <View style={{ width: "100%", maxWidth: 360, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border, padding: 24 }}>
+            <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 10, letterSpacing: -0.3 }}>
+              Delete your account?
+            </Text>
+            <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, lineHeight: 20, marginBottom: 24 }}>
+              This permanently deletes your Merizo account and cannot be undone. We&apos;ll email a confirmation code to {user?.email || "your email"} before anything is removed.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                testID="delete-account-cancel"
+                onPress={() => setDeleteConfirmVisible(false)}
+                style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
+              >
+                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>No, keep it</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="delete-account-confirm"
+                disabled={deleteLoading}
+                onPress={onDeleteConfirmed}
+                style={{ flex: 1, backgroundColor: c.textPrimary, paddingVertical: 14, alignItems: "center", opacity: deleteLoading ? 0.6 : 1 }}
+              >
+                {deleteLoading
+                  ? <ActivityIndicator color={c.bg} />
+                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>Yes, delete</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
+      </Modal>
+
+      {/* ── Delete Account: Step 2 — Email OTP confirmation ── */}
+      <Modal visible={deleteOtpVisible} transparent animationType="slide" onRequestClose={() => setDeleteOtpVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" }}
+        >
+          <View style={{ backgroundColor: c.bg, borderTopWidth: 1.5, borderTopColor: c.border, padding: 24, paddingBottom: 48 }}>
+            <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, marginBottom: 8, letterSpacing: -0.3 }}>
+              Confirm deletion
+            </Text>
+            <Text style={{ fontFamily: type.family.regular, fontSize: 13, color: c.textSecondary, lineHeight: 19, marginBottom: 20 }}>
+              Enter the 6-digit code we sent to {user?.email}.
+            </Text>
+            <TextInput
+              testID="delete-otp-input"
+              value={deleteOtp}
+              onChangeText={v => setDeleteOtp(v.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              placeholderTextColor={c.textMuted}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+              style={{
+                borderWidth: 1.5, borderColor: deleteError ? "#cc0000" : c.border,
+                paddingVertical: 16, fontSize: 24, fontWeight: "700",
+                color: c.textPrimary, textAlign: "center", letterSpacing: 10,
+                marginBottom: 12,
+              } as any}
+            />
+            {!!deleteError && (
+              <Text testID="delete-otp-error" style={{ color: "#cc0000", fontSize: 13, marginBottom: 12 }}>
+                {deleteError}
+              </Text>
+            )}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="delete-otp-cancel"
+                onPress={() => { setDeleteOtpVisible(false); setDeleteOtp(""); setDeleteError(""); }}
+                style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, paddingVertical: 14, alignItems: "center" }}
+              >
+                <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.textPrimary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="delete-otp-submit"
+                disabled={deleteLoading || deleteOtp.length !== 6}
+                onPress={onSubmitDeleteOtp}
+                style={{ flex: 1, backgroundColor: c.textPrimary, paddingVertical: 14, alignItems: "center", opacity: deleteLoading || deleteOtp.length !== 6 ? 0.6 : 1 }}
+              >
+                {deleteLoading
+                  ? <ActivityIndicator color={c.bg} />
+                  : <Text style={{ fontFamily: type.family.semibold, fontSize: type.size.base, color: c.bg }}>Delete account</Text>
+                }
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity testID="delete-otp-resend" disabled={deleteResendTimer > 0} onPress={onResendDeleteOtp} style={{ alignItems: "center" }}>
+              <Text style={{ fontFamily: type.family.regular, fontSize: 13, color: deleteResendTimer > 0 ? c.textMuted : c.textPrimary }}>
+                {deleteResendTimer > 0 ? `Resend code in ${deleteResendTimer}s` : "Resend code"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

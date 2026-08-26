@@ -105,7 +105,7 @@ export function EmptyGroups({ onPrimary, onSecondary }: EmptyProps) {
         No groups yet
       </Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
-        Create a group for trips, roommates, or dinner — and we'll handle all the math.
+        Create a group for trips, roommates, or dinner — and we&apos;ll handle all the math.
       </Text>
       <PrimaryBtn
         label="Create a Group" c={c}
@@ -134,7 +134,7 @@ export function EmptyExpenses({ onPrimary, onSecondary }: EmptyProps) {
         No expenses yet
       </Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
-        Add your first expense or scan a receipt — we'll extract the details automatically.
+        Add your first expense or scan a receipt — we&apos;ll extract the details automatically.
       </Text>
       <PrimaryBtn
         label="Add Expense" c={c}
@@ -178,7 +178,7 @@ export function EmptyInsights({ onPrimary }: EmptyProps) {
         No insights yet
       </Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 28 }}>
-        Start adding expenses and we'll show you spending patterns, category breakdowns, and smart suggestions.
+        Start adding expenses and we&apos;ll show you spending patterns, category breakdowns, and smart suggestions.
       </Text>
       <PrimaryBtn
         label="Add your first expense" c={c}
@@ -195,7 +195,7 @@ export function EmptySearch({ query }: { query: string }) {
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
       <FloatingOrb size={80} icon={<MagnifyingGlassIcon size={32} color={c.textMuted} weight="thin" />} />
       <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, textAlign: "center", marginBottom: 8, letterSpacing: type.tracking.tight }}>
-        Nothing found for "{query}"
+        Nothing found for &quot;{query}&quot;
       </Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>
         Try a different search term or check the spelling.
@@ -210,7 +210,7 @@ export function EmptyNetworkError({ onRetry }: { onRetry?: () => void }) {
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 32 }}>
       <FloatingOrb size={80} icon={<WifiSlashIcon size={32} color={c.textMuted} weight="thin" />} />
       <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, textAlign: "center", marginBottom: 8, letterSpacing: type.tracking.tight }}>
-        Can't connect right now
+        Can&apos;t connect right now
       </Text>
       <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 24 }}>
         Check your internet connection and try again.

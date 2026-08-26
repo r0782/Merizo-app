@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,8 +31,8 @@ export default function RegisterScreen() {
       const emailCheck = await validateEmailAPI(email.trim());
       if (!emailCheck.format) { setError("Please enter a valid email address."); setLoading(false); return; }
       if (!emailCheck.valid)  { setError(emailCheck.reason || "This email cannot receive messages. Please use a different one."); setLoading(false); return; }
-      await register(email.trim(), password, name.trim());
-      router.replace(ROUTES.CURRENCY_ONBOARDING);
+      const { email: registeredEmail } = await register(email.trim(), password, name.trim());
+      router.push({ pathname: ROUTES.REGISTER_VERIFY, params: { email: registeredEmail } });
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Could not create account");
@@ -42,7 +42,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       {/* Theme toggle */}
       <TouchableOpacity
         testID="theme-toggle-register"
@@ -59,9 +59,11 @@ export default function RegisterScreen() {
       >
         {/* Wordmark */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 40 }}>
-          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.textPrimary, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: c.bg, fontSize: 18, fontWeight: "800" }}>M</Text>
-          </View>
+          <Image
+            source={require("../assets/images/logo-icon.png")}
+            style={{ width: 36, height: 36 }}
+            resizeMode="contain"
+          />
           <Text style={{ color: c.textPrimary, fontSize: 20, fontWeight: "700", letterSpacing: -0.5 }}>Merizo</Text>
         </View>
 
