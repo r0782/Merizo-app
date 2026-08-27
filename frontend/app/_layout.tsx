@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
-import { Text, TextInput } from "react-native";
+import { Text, TextInput, View, Platform, useWindowDimensions } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -31,8 +31,17 @@ SplashScreen.preventAutoHideAsync();
 (TextInput as any).defaultProps = (TextInput as any).defaultProps ?? {};
 (TextInput as any).defaultProps.style = [{ fontFamily: "Manrope_400Regular" }];
 
+// Above this viewport width on web (tablet browser windows and desktop/PC),
+// the app's mobile-first screens would otherwise stretch edge-to-edge and
+// look broken (form fields and buttons spanning a widescreen monitor). Below
+// it — phones, and narrow tablet/desktop browser windows — nothing changes.
+const WEB_WIDE_BREAKPOINT = 700;
+const WEB_MAX_CONTENT_WIDTH = 480;
+
 function RootStack() {
   const { isDark, c } = useTheme();
+  const { width } = useWindowDimensions();
+  const isWideWeb = Platform.OS === "web" && width >= WEB_WIDE_BREAKPOINT;
 
   // Without this, the native window background behind the OS edge-to-edge
   // gesture/nav bar stays its Android default (white) regardless of the
@@ -41,16 +50,38 @@ function RootStack() {
     SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
   }, [c.bg]);
 
+  const stack = (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: c.bg },
+        animation: "fade",
+      }}
+    />
+  );
+
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: c.bg },
-          animation: "fade",
-        }}
-      />
+      {isWideWeb ? (
+        <View style={{ flex: 1, backgroundColor: c.surfaceAlt, alignItems: "center" }}>
+          <View
+            style={{
+              flex: 1,
+              width: "100%",
+              maxWidth: WEB_MAX_CONTENT_WIDTH,
+              backgroundColor: c.bg,
+              borderLeftWidth: 1,
+              borderRightWidth: 1,
+              borderColor: c.border,
+            }}
+          >
+            {stack}
+          </View>
+        </View>
+      ) : (
+        stack
+      )}
     </>
   );
 }

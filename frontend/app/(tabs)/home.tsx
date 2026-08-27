@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  Platform, Modal,
+  Platform, Modal, useWindowDimensions,
 } from "react-native";
 import Animated, {
   useSharedValue, withSpring, withTiming, withDelay,
@@ -336,6 +336,10 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  // Scanning a paper bill via camera isn't a desktop/PC workflow — hide the
+  // quick action there while keeping it on mobile and tablet-width web.
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
 
   const [trips,          setTrips]          = useState<any[]>([]);
   const [recentExp,      setRecentExp]      = useState<any[]>([]);
@@ -449,12 +453,14 @@ export default function HomeScreen() {
               c={c}
               icon={<PlusIcon size={22} color={c.textPrimary} weight="regular" />}
             />
-            <QuickAction
-              label={`${t("home.wordScan")}\n${t("home.wordBill")}`}
-              onPress={() => router.push("/scan")}
-              c={c}
-              icon={<ScanIcon size={22} color={c.textPrimary} weight="regular" />}
-            />
+            {!isDesktopWeb && (
+              <QuickAction
+                label={`${t("home.wordScan")}\n${t("home.wordBill")}`}
+                onPress={() => router.push("/scan")}
+                c={c}
+                icon={<ScanIcon size={22} color={c.textPrimary} weight="regular" />}
+              />
+            )}
             <QuickAction
               label={`${t("home.wordNew")}\n${t("home.wordGroup")}`}
               onPress={() => setShowNewGroup(true)}

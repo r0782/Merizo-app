@@ -192,6 +192,7 @@ export const categoryMeta: Record<string, { label: string; icon: string; tint: s
   travel:        { label: "Travel",        icon: "airplane-outline",          tint: "#60A5FA" },
   entertainment: { label: "Entertainment", icon: "film-outline",              tint: "#A78BFA" },
   utilities:     { label: "Utilities",     icon: "flash-outline",             tint: "#FBBF24" },
+  home:          { label: "Home",          icon: "home-outline",              tint: "#7DD3FC" },
   shopping:      { label: "Shopping",      icon: "bag-handle-outline",        tint: "#F472B6" },
   health:        { label: "Health",        icon: "medkit-outline",            tint: "#34D399" },
   accommodation: { label: "Stay",          icon: "bed-outline",               tint: "#E8B04E" },
