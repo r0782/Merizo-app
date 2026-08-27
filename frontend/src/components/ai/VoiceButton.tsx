@@ -191,8 +191,13 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
   };
 
   // Stops the native recognizer/recording without touching React state —
-  // safe to call after this component has already unmounted.
-  const cancelNativeListening = () => {
+  // safe to call after this component has already unmounted. Kept behind a
+  // ref (rather than passed to the effects below as a dependency) since it
+  // closes over stopPulse/safeUnload, which are recreated every render —
+  // the ref lets the effects always call the latest version without needing
+  // to re-run on every render or re-fire their cleanup on unrelated renders.
+  const cancelNativeListeningRef = useRef<() => void>(() => {});
+  cancelNativeListeningRef.current = () => {
     if (AndroidSpeech.isAndroidSpeechSupported) {
       AndroidSpeech.cancel().catch(() => {});
     } else {
@@ -207,7 +212,7 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
   // the waveform animation is left frozen mid-pulse for whoever returns.
   useEffect(() => {
     if (!isFocused && isRecordingRef.current) {
-      cancelNativeListening();
+      cancelNativeListeningRef.current();
       setIsRecording(false);
       setIsLoading(false);
     }
@@ -215,7 +220,7 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
 
   useEffect(() => {
     return () => {
-      if (isRecordingRef.current) cancelNativeListening();
+      if (isRecordingRef.current) cancelNativeListeningRef.current();
     };
   }, []);
 
