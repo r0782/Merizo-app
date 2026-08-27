@@ -141,3 +141,6 @@ See `backend/.env.example` and `frontend/.env.example` for the full list. Notabl
 
 - Backend: Render (`render.yaml`, `rootDir: backend`, `uvicorn server:app --host 0.0.0.0 --port $PORT`).
 - Frontend: EAS Build (`frontend/eas.json`) for app store builds; `expo export` for web.
+
+## Apk File
+- https://expo.dev/accounts/mahesh_05/projects/merizo/builds/5d237e46-91b5-47f9-b092-403166a5e3b1
