@@ -56,20 +56,27 @@ jobs:
     # over HTTP — never point them at production. Set the MERIZO_TEST_BACKEND_URL
     # repo/environment secret to a staging deployment backed by a separate
     # Supabase project to enable this job; until then it's skipped, not failed.
-    if: ${{ vars.MERIZO_TEST_BACKEND_URL != '' || secrets.MERIZO_TEST_BACKEND_URL != '' }}
+    #
+    # `secrets`/`env` aren't in scope for jobs.<job_id>.if (only github, needs,
+    # vars, inputs are), so the enable check has to live on each step instead —
+    # a job-level if referencing either one is an invalid workflow file.
     env:
       EXPO_PUBLIC_BACKEND_URL: ${{ vars.MERIZO_TEST_BACKEND_URL || secrets.MERIZO_TEST_BACKEND_URL }}
     steps:
       - uses: actions/checkout@v4
+        if: env.EXPO_PUBLIC_BACKEND_URL != ''
 
       - uses: actions/setup-python@v5
+        if: env.EXPO_PUBLIC_BACKEND_URL != ''
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
 
       - name: Install dependencies
+        if: env.EXPO_PUBLIC_BACKEND_URL != ''
         run: pip install -r requirements-dev.txt
 
       - name: Run pytest against staging
+        if: env.EXPO_PUBLIC_BACKEND_URL != ''
         run: pytest tests/ -v

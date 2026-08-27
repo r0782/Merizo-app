@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -119,7 +119,7 @@ async def voice_transcribe(
 ):
     """
     Transcribe audio and parse it as an expense.
-    Tries Gemini first, then Sarvam STT, then falls back to OpenAI Whisper.
+    Tries Gemini first, then falls back to OpenAI Whisper.
     """
     import os
     audio_bytes = await audio.read()
@@ -139,71 +139,12 @@ async def voice_transcribe(
             import logging
             logging.getLogger("merizo.router").warning(f"Gemini STT failed, falling back: {e}")
 
-    # Then Sarvam STT
-    if os.environ.get("SARVAM_API_KEY"):
-        try:
-            from .sarvam_voice import transcribe_audio_sarvam
-            from .parser import parse_expense_from_text
-            transcript = await transcribe_audio_sarvam(
-                audio_bytes, language, audio.filename or "audio.m4a"
-            )
-            parsed = await parse_expense_from_text(transcript, member_list, currency)
-            return {"transcript": transcript, "parsed": parsed}
-        except Exception as e:
-            import logging
-            logging.getLogger("merizo.router").warning(f"Sarvam STT failed, falling back: {e}")
-
     # Fallback to OpenAI Whisper
     try:
         from .voice import transcribe_and_parse
         return await transcribe_and_parse(audio_bytes, member_list, currency, language)
     except RuntimeError:
-        raise HTTPException(503, "Voice transcription requires GEMINI_API_KEY, SARVAM_API_KEY, or OPENAI_API_KEY.")
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-class TTSRequest(BaseModel):
-    text: str
-    language: str = "en"
-    speed: float = 1.0
-
-
-@router.post("/tts")
-async def text_to_speech(req: TTSRequest):
-    """
-    Convert text to speech using Sarvam bulbul:v1.
-    Returns audio/wav bytes as a streaming response.
-    """
-    if not req.text.strip():
-        raise HTTPException(400, "text is required")
-    try:
-        from .sarvam_voice import text_to_speech_sarvam
-        audio_bytes = await text_to_speech_sarvam(req.text, req.language, req.speed)
-        return Response(
-            content=audio_bytes,
-            media_type="audio/wav",
-            headers={"Content-Disposition": "inline; filename=speech.wav"},
-        )
-    except RuntimeError as e:
-        raise HTTPException(503, str(e))
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-class DetectLangRequest(BaseModel):
-    text: str
-
-
-@router.post("/detect-language")
-async def detect_language(req: DetectLangRequest):
-    """Detect the language of a text string using Sarvam."""
-    try:
-        from .sarvam_voice import detect_language_sarvam
-        lang = await detect_language_sarvam(req.text)
-        return {"language": lang}
-    except RuntimeError:
-        return {"language": "en"}
+        raise HTTPException(503, "Voice transcription requires GEMINI_API_KEY or OPENAI_API_KEY.")
     except Exception as e:
         raise HTTPException(500, str(e))
 

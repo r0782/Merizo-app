@@ -55,7 +55,7 @@ export function SketchAIAvatar({ size = 40, color, speaking = false }: Props) {
     );
 
     return () => clearTimeout(t);
-  }, []);
+  }, [antennaBob, eyeL, eyeR]);
 
   const leftEyeProps = useAnimatedProps(() => ({ ry: eyeL.value }));
   const rightEyeProps = useAnimatedProps(() => ({ ry: eyeR.value }));
@@ -75,9 +75,7 @@ export function SketchAIAvatar({ size = 40, color, speaking = false }: Props) {
     } else {
       mouthOpen.value = withTiming(0, { duration: 150 });
     }
-  }, [speaking]);
-
-  const scale = size / 40; // normalize to 40px
+  }, [speaking, mouthOpen]);
 
   return (
     <Svg width={size} height={size} viewBox="0 0 40 40">

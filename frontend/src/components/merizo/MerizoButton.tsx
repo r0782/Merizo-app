@@ -3,8 +3,8 @@
  * On press: the border "fills" with ink like a pen drawing.
  * States: idle → pressing (ink spreads) → loading → done (checkmark draws)
  */
-import { useRef, useEffect, useState } from "react";
-import { Animated, TouchableOpacity, Text, View, ViewStyle } from "react-native";
+import { useRef, useEffect } from "react";
+import { Animated, TouchableOpacity, View, ViewStyle } from "react-native";
 import Svg, { Path, Circle } from "react-native-svg";
 import { useTheme } from "../../lib/theme";
 import { type } from "../../lib/tokens";
@@ -36,13 +36,11 @@ export function MerizoButton({
   const { c } = useTheme();
   const scale       = useRef(new Animated.Value(1)).current;
   const inkFill     = useRef(new Animated.Value(0)).current;   // 0=outline, 1=filled
-  const labelOpacity = useRef(new Animated.Value(1)).current;
 
   // Checkmark stroke-dashoffset animation
   const checkProgress = useSharedValue(CHECK_LENGTH);
 
   const isPrimary = variant === "primary";
-  const isOutline = variant === "outline";
 
   const heights = { sm: 40, md: 48, lg: 56 };
   const fontSizes = { sm: type.size.sm, md: type.size.base, lg: type.size.md };
@@ -82,7 +80,7 @@ export function MerizoButton({
         easing: REasing.out(REasing.cubic),
       });
     }
-  }, [done]);
+  }, [done, checkProgress]);
 
   const animatedCheckProps = useAnimatedProps(() => ({
     strokeDashoffset: checkProgress.value,
@@ -152,11 +150,11 @@ export function MerizoButton({
 // ── Ink loader — three dots that animate like an ink pen writing ──────────────
 export function InkLoader({ color, size = 5 }: { color?: string; size?: number }) {
   const { c } = useTheme();
-  const dots = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
+  const dots = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
 
   useEffect(() => {
     const anims = dots.map((d, i) =>
@@ -171,7 +169,7 @@ export function InkLoader({ color, size = 5 }: { color?: string; size?: number }
     );
     Animated.parallel(anims).start();
     return () => anims.forEach(a => a.stop());
-  }, []);
+  }, [dots]);
 
   const ink = color ?? c.textPrimary;
 
@@ -201,7 +199,7 @@ export function InkCheck({ size = 24, color, strokeWidth = 2 }: {
       duration: 450,
       easing: REasing.out(REasing.cubic),
     });
-  }, []);
+  }, [progress]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: progress.value,
