@@ -36,6 +36,7 @@ public class SpeechRecognizerModule extends ReactContextBaseJavaModule {
     private static final String EVENT_FINAL = "AndroidSpeech:finalResult";
     private static final String EVENT_ERROR = "AndroidSpeech:error";
     private static final String EVENT_STATE = "AndroidSpeech:state";
+    private static final String EVENT_VOLUME = "AndroidSpeech:volume";
 
     private final ReactApplicationContext reactContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -71,13 +72,25 @@ public class SpeechRecognizerModule extends ReactContextBaseJavaModule {
     public void start(String languageTag, Promise promise) {
         mainHandler.post(() -> {
             try {
-                destroyInternal();
-
-                recognizer = SpeechRecognizer.createSpeechRecognizer(reactContext);
+                // Re-creating SpeechRecognizer every tap re-binds to the system
+                // recognition service each time, which is the main source of
+                // perceived start latency. Reuse the instance across calls —
+                // cancel() resets it to a clean state without a full rebind —
+                // and only fall back to a fresh instance if that throws.
+                if (recognizer != null) {
+                    try {
+                        recognizer.cancel();
+                    } catch (Exception e) {
+                        destroyInternal();
+                    }
+                }
+                if (recognizer == null) {
+                    recognizer = SpeechRecognizer.createSpeechRecognizer(reactContext);
+                }
                 recognizer.setRecognitionListener(new RecognitionListener() {
                     @Override public void onReadyForSpeech(Bundle params) { emit(EVENT_STATE, "ready"); }
                     @Override public void onBeginningOfSpeech() { emit(EVENT_STATE, "speechStart"); }
-                    @Override public void onRmsChanged(float rmsdB) {}
+                    @Override public void onRmsChanged(float rmsdB) { emit(EVENT_VOLUME, (double) rmsdB); }
                     @Override public void onBufferReceived(byte[] buffer) {}
                     @Override public void onEndOfSpeech() { emit(EVENT_STATE, "speechEnd"); }
 
@@ -96,8 +109,21 @@ public class SpeechRecognizerModule extends ReactContextBaseJavaModule {
                 Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
                 intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                // Ask for a few alternates, not just the top guess — emitted as
+                // event.alternatives alongside the top hit for future fuzzy-matching.
+                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
                 intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, reactContext.getPackageName());
+                // The system default silence window before the recognizer decides
+                // the user is done speaking is ~2s, which reads as sluggish next to
+                // Google's own dictation. Shorting it makes listening feel snappy
+                // without touching the recognition model itself, so accuracy is
+                // unaffected — this only changes when we stop *waiting*.
+                intent.putExtra("android.speech.extra.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 900L);
+                intent.putExtra("android.speech.extra.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS", 900L);
+                intent.putExtra("android.speech.extra.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS", 15000L);
+                // Explicit even though it's the platform default: prefer the
+                // server-based recognizer over the on-device one for accuracy.
+                intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false);
                 if (languageTag != null && !languageTag.isEmpty()) {
                     intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag);
                 }

@@ -164,7 +164,7 @@ export default function CreateSplitScreen() {
             <Ionicons name="arrow-back" size={20} color={c.textPrimary} />
           </TouchableOpacity>
           <View style={[styles.catChip, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
+            <Ionicons name={meta.icon as any} size={14} color={c.textPrimary} />
             <Text style={{ color: c.textPrimary, fontSize: 12, fontWeight: "700", marginLeft: 6 }}>
               {meta.label}
             </Text>

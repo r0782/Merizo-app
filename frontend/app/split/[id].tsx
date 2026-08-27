@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Svg, { Path, Circle as SvgCircle } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { SkeletonGroupDetail } from "../../src/components/Skeleton";
 import { EmptyExpenses } from "../../src/components/EmptyStates";
 import { cache, CK, TTL } from "../../src/lib/cache";
@@ -556,7 +557,7 @@ function AIOverviewSection({ trip }: { trip: any }) {
                   key={i}
                   style={[styles.factCard, { backgroundColor: c.surface, borderColor: c.border }]}
                 >
-                  <Text style={{ fontSize: 16 }}>📍</Text>
+                  <Ionicons name="location-outline" size={16} color={c.textPrimary} />
                   <Text
                     style={{
                       color: c.textPrimary,
@@ -685,7 +686,7 @@ function LedgerTab({ trip, onChange, userId, onAddExpense }: { trip: any; onChan
                 {/* Header row */}
                 <View style={{ flexDirection: "row", alignItems: "flex-start", padding: 14, paddingBottom: 10 }}>
                   <View style={{ width: 32, height: 32, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, alignItems: "center", justifyContent: "center", marginRight: 10, flexShrink: 0 }}>
-                    <Text style={{ fontSize: 15 }}>{categoryMeta[exp.category]?.emoji || "💸"}</Text>
+                    <Ionicons name={(categoryMeta[exp.category]?.icon || "cash-outline") as any} size={15} color={c.textPrimary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: c.textPrimary, fontSize: 14, fontFamily: "Manrope_600SemiBold" }} numberOfLines={1}>
@@ -1178,7 +1179,7 @@ function InsightsTab({ trip }: { trip: any }) {
   if (total === 0 && expenses.length === 0) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
-        <Text style={{ fontSize: 32 }}>📊</Text>
+        <Ionicons name="stats-chart-outline" size={32} color={c.textMuted} />
         <Text style={{ fontSize: 17, fontWeight: "500", color: c.textPrimary, textAlign: "center" }}>No spending data yet</Text>
         <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 22 }}>Add expenses to see AI insights, financial score, and settlement recommendations.</Text>
       </View>
@@ -1187,7 +1188,7 @@ function InsightsTab({ trip }: { trip: any }) {
 
   const CAT_COLORS: Record<string, string> = { food: "#3A3A38", travel: "#6A6A67", entertainment: "#0A0A0A", utilities: "#9A9A97", shopping: "#3A3A38", health: "#6A6A67", accommodation: "#0A0A0A", trip: "#3A3A38", other: "#9A9A97" };
   const CAT_LABELS: Record<string, string> = { food: "Food & Dining", travel: "Travel", entertainment: "Fun", utilities: "Bills", shopping: "Shopping", health: "Health", accommodation: "Stay", trip: "Trip", other: "Other" };
-  const CAT_EMOJI:  Record<string, string> = { food: "🍽️", travel: "✈️", entertainment: "🎬", utilities: "⚡", shopping: "🛍️", health: "💊", accommodation: "🏨", trip: "🗺️", other: "📦" };
+  const catIcon = (k: string) => categoryMeta[k]?.icon || categoryMeta.other.icon;
 
   const categories = trip.by_category || {};
   const topCatKey  = Object.keys(categories).sort((a, b) => categories[b] - categories[a])[0];
@@ -1264,8 +1265,9 @@ function InsightsTab({ trip }: { trip: any }) {
       {/* ── Expense breakdown: what was paid and by whom ── */}
       {expenses.length > 0 && (
         <View style={cardStyle}>
-          <View style={[headerStyle, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>🧾 What was spent</Text>
+          <View style={[headerStyle, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+            <Ionicons name="receipt-outline" size={14} color={c.textPrimary} />
+            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>What was spent</Text>
             <Text style={{ fontSize: 11, color: c.textMuted, marginLeft: 2 }}>{expenses.length} expense{expenses.length !== 1 ? "s" : ""}</Text>
           </View>
           {expenses.map((exp: any, i: number) => {
@@ -1280,7 +1282,10 @@ function InsightsTab({ trip }: { trip: any }) {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }} numberOfLines={1}>{exp.title || exp.name || "Expense"}</Text>
-                    <Text style={{ fontSize: 11, color: c.textMuted }}>{CAT_EMOJI[exp.category || "other"] || "📦"} {exp.paid_by_name || "Unknown"} paid</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name={catIcon(exp.category || "other") as any} size={11} color={c.textMuted} />
+                      <Text style={{ fontSize: 11, color: c.textMuted }}>{exp.paid_by_name || "Unknown"} paid</Text>
+                    </View>
                   </View>
                   <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>{sym}{Math.round(exp.amount).toLocaleString(getDeviceLocale())}</Text>
                 </View>
@@ -1303,7 +1308,10 @@ function InsightsTab({ trip }: { trip: any }) {
       {/* ── Who paid vs who owes ── */}
       <View style={cardStyle}>
         <View style={headerStyle}>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>👤 Each person&apos;s position</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="person-outline" size={14} color={c.textPrimary} />
+            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>Each person&apos;s position</Text>
+          </View>
           <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Paid vs their fair share of all expenses</Text>
         </View>
         {balances.map((b: any, i: number) => {
@@ -1351,7 +1359,8 @@ function InsightsTab({ trip }: { trip: any }) {
       {cancellations.length > 0 && (
         <View style={cardStyle}>
           <View style={[headerStyle, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>🔄 Why some debts cancel out</Text>
+            <Ionicons name="sync-outline" size={14} color={c.textPrimary} />
+            <Text style={{ fontSize: 13, fontWeight: "600", color: c.textPrimary }}>Why some debts cancel out</Text>
           </View>
           <View style={{ padding: 16, gap: 12 }}>
             <Text style={{ fontSize: 13, color: c.textSecondary, lineHeight: 20 }}>
@@ -1423,14 +1432,15 @@ function InsightsTab({ trip }: { trip: any }) {
             </View>
             <View style={{ padding: 16, flexDirection: "row", alignItems: "center", gap: 16 }}>
               <DonutRing size={130} thickness={22} segments={segments}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: c.textMuted, textAlign: "center" }}>{CAT_EMOJI[topCatKey] || "📦"}</Text>
+                <Ionicons name={catIcon(topCatKey) as any} size={16} color={c.textMuted} />
                 <Text style={{ fontSize: 9, color: c.textMuted, textAlign: "center" }}>{topCatPct}%</Text>
               </DonutRing>
               <View style={{ flex: 1, gap: 6 }}>
                 {entries.map(([k, v]) => (
                   <View key={k} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
                     <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: CAT_COLORS[k] || "#9CA3AF", flexShrink: 0 }} />
-                    <Text style={{ flex: 1, fontSize: 12, color: c.textSecondary }} numberOfLines={1}>{CAT_EMOJI[k]} {CAT_LABELS[k] || k}</Text>
+                    <Ionicons name={catIcon(k) as any} size={12} color={c.textSecondary} />
+                    <Text style={{ flex: 1, fontSize: 12, color: c.textSecondary }} numberOfLines={1}>{CAT_LABELS[k] || k}</Text>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: c.textPrimary }}>{total > 0 ? Math.round((v as number) / total * 100) : 0}%</Text>
                   </View>
                 ))}
@@ -1672,7 +1682,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
         const cap = matchedSub.charAt(0).toUpperCase() + matchedSub.slice(1);
         Alert.alert(
           "Heads up",
-          `${cap} typically supports ${limit} screens - splitting among ${memberCount} people may cause issues 📺`,
+          `${cap} typically supports ${limit} screens - splitting among ${memberCount} people may cause issues.`,
           [{ text: "OK" }]
         );
       }
@@ -1702,7 +1712,6 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
         amount: amt,
         currency,
         category: cat,
-        emoji: meta.emoji,
         paid_by: paidBy,
         split_among: splitAmong,
         notes: notes.trim() || undefined,
@@ -1824,7 +1833,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                     backgroundColor: c.surface,
                   }}
                 >
-                  <Text style={{ fontSize: 13 }}>{meta.emoji}</Text>
+                  <Ionicons name={meta.icon as any} size={13} color={c.textPrimary} />
                   <Text style={{ color: c.textPrimary, fontSize: 11, fontWeight: "700", marginLeft: 5 }}>
                     {meta.label}
                   </Text>
@@ -1859,7 +1868,7 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                           borderColor: active ? c.textPrimary : c.border,
                         }}
                       >
-                        <Text style={{ fontSize: 12 }}>{m.emoji}</Text>
+                        <Ionicons name={m.icon as any} size={12} color={active ? c.bg : c.textPrimary} />
                         <Text style={{ color: active ? c.bg : c.textPrimary, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>
                           {m.label}
                         </Text>
@@ -2083,9 +2092,12 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
                     </View>
                   </View>
                   {customTotal > 0 && customTotal !== parseFloat(amount || "0") && (
-                    <Text style={{ color: c.textPrimary, fontSize: 12, textAlign: "center" }}>
-                      {customTotal > parseFloat(amount || "0") ? "⚠️ Over by" : "⚠️ Still need"} {currencySymbol(currency)}{Math.abs(Math.round(parseFloat(amount || "0") - customTotal)).toLocaleString(getDeviceLocale())}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      <Ionicons name="warning-outline" size={12} color={c.textPrimary} />
+                      <Text style={{ color: c.textPrimary, fontSize: 12, textAlign: "center" }}>
+                        {customTotal > parseFloat(amount || "0") ? "Over by" : "Still need"} {currencySymbol(currency)}{Math.abs(Math.round(parseFloat(amount || "0") - customTotal)).toLocaleString(getDeviceLocale())}
+                      </Text>
+                    </View>
                   )}
                 </View>
               )}

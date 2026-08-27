@@ -26,6 +26,8 @@ interface StartOptions {
   onFinal?: (event: TranscriptEvent) => void;
   onError?: (event: SpeechErrorEvent) => void;
   onState?: (state: SpeechState) => void;
+  /** Raw RMS dB from SpeechRecognizer.onRmsChanged — roughly 0 (silence) to 10+ (loud speech). */
+  onVolume?: (rmsdB: number) => void;
 }
 
 const NativeSpeech = NativeModules.AndroidSpeechRecognizer;
@@ -72,6 +74,9 @@ export async function start(options: StartOptions = {}): Promise<void> {
   }
   if (options.onState) {
     subscriptions.push(em.addListener("AndroidSpeech:state", options.onState));
+  }
+  if (options.onVolume) {
+    subscriptions.push(em.addListener("AndroidSpeech:volume", options.onVolume));
   }
 
   await NativeSpeech.start(options.languageTag ?? "");

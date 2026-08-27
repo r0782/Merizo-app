@@ -340,11 +340,12 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
                 {transcript.trim().length > 6 && (
                   <TouchableOpacity
                     onPress={() => doParse(transcript)}
-                    style={{ marginTop: 10, backgroundColor: isDark ? c.indigo : "#1F1A17", borderRadius: 8, paddingVertical: 8, alignItems: "center" }}
+                    style={{ marginTop: 10, backgroundColor: isDark ? c.indigo : "#1F1A17", borderRadius: 8, paddingVertical: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
                   >
                     <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>
-                      {parsing ? "Parsing with AI…" : "Parse with AI ✦"}
+                      {parsing ? "Parsing with AI…" : "Parse with AI"}
                     </Text>
+                    {!parsing && <Ionicons name="sparkles" size={12} color="#fff" />}
                   </TouchableOpacity>
                 )}
               </View>
@@ -368,21 +369,26 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
 
                   {[
                     { k: "Expense",    v: parsed.name || "—" },
-                    { k: "Amount",     v: parsed.amount > 0 ? `${sym}${parsed.amount.toLocaleString(getDeviceLocale())}` : "Not detected ⚠️" },
+                    { k: "Amount",     v: parsed.amount > 0 ? `${sym}${parsed.amount.toLocaleString(getDeviceLocale())}` : "Not detected", warn: !(parsed.amount > 0) },
                     { k: "Paid by",    v: parsed.paidByName || "You" },
                     { k: "Split among",v: parsed.splitAmongNames?.length > 0 ? `${parsed.splitAmongNames.join(", ")} (${parsed.splitAmongNames.length})` : "All members" },
                     { k: "Each owes",  v: parsed.splitAmongIds?.length > 0 && parsed.amount > 0 ? `${sym}${Math.round(parsed.amount / parsed.splitAmongIds.length).toLocaleString(getDeviceLocale())}` : "—" },
-                    { k: "Category",   v: `${categoryMeta[parsed.category]?.emoji || "💸"} ${categoryMeta[parsed.category]?.label || parsed.category}` },
-                  ].map(({ k, v }, i, arr) => (
+                    { k: "Category",   v: categoryMeta[parsed.category]?.label || parsed.category, icon: categoryMeta[parsed.category]?.icon || "cash-outline" },
+                  ].map(({ k, v, warn, icon }: any, i, arr) => (
                     <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderColor: c.border }}>
                       <Text style={{ color: c.textSecondary, fontSize: 12, flex: 1 }}>{k}</Text>
-                      <Text style={{ color: v.includes("⚠️") ? c.negative : c.textPrimary, fontSize: 12, fontWeight: "600", flex: 2, textAlign: "right" }} numberOfLines={3}>{v}</Text>
+                      <View style={{ flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                        {warn && <Ionicons name="warning-outline" size={12} color={c.negative} />}
+                        {icon && <Ionicons name={icon} size={12} color={c.textPrimary} />}
+                        <Text style={{ color: warn ? c.negative : c.textPrimary, fontSize: 12, fontWeight: "600", textAlign: "right" }} numberOfLines={3}>{v}</Text>
+                      </View>
                     </View>
                   ))}
 
                   {parsed.confidence === "low" && (
-                    <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: isDark ? "rgba(245,158,11,0.1)" : "#FFFBEB", borderWidth: 1, borderColor: isDark ? "rgba(245,158,11,0.3)" : "#FDE68A" }}>
-                      <Text style={{ color: "#B45309", fontSize: 11 }}>⚠️ Low confidence — please check the details above before adding.</Text>
+                    <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: isDark ? "rgba(245,158,11,0.1)" : "#FFFBEB", borderWidth: 1, borderColor: isDark ? "rgba(245,158,11,0.3)" : "#FDE68A", flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="warning-outline" size={13} color="#B45309" />
+                      <Text style={{ color: "#B45309", fontSize: 11, flex: 1 }}>Low confidence — please check the details above before adding.</Text>
                     </View>
                   )}
                 </View>

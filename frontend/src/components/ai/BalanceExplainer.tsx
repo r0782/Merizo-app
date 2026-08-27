@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Modal, ScrollView, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../lib/theme";
 import { currencySymbol } from "../../lib/tokens";
 import { getDeviceLocale } from "../../lib/currency";
@@ -105,16 +106,16 @@ function SettlementFlow({
   );
 }
 
-const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
-  food:          { emoji: "🍽️", label: "Food" },
-  travel:        { emoji: "✈️", label: "Travel" },
-  entertainment: { emoji: "🎬", label: "Fun" },
-  utilities:     { emoji: "⚡", label: "Bills" },
-  shopping:      { emoji: "🛍️", label: "Shop" },
-  health:        { emoji: "💊", label: "Health" },
-  accommodation: { emoji: "🏨", label: "Stay" },
-  trip:          { emoji: "🗺️", label: "Trip" },
-  other:         { emoji: "📦", label: "Other" },
+const CATEGORY_META: Record<string, { icon: string; label: string }> = {
+  food:          { icon: "restaurant-outline",       label: "Food" },
+  travel:        { icon: "airplane-outline",         label: "Travel" },
+  entertainment: { icon: "film-outline",              label: "Fun" },
+  utilities:     { icon: "flash-outline",             label: "Bills" },
+  shopping:      { icon: "bag-handle-outline",        label: "Shop" },
+  health:        { icon: "medkit-outline",            label: "Health" },
+  accommodation: { icon: "bed-outline",               label: "Stay" },
+  trip:          { icon: "map-outline",               label: "Trip" },
+  other:         { icon: "cube-outline",              label: "Other" },
 };
 
 export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }) {
@@ -188,7 +189,7 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                   borderWidth: 1, borderColor: c.border,
                   backgroundColor: c.surface, marginBottom: 16,
                 }}>
-                  <Text style={{ fontSize: 40 }}>🎉</Text>
+                  <IcoSparkles color={c.textPrimary} size={36} />
                   <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>All Settled!</Text>
                   <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 20 }}>
                     Everyone has paid their fair share. No payments needed right now.
@@ -281,7 +282,7 @@ export function BalanceExplainer({ trip, userId }: { trip: any; userId: string }
                         borderBottomColor: c.border,
                         flexDirection: "row", alignItems: "center", gap: 12,
                       }}>
-                        <Text style={{ fontSize: 20 }}>{meta.emoji}</Text>
+                        <Ionicons name={meta.icon as any} size={20} color={c.textPrimary} />
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
                             <Text style={{ fontSize: 13, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{meta.label}</Text>

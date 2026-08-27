@@ -7,13 +7,13 @@ import { useTheme } from "../src/lib/theme";
 import { ROUTES } from "../src/lib/routes";
 
 const items = [
-  { key: "trip", emoji: "✈️", label: "Trip / Travel", description: "Beach, mountains, road trips", grad: ["#0EA5E9", "#0369A1"] },
-  { key: "food", emoji: "🍽️", label: "Food & Dining", description: "Restaurants, drinks, takeout", grad: ["#F97316", "#9A3412"] },
-  { key: "home", emoji: "🏠", label: "Home & Rent", description: "Rent, bills, utilities", grad: ["#10B981", "#065F46"] },
-  { key: "friends", emoji: "🎉", label: "Friends & Events", description: "Parties, meetups, gigs", grad: ["#F59E0B", "#92400E"] },
-  { key: "shopping", emoji: "🛍️", label: "Shopping", description: "Gifts, gear, groceries", grad: ["#A855F7", "#5B21B6"] },
-  { key: "bills", emoji: "⚡", label: "Bills & Subs", description: "Recurring expenses", grad: ["#14B8A6", "#0F766E"] },
-];
+  { key: "trip", icon: "airplane-outline", label: "Trip / Travel", description: "Beach, mountains, road trips", grad: ["#0EA5E9", "#0369A1"] },
+  { key: "food", icon: "restaurant-outline", label: "Food & Dining", description: "Restaurants, drinks, takeout", grad: ["#F97316", "#9A3412"] },
+  { key: "home", icon: "home-outline", label: "Home & Rent", description: "Rent, bills, utilities", grad: ["#10B981", "#065F46"] },
+  { key: "friends", icon: "sparkles-outline", label: "Friends & Events", description: "Parties, meetups, gigs", grad: ["#F59E0B", "#92400E"] },
+  { key: "shopping", icon: "bag-handle-outline", label: "Shopping", description: "Gifts, gear, groceries", grad: ["#A855F7", "#5B21B6"] },
+  { key: "bills", icon: "flash-outline", label: "Bills & Subs", description: "Recurring expenses", grad: ["#14B8A6", "#0F766E"] },
+] as const;
 
 export default function CategoryScreen() {
   const { c, isDark } = useTheme();
@@ -61,7 +61,7 @@ export default function CategoryScreen() {
                   end={{ x: 1, y: 1 }}
                   style={[styles.card, { borderColor: c.border }]}
                 >
-                  <Text style={{ fontSize: 30 }}>{it.emoji}</Text>
+                  <Ionicons name={it.icon} size={28} color={isDark ? "#fff" : c.textPrimary} />
                   <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 14, marginTop: 10 }}>
                     {it.label}
                   </Text>
@@ -71,7 +71,7 @@ export default function CategoryScreen() {
                 </LinearGradient>
               ) : (
                 <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-                  <Text style={{ fontSize: 30 }}>{it.emoji}</Text>
+                  <Ionicons name={it.icon} size={28} color={isDark ? "#fff" : c.textPrimary} />
                   <Text style={{ color: c.textPrimary, fontFamily: "Manrope_700Bold", fontSize: 14, marginTop: 10 }}>
                     {it.label}
                   </Text>

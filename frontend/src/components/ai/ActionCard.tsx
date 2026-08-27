@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../lib/theme";
 import { currencySymbol } from "../../lib/tokens";
 
@@ -32,7 +33,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
       paddingHorizontal: 14, paddingVertical: 12, overflow: "hidden",
     }}>
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 6 }}>
-        <Text style={{ fontSize: 15 }}>{icon}</Text>
+        <Ionicons name={icon as any} size={15} color={c.textPrimary} />
         <Text style={{ color: c.textPrimary, fontSize: 13, fontWeight: "700" }}>{label}</Text>
         <View style={{
           marginLeft: "auto", backgroundColor: isDark ? "#1F1F1F" : "#E8F5E9",
@@ -66,7 +67,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             </TouchableOpacity>
           )}
         </>,
-        "💸", data.title || "Expense"
+        "cash-outline", data.title || "Expense"
       );
 
     case "group_created":
@@ -77,25 +78,25 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             <Row label="Members" value={data.members_added.join(", ")} />
           )}
         </>,
-        "👥", data.name || "New Group"
+        "people-outline", data.name || "New Group"
       );
 
     case "group_renamed":
       return card(
         <Row label="New name" value={data.new_name || ""} />,
-        "✏️", "Group Renamed"
+        "create-outline", "Group Renamed"
       );
 
     case "member_added":
       return card(
         <Row label="Added to group" value={data.group_id ? "this group" : ""} />,
-        "➕", `${data.member_name || "Member"} added`
+        "person-add-outline", `${data.member_name || "Member"} added`
       );
 
     case "member_removed":
       return card(
         <Text style={{ color: c.textMuted, fontSize: 12 }}>Member removed from group.</Text>,
-        "➖", `${data.member_name || "Member"} removed`
+        "person-remove-outline", `${data.member_name || "Member"} removed`
       );
 
     case "debt_settled":
@@ -105,7 +106,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
           <Row label="To" value={String(data.to || "")} />
           <Row label="Amount" value={`${sym}${Number(data.amount || 0).toLocaleString()}`} />
         </>,
-        "✅", "Settlement Recorded"
+        "checkmark-circle-outline", "Settlement Recorded"
       );
 
     case "balance_shown":
@@ -119,19 +120,19 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 4 }}>All settled up!</Text>
           )}
         </>,
-        "⚖️", data.group_name || "Balances"
+        "swap-horizontal-outline", data.group_name || "Balances"
       );
 
     case "expense_deleted":
       return card(
         <Text style={{ color: c.textMuted, fontSize: 12 }}>Expense removed from the group.</Text>,
-        "🗑️", "Expense Deleted"
+        "trash-outline", "Expense Deleted"
       );
 
     case "group_deleted":
       return card(
         <Text style={{ color: c.textMuted, fontSize: 12 }}>Group and all expenses permanently deleted.</Text>,
-        "🗑️", "Group Deleted"
+        "trash-outline", "Group Deleted"
       );
 
     case "expenses_listed":
@@ -152,7 +153,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             </Text>
           )}
         </>,
-        "📋", `${data.count || 0} Expenses`
+        "list-outline", `${data.count || 0} Expenses`
       );
     }
 
@@ -166,7 +167,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             <Row key={i} label={cat} value={`${sym}${Number(amt).toLocaleString()}`} />
           ))}
         </>,
-        "📊", data.name || "Summary"
+        "bar-chart-outline", data.name || "Summary"
       );
     }
 
@@ -177,7 +178,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
           <Row label="Owed to you" value={`${sym}${Number(data.owed_to_you || 0).toLocaleString()}`} />
           <Row label="You owe" value={`${sym}${Number(data.you_owe || 0).toLocaleString()}`} />
         </>,
-        "📈", `Stats — ${data.period || "month"}`
+        "trending-up-outline", `Stats — ${data.period || "month"}`
       );
 
     case "groups_listed": {
@@ -192,7 +193,7 @@ export function ActionCard({ actionType, data, onNavigate }: ActionCardProps) {
             />
           ))}
         </>,
-        "👥", `${data.count || 0} Groups`
+        "people-outline", `${data.count || 0} Groups`
       );
     }
 

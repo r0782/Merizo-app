@@ -185,17 +185,19 @@ export const currencyOptions = [
 ];
 
 // ── Category metadata ─────────────────────────────────────────────────────────
-export const categoryMeta: Record<string, { label: string; emoji: string; tint: string }> = {
-  food:          { label: "Food",          emoji: "🍽️", tint: "#FF8B7B" },
-  travel:        { label: "Travel",        emoji: "✈️", tint: "#60A5FA" },
-  entertainment: { label: "Entertainment", emoji: "🎬", tint: "#A78BFA" },
-  utilities:     { label: "Utilities",     emoji: "⚡", tint: "#FBBF24" },
-  shopping:      { label: "Shopping",      emoji: "🛍️", tint: "#F472B6" },
-  health:        { label: "Health",        emoji: "💊", tint: "#34D399" },
-  accommodation: { label: "Stay",          emoji: "🏨", tint: "#E8B04E" },
-  trip:          { label: "Trip",          emoji: "🗺️", tint: "#9D7BFF" },
-  other:         { label: "Other",         emoji: "📦", tint: "#9CA3AF" },
-  settlement:    { label: "Settlement",    emoji: "✅", tint: "#7ED38B" },
+// `icon` is an Ionicons glyph name (see @expo/vector-icons), rendered wherever
+// a category needs a small badge instead of the emoji this used to hold.
+export const categoryMeta: Record<string, { label: string; icon: string; tint: string }> = {
+  food:          { label: "Food",          icon: "restaurant-outline",        tint: "#FF8B7B" },
+  travel:        { label: "Travel",        icon: "airplane-outline",          tint: "#60A5FA" },
+  entertainment: { label: "Entertainment", icon: "film-outline",              tint: "#A78BFA" },
+  utilities:     { label: "Utilities",     icon: "flash-outline",             tint: "#FBBF24" },
+  shopping:      { label: "Shopping",      icon: "bag-handle-outline",        tint: "#F472B6" },
+  health:        { label: "Health",        icon: "medkit-outline",            tint: "#34D399" },
+  accommodation: { label: "Stay",          icon: "bed-outline",               tint: "#E8B04E" },
+  trip:          { label: "Trip",          icon: "map-outline",               tint: "#9D7BFF" },
+  other:         { label: "Other",         icon: "cube-outline",              tint: "#9CA3AF" },
+  settlement:    { label: "Settlement",    icon: "checkmark-circle-outline",  tint: "#7ED38B" },
 };
 
 export function detectCategory(name: string): string {

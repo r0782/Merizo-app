@@ -312,7 +312,6 @@ export default function ScanBillScreen() {
     if (!selectedTripId) { Alert.alert("Pick a split", "Choose which split to add this expense to."); return; }
     const trip = trips.find((t) => t.id === selectedTripId);
     if (!trip) return;
-    const meta = categoryMeta[result.category] || categoryMeta.other;
     // Prefer whoever's actually logged in over always crediting the first
     // member — trip.members[0] isn't necessarily the person scanning the bill.
     const payer = trip.members.find((m: any) => m.id === user?.id) || trip.members[0];
@@ -323,7 +322,6 @@ export default function ScanBillScreen() {
         amount: amt,
         currency: result.currency || trip.currency || defaultCurrency,
         category: result.category || "other",
-        emoji: meta.emoji,
         paid_by: payer.id,
         split_among: trip.members.map((m: any) => m.id),
       });

@@ -1,5 +1,6 @@
-import { Platform, View, Text } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Circle, Line } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { type } from "../../src/lib/tokens";
@@ -60,6 +61,20 @@ function NavProfile({ active, color }: { active: boolean; color: string }) {
   );
 }
 
+// ── Tab press target — plain opacity feedback, no Android ripple ──────────────
+// The default tab bar button uses Android's ripple, which isn't clipped to the
+// tab bar's own bounds and visibly spills across the top border line on tap.
+// Every other pressable in this app already uses TouchableOpacity instead of a
+// ripple, so this just makes the tab bar consistent with that and removes the
+// bleed at the same time.
+function TabBarButton({ children, style, onPress, ...rest }: any) {
+  return (
+    <TouchableOpacity {...rest} onPress={onPress} activeOpacity={0.6} style={style}>
+      {children}
+    </TouchableOpacity>
+  );
+}
+
 // ── Tab item with hand-drawn underline when active ────────────────────────────
 function TabIcon({
   Icon, focused, color, label,
@@ -99,10 +114,18 @@ function TabIcon({
 
 export default function TabsLayout() {
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const tabBarBg     = c.bg;
   const activeColor  = c.textPrimary;
   const inactiveColor = c.textMuted;
+
+  // Hardcoded platform paddings (ios:26/android:8) guessed at the system
+  // gesture-bar height instead of reading it — on Android especially this
+  // varies by device, and edge-to-edge rendering leaves whatever gap is left
+  // uncovered by the tab bar showing through as unstyled native chrome
+  // rather than the app's theme. Real insets close that gap on every device.
+  const tabBarPaddingBottom = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -111,12 +134,13 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
+        tabBarButton: (props) => <TabBarButton {...props} />,
         tabBarStyle: {
           backgroundColor: tabBarBg,
           borderTopColor: c.border,
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 84 : 64,
-          paddingBottom: Platform.OS === "ios" ? 26 : 8,
+          height: 56 + tabBarPaddingBottom,
+          paddingBottom: tabBarPaddingBottom,
           paddingTop: 0,
           elevation: 0,
           shadowOpacity: 0,

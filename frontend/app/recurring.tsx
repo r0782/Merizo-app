@@ -2,15 +2,27 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Alert, Image } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { currencySymbol } from "../src/lib/tokens";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "../src/lib/storage-keys";
 import { useCurrency } from "../src/lib/CurrencyContext";
 
+// Fallback for subscriptions saved before the emoji->icon migration — an old
+// saved entry's `icon` field may still hold an emoji character rather than
+// an Ionicons name, which would render as a blank glyph.
+const DEFAULT_ICON = "pricetag-outline";
+const KNOWN_ICONS = new Set([
+  "tv-outline", "musical-notes-outline", "cube-outline", "play-outline",
+  "film-outline", "cellular-outline", "cloud-outline", "document-text-outline",
+  "home-outline", "bulb-outline", "water-outline", "wifi-outline",
+  "barbell-outline", "shield-checkmark-outline", "business-outline", DEFAULT_ICON,
+]);
+
 export type Subscription = {
   name: string;
-  emoji: string;
+  icon: string;
   amount: number;
   period: string;
   color: string;
@@ -41,9 +53,9 @@ function logoUrlForName(name: string): string | null {
   return `https://img.logo.dev/name/${encodeURIComponent(trimmed)}?token=${LOGO_DEV_TOKEN}&size=64`;
 }
 
-// Renders a fetched logo when there is one, falling back to the emoji if the
+// Renders a fetched logo when there is one, falling back to an icon if the
 // URL 404s (unrecognized name) or the request fails — never a broken-image icon.
-function SubscriptionIcon({ emoji, logoUrl, size = 22 }: { emoji: string; logoUrl?: string | null; size?: number }) {
+function SubscriptionIcon({ icon, logoUrl, size = 22, color }: { icon: string; logoUrl?: string | null; size?: number; color: string }) {
   const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
@@ -60,40 +72,45 @@ function SubscriptionIcon({ emoji, logoUrl, size = 22 }: { emoji: string; logoUr
       />
     );
   }
-  return <Text style={{ fontSize: size, width: size + 10, textAlign: "center" }}>{emoji}</Text>;
+  const name = KNOWN_ICONS.has(icon) ? icon : DEFAULT_ICON;
+  return (
+    <View style={{ width: size + 10, alignItems: "center" }}>
+      <Ionicons name={name as any} size={size} color={color} />
+    </View>
+  );
 }
 
 // ── Smart platform detection from name or amount ────────────────────────────
-const PLATFORM_DB: { keywords: string[]; amounts: number[]; emoji: string; period: string }[] = [
-  { keywords: ["netflix"],         amounts: [149, 199, 499, 649], emoji: "📺", period: "monthly" },
-  { keywords: ["spotify"],         amounts: [59, 119, 179],       emoji: "🎵", period: "monthly" },
-  { keywords: ["prime", "amazon"], amounts: [179, 299, 1499],     emoji: "📦", period: "monthly" },
-  { keywords: ["youtube", "yt"],   amounts: [129, 189],           emoji: "▶️", period: "monthly" },
-  { keywords: ["hotstar", "disney"], amounts: [299, 499, 899],    emoji: "🎬", period: "monthly" },
-  { keywords: ["jio"],             amounts: [149, 239, 299, 399], emoji: "📡", period: "monthly" },
-  { keywords: ["airtel"],          amounts: [199, 299, 399, 599], emoji: "📡", period: "monthly" },
-  { keywords: ["icloud"],          amounts: [75, 219, 749],       emoji: "☁️", period: "monthly" },
-  { keywords: ["notion"],          amounts: [0, 990],             emoji: "📝", period: "monthly" },
-  { keywords: ["rent"],            amounts: [],                   emoji: "🏠", period: "monthly" },
-  { keywords: ["electricity", "electric", "eb bill"], amounts: [], emoji: "💡", period: "monthly" },
-  { keywords: ["water"],           amounts: [],                   emoji: "🌊", period: "monthly" },
-  { keywords: ["internet", "wifi", "broadband"], amounts: [], emoji: "📶", period: "monthly" },
-  { keywords: ["gym"],             amounts: [],                   emoji: "🏋️", period: "monthly" },
-  { keywords: ["insurance"],       amounts: [],                   emoji: "🛡️", period: "monthly" },
-  { keywords: ["emi", "loan"],     amounts: [],                   emoji: "🏦", period: "monthly" },
+const PLATFORM_DB: { keywords: string[]; amounts: number[]; icon: string; period: string }[] = [
+  { keywords: ["netflix"],         amounts: [149, 199, 499, 649], icon: "tv-outline", period: "monthly" },
+  { keywords: ["spotify"],         amounts: [59, 119, 179],       icon: "musical-notes-outline", period: "monthly" },
+  { keywords: ["prime", "amazon"], amounts: [179, 299, 1499],     icon: "cube-outline", period: "monthly" },
+  { keywords: ["youtube", "yt"],   amounts: [129, 189],           icon: "play-outline", period: "monthly" },
+  { keywords: ["hotstar", "disney"], amounts: [299, 499, 899],    icon: "film-outline", period: "monthly" },
+  { keywords: ["jio"],             amounts: [149, 239, 299, 399], icon: "cellular-outline", period: "monthly" },
+  { keywords: ["airtel"],          amounts: [199, 299, 399, 599], icon: "cellular-outline", period: "monthly" },
+  { keywords: ["icloud"],          amounts: [75, 219, 749],       icon: "cloud-outline", period: "monthly" },
+  { keywords: ["notion"],          amounts: [0, 990],             icon: "document-text-outline", period: "monthly" },
+  { keywords: ["rent"],            amounts: [],                   icon: "home-outline", period: "monthly" },
+  { keywords: ["electricity", "electric", "eb bill"], amounts: [], icon: "bulb-outline", period: "monthly" },
+  { keywords: ["water"],           amounts: [],                   icon: "water-outline", period: "monthly" },
+  { keywords: ["internet", "wifi", "broadband"], amounts: [], icon: "wifi-outline", period: "monthly" },
+  { keywords: ["gym"],             amounts: [],                   icon: "barbell-outline", period: "monthly" },
+  { keywords: ["insurance"],       amounts: [],                   icon: "shield-checkmark-outline", period: "monthly" },
+  { keywords: ["emi", "loan"],     amounts: [],                   icon: "business-outline", period: "monthly" },
 ];
 
-function detectPlatform(name: string, amount: number): { emoji: string; period: string } | null {
+function detectPlatform(name: string, amount: number): { icon: string; period: string } | null {
   const lower = name.toLowerCase().trim();
   for (const p of PLATFORM_DB) {
     if (p.keywords.some(k => lower.includes(k))) {
-      return { emoji: p.emoji, period: p.period };
+      return { icon: p.icon, period: p.period };
     }
   }
   if (amount > 0) {
     for (const p of PLATFORM_DB) {
       if (p.amounts.includes(amount)) {
-        return { emoji: p.emoji, period: p.period };
+        return { icon: p.icon, period: p.period };
       }
     }
   }
@@ -182,7 +199,7 @@ export default function RecurringScreen() {
     const detectedPlatform = detectPlatform(name, isNaN(amt) ? 0 : amt);
     const newSub: Subscription = {
       name,
-      emoji: detectedPlatform?.emoji || "📌",
+      icon: detectedPlatform?.icon || DEFAULT_ICON,
       amount: isNaN(amt) ? 0 : amt,
       period: detectedPlatform?.period || "monthly",
       color: "#9A9A97",
@@ -240,7 +257,7 @@ export default function RecurringScreen() {
               {saved.map((sub, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.border }}>
                   <View style={{ width: 32, alignItems: "center" }}>
-                    <SubscriptionIcon emoji={sub.emoji} logoUrl={sub.logoUrl} />
+                    <SubscriptionIcon icon={sub.icon} logoUrl={sub.logoUrl} color={c.textMuted} />
                   </View>
                   <TouchableOpacity style={{ flex: 1 }} onPress={() => openEdit(sub)}>
                     <Text style={{ fontSize: 14, fontFamily: "Manrope_600SemiBold", color: c.textPrimary }}>{sub.name}</Text>
@@ -260,7 +277,7 @@ export default function RecurringScreen() {
           </View>
         ) : (
           <View style={{ marginHorizontal: 20, borderWidth: 1, borderColor: c.border, padding: 32, alignItems: "center", gap: 10 }}>
-            <Text style={{ fontSize: 28 }}>📋</Text>
+            <Ionicons name="clipboard-outline" size={28} color={c.textMuted} />
             <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>No subscriptions yet</Text>
             <Text style={{ fontSize: 12, color: c.textMuted, textAlign: "center", lineHeight: 18 }}>
               Add your monthly bills — rent, Netflix, Spotify, electricity — to track your fixed costs.
@@ -303,7 +320,7 @@ export default function RecurringScreen() {
 
             {addName.trim().length > 0 && (
               <View style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: 12, marginBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <SubscriptionIcon emoji={detected?.emoji || "📌"} logoUrl={previewLogoUrl} size={20} />
+                <SubscriptionIcon icon={detected?.icon || DEFAULT_ICON} logoUrl={previewLogoUrl} size={20} color={c.textMuted} />
                 <Text style={{ fontSize: 12, color: c.textMuted, flex: 1 }}>
                   {detected ? (
                     <>Detected as <Text style={{ color: c.textPrimary, fontFamily: "Manrope_600SemiBold" }}>{addName.trim()}</Text> · {detected.period}</>
@@ -327,7 +344,7 @@ export default function RecurringScreen() {
           <View style={{ backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border, padding: 24, paddingBottom: Platform.OS === "ios" ? 44 : 28 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <SubscriptionIcon emoji={editItem?.emoji || "📌"} logoUrl={editItem?.logoUrl} size={24} />
+                <SubscriptionIcon icon={editItem?.icon || DEFAULT_ICON} logoUrl={editItem?.logoUrl} size={24} color={c.textMuted} />
                 <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: c.textPrimary }}>Edit</Text>
               </View>
               <TouchableOpacity onPress={() => setEditItem(null)} style={{ width: 32, height: 32, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>

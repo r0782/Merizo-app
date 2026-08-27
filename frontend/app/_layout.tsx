@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import * as SystemUI from "expo-system-ui";
 import {
   useFonts,
   Manrope_300Light,
@@ -32,6 +33,14 @@ SplashScreen.preventAutoHideAsync();
 
 function RootStack() {
   const { isDark, c } = useTheme();
+
+  // Without this, the native window background behind the OS edge-to-edge
+  // gesture/nav bar stays its Android default (white) regardless of the
+  // in-app theme, showing as a stray white strip below the tab bar.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
+  }, [c.bg]);
+
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />

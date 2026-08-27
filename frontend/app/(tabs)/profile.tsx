@@ -223,7 +223,6 @@ export default function ProfileScreen() {
   const icons = {
     currency:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 10 2 Q 16 2 18 10 Q 16 18 10 18 Q 4 18 2 10 Q 4 2 10 2 Z" stroke={p.color} strokeWidth={1.3} fill="none" /><Text style={{ fontSize: 10, color: p.color, position: "absolute", left: 5, top: 4 }}>₹</Text></Svg>,
     language:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={10} cy={10} r={7} stroke={p.color} strokeWidth={1.3} fill="none" /><Path d="M 3 10 L 17 10" stroke={p.color} strokeWidth={1} strokeLinecap="round" /><Path d="M 10 3 Q 7 10 10 17" stroke={p.color} strokeWidth={1} fill="none" /><Path d="M 10 3 Q 13 10 10 17" stroke={p.color} strokeWidth={1} fill="none" /></Svg>,
-    ai:        (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 3 5 Q 3 3 5 3 L 15 3 Q 17 3 17 5 L 17 12 Q 17 14 15 14 L 7 14 L 3 17 L 3 5 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /></Svg>,
     bell:      (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 5 9 Q 5 4 10 4 Q 15 4 15 9 L 16 14 L 4 14 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /><Path d="M 8 14 Q 8 17 10 17 Q 12 17 12 14" stroke={p.color} strokeWidth={1.2} fill="none" /></Svg>,
     chart:     (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Line x1={2} y1={17} x2={18} y2={17} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={5} y1={17} x2={5} y2={11} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={9} y1={17} x2={9} y2={7} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={13} y1={17} x2={13} y2={12} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={17} y1={17} x2={17} y2={4} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
     repeat:    (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 4 6 Q 4 3 10 3 Q 16 3 16 8" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 13 1 L 16 3 L 13 5" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /><Path d="M 16 14 Q 16 17 10 17 Q 4 17 4 12" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 7 19 L 4 17 L 7 15" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /></Svg>,
@@ -294,8 +293,6 @@ export default function ProfileScreen() {
         <ProfileRow icon={icons.currency} label={t("common.currency")} sub={`${sym} · ${currency}`} onPress={() => setShowCurrencyPicker(true)} c={c} />
         <InkDivider c={c} />
         <ProfileRow icon={icons.language} label={t("common.language")} sub={langMeta.nativeName} onPress={() => router.push("/language-settings")} c={c} />
-        <InkDivider c={c} />
-        <ProfileRow icon={icons.ai} label={t("profile.aiSettings")} sub={t("profile.aiSettingsSub")} onPress={() => router.push("/ai-settings")} c={c} />
         <InkDivider c={c} />
         <ProfileRow icon={icons.theme}   label={isDark ? t("profile.lightMode") : t("profile.darkMode")} onPress={toggle} c={c} right={null} />
         <InkDivider c={c} />
@@ -372,7 +369,7 @@ export default function ProfileScreen() {
         <SectionLabel label={t("profile.sectionSupport")} />
         <ProfileRow icon={icons.question} label={t("profile.helpFaq")} onPress={() => Linking.openURL("https://merizo-app.onrender.com")} c={c} />
         <InkDivider c={c} />
-        <ProfileRow icon={icons.mail} label={t("profile.contactUs")} sub="support@merizo.app" onPress={() => Linking.openURL("mailto:support@merizo.app")} c={c} />
+        <ProfileRow icon={icons.mail} label={t("profile.contactUs")} sub="merizoomadasupport@gmail.com" onPress={() => Linking.openURL("mailto:merizoomadasupport@gmail.com")} c={c} />
 
         {/* ── Data ── */}
         <SectionLabel label={t("profile.sectionData")} />

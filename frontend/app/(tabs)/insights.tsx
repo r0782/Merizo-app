@@ -178,7 +178,6 @@ function CircularProgress({ spent, budget, label, sym, size = 96 }: { spent: num
 
 // ── Derive AI insights ────────────────────────────────────────────────────────
 type Insight = {
-  emoji: string;
   title: string;
   sub?: string;
   trendDir?: "up" | "down" | "neutral";
@@ -201,7 +200,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
     const top = cats[0];
     const meta = categoryMeta[top.category] || categoryMeta.other;
     insights.push({
-      emoji: meta.emoji,
       title: `${meta.label} is your top spend — ${sym}${Math.round(top.amount).toLocaleString(getDeviceLocale())}`,
       sub: `${top.percent.toFixed(0)}% of your total spending this period`,
       trendDir: "neutral",
@@ -218,7 +216,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
     const changePct = Math.round(((last - prev) / Math.max(prev, 1)) * 100);
     if (Math.abs(changePct) >= 5) {
       insights.push({
-        emoji: changePct > 0 ? "📈" : "📉",
         title: changePct > 0
           ? `Spending up ${Math.abs(changePct)}% vs last month`
           : `Spending down ${Math.abs(changePct)}% vs last month`,
@@ -234,7 +231,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
 
   if (owed > 0 && owing === 0) {
     insights.push({
-      emoji: "✅",
       title: `+${sym}${Math.round(owed).toLocaleString(getDeviceLocale())} owed to you`,
       sub: "You're in a great position — others owe you",
       trendDir: "down",
@@ -245,7 +241,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
     });
   } else if (owing > 0) {
     insights.push({
-      emoji: "⚡",
       title: `-${sym}${Math.round(owing).toLocaleString(getDeviceLocale())} you owe across groups`,
       sub: "Settle up to keep balances clean",
       trendDir: "up",
@@ -260,7 +255,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
   if (cats.length >= 3 && topTwo > 70) {
     const names = cats.slice(0, 2).map((cc: any) => (categoryMeta[cc.category] || categoryMeta.other).label);
     insights.push({
-      emoji: "🎯",
       title: `${names.join(" & ")} make up ${Math.round(topTwo)}% of spending`,
       sub: "Consider diversifying your budget tracking",
       trendDir: "neutral",
@@ -271,7 +265,6 @@ function deriveInsights(data: any, sym: string): Insight[] {
     });
   } else if (total > 0) {
     insights.push({
-      emoji: "✨",
       title: `Total: ${sym}${Math.round(total).toLocaleString(getDeviceLocale())} across ${cats.length} categories`,
       sub: "Your spending is well distributed",
       trendDir: "neutral",
@@ -587,7 +580,7 @@ export default function InsightsScreen() {
           {!loading && aiInsights.length > 0 ? (
             <View style={{ borderTopWidth: 1, borderTopColor: `${c.border}30` }}>
               {aiInsights.map((ins, i) => (
-                <AIInsightCard key={i} index={i} emoji={ins.emoji} title={ins.title} sub={ins.sub} trendDir={ins.trendDir} onPress={() => setSelectedInsight(ins)} />
+                <AIInsightCard key={i} index={i} title={ins.title} sub={ins.sub} trendDir={ins.trendDir} onPress={() => setSelectedInsight(ins)} />
               ))}
             </View>
           ) : loading ? (

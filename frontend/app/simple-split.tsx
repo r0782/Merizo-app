@@ -128,7 +128,7 @@ export default function SimpleSplit() {
 
           {/* Say it */}
           <TouchableOpacity
-            onPress={() => router.push(ROUTES.SCAN)}
+            onPress={() => router.push(ROUTES.CHAT)}
             style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18, paddingHorizontal: 16, borderWidth: 1, borderColor: c.border }}
           >
             <View style={{ width: 38, height: 38, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>

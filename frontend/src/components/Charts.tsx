@@ -414,14 +414,12 @@ export function SketchDonutLegend({
 // AIInsightCard — ledger row style, no colored backgrounds
 // ─────────────────────────────────────────────────────────────────────────────
 export function AIInsightCard({
-  emoji,
   title,
   sub,
   trendDir,
   index = 0,
   onPress,
 }: {
-  emoji: string;
   title: string;
   sub?: string;
   trendDir?: "up" | "down" | "neutral";

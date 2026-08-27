@@ -219,7 +219,10 @@ export default function ItemSplitScreen() {
                     </Text>
                   )}
                   {item.assignedTo.length === 0 && (
-                    <Text style={{ color: "#FF8B7B", fontSize: 11, marginTop: 2 }}>⚠️ No one assigned yet</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <Ionicons name="warning-outline" size={11} color="#FF8B7B" />
+                      <Text style={{ color: "#FF8B7B", fontSize: 11 }}>No one assigned yet</Text>
+                    </View>
                   )}
                 </View>
                 <Text style={{ fontFamily: "Manrope_700Bold" as any, fontSize: 16, color: c.textPrimary, marginRight: 12, fontVariant: ["tabular-nums"] as any }}>

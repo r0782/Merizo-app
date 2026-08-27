@@ -2,10 +2,18 @@
  * MERIZO AI Chat — Hand-drawn notebook assistant
  * Messages look like handwritten notes from a financial advisor.
  */
+
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList,
-  KeyboardAvoidingView, Platform, Alert,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Keyboard,
+  Platform,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -13,14 +21,22 @@ import Svg, { Path, Line, Rect } from "react-native-svg";
 import { useTheme } from "../../src/lib/theme";
 import { chatV2, type ChatV2Context } from "../../src/lib/ai";
 import { getCurrentLanguage } from "../../src/lib/i18n";
-import { ChatBubble, type Message } from "../../src/components/ai/ChatBubble";
+import {
+  ChatBubble,
+  type Message,
+} from "../../src/components/ai/ChatBubble";
 import { VoiceButton } from "../../src/components/ai/VoiceButton";
 import { api } from "../../src/lib/api";
 import { type } from "../../src/lib/tokens";
 import { SketchAIAvatar } from "../../src/components/merizo/SketchAvatar";
 import { InkLoader } from "../../src/components/merizo/MerizoButton";
 
-interface Group { id: string; name: string; currency: string; my_net: number }
+interface Group {
+  id: string;
+  name: string;
+  currency: string;
+  my_net: number;
+}
 
 const getPromptsNoGroup = (t: (key: string) => string) => [
   { text: t("chat.suggestions.createGroup") },
@@ -29,7 +45,10 @@ const getPromptsNoGroup = (t: (key: string) => string) => [
   { text: t("chat.suggestions.whoOwes") },
 ];
 
-const getPromptsWithGroup = (name: string, t: (key: string, opts?: any) => string) => [
+const getPromptsWithGroup = (
+  name: string,
+  t: (key: string, opts?: any) => string
+) => [
   { text: t("chat.promptWhoOwesInGroup", { name }) },
   { text: t("chat.promptRecentExpenses", { name }) },
   { text: t("chat.promptAddExpense", { name }) },
@@ -39,10 +58,26 @@ const getPromptsWithGroup = (name: string, t: (key: string, opts?: any) => strin
 // ── Typing indicator — three ink dots ────────────────────────────────────────
 function TypingIndicator() {
   const { c } = useTheme();
+
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingHorizontal: 4 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+      }}
+    >
       <SketchAIAvatar size={28} speaking />
-      <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 4,
+          alignItems: "center",
+        }}
+      >
         <InkLoader color={c.textMuted} size={4} />
       </View>
     </View>
@@ -50,14 +85,36 @@ function TypingIndicator() {
 }
 
 // ── Suggestion chips — ledger-style ──────────────────────────────────────────
-function SuggestionList({ prompts, onSelect }: { prompts: { text: string }[]; onSelect: (t: string) => void }) {
+function SuggestionList({
+  prompts,
+  onSelect,
+}: {
+  prompts: { text: string }[];
+  onSelect: (t: string) => void;
+}) {
   const { c } = useTheme();
   const { t } = useTranslation();
+
   return (
-    <View style={{ gap: 0, marginBottom: 16 }}>
-      <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 8 }}>
+    <View
+      style={{
+        gap: 0,
+        marginBottom: 16,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: type.family.regular,
+          fontSize: 10,
+          color: c.textMuted,
+          letterSpacing: 2.5,
+          textTransform: "uppercase",
+          marginBottom: 8,
+        }}
+      >
         {t("chat.tryAsking")}
       </Text>
+
       {prompts.map((p, i) => (
         <TouchableOpacity
           key={i}
@@ -73,12 +130,36 @@ function SuggestionList({ prompts, onSelect }: { prompts: { text: string }[]; on
           }}
         >
           {/* Ledger dot */}
-          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.textMuted, opacity: 0.4 }} />
-          <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textSecondary, flex: 1 }}>
+          <View
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: c.textMuted,
+              opacity: 0.4,
+            }}
+          />
+
+          <Text
+            style={{
+              fontFamily: type.family.regular,
+              fontSize: type.size.sm,
+              color: c.textSecondary,
+              flex: 1,
+            }}
+          >
             {p.text}
           </Text>
+
           <Svg width={14} height={14} viewBox="0 0 14 14">
-            <Path d="M 3 7 L 11 7 M 8 4 L 11 7 L 8 10" stroke={c.textMuted} strokeWidth={1} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path
+              d="M 3 7 L 11 7 M 8 4 L 11 7 L 8 10"
+              stroke={c.textMuted}
+              strokeWidth={1}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </Svg>
         </TouchableOpacity>
       ))}
@@ -87,22 +168,65 @@ function SuggestionList({ prompts, onSelect }: { prompts: { text: string }[]; on
 }
 
 // ── Context pill ──────────────────────────────────────────────────────────────
-function ContextBadge({ group, onClear }: { group: Group; onClear: () => void }) {
+function ContextBadge({
+  group,
+  onClear,
+}: {
+  group: Group;
+  onClear: () => void;
+}) {
   const { c } = useTheme();
   const { t } = useTranslation();
+
   return (
-    <View style={{
-      flexDirection: "row", alignItems: "center", gap: 8,
-      paddingHorizontal: 16, paddingVertical: 6,
-      borderBottomWidth: 1, borderBottomColor: `${c.border}22`,
-    }}>
-      <View style={{ width: 6, height: 6, borderWidth: 1, borderColor: c.textPrimary, transform: [{ rotate: "45deg" }] }} />
-      <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary, flex: 1 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: `${c.border}22`,
+      }}
+    >
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderWidth: 1,
+          borderColor: c.textPrimary,
+          transform: [{ rotate: "45deg" }],
+        }}
+      />
+
+      <Text
+        style={{
+          fontFamily: type.family.regular,
+          fontSize: 11,
+          color: c.textSecondary,
+          flex: 1,
+        }}
+      >
         {t("chat.contextGroup", { name: group.name })}
       </Text>
-      <TouchableOpacity onPress={onClear} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+
+      <TouchableOpacity
+        onPress={onClear}
+        hitSlop={{
+          top: 8,
+          bottom: 8,
+          left: 8,
+          right: 8,
+        }}
+      >
         <Svg width={14} height={14} viewBox="0 0 14 14">
-          <Path d="M 3 3 L 11 11 M 11 3 L 3 11" stroke={c.textMuted} strokeWidth={1.2} strokeLinecap="round" />
+          <Path
+            d="M 3 3 L 11 11 M 11 3 L 3 11"
+            stroke={c.textMuted}
+            strokeWidth={1.2}
+            strokeLinecap="round"
+          />
         </Svg>
       </TouchableOpacity>
     </View>
@@ -116,207 +240,509 @@ export default function AIChatScreen() {
   const router = useRouter();
   const listRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState<Message[]>([{
-    id: "0",
-    role: "assistant",
-    content: `${t("chat.greetingIntro")}\n\n${t("chat.greetingCapabilities")}`,
-    action_type: null,
-    action_data: null,
-  }]);
-  const [input,       setInput]       = useState("");
-  const [loading,     setLoading]     = useState(false);
-  const [groups,      setGroups]      = useState<Group[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "0",
+      role: "assistant",
+      content: `${t("chat.greetingIntro")}\n\n${t(
+        "chat.greetingCapabilities"
+      )}`,
+      action_type: null,
+      action_data: null,
+    },
+  ]);
+
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [activeGroup, setActiveGroup] = useState<Group | null>(null);
-  const [userName,    setUserName]    = useState("");
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const [tripsR, meR] = await Promise.all([api.get("/trips"), api.get("/auth/me")]);
+        const [tripsR, meR] = await Promise.all([
+          api.get("/trips"),
+          api.get("/auth/me"),
+        ]);
+
         setGroups(tripsR.data || []);
         setUserName(meR.data?.name || "");
       } catch {}
     })();
   }, []);
 
-  const buildContext = useCallback((): ChatV2Context => ({
-    group_id:    activeGroup?.id,
-    group_name:  activeGroup?.name,
-    user_name:   userName,
-    currency:    activeGroup?.currency || "INR",
-    groups:      groups.map(g => ({ id: g.id, name: g.name, currency: g.currency, my_net: g.my_net })),
-  }), [activeGroup, userName, groups]);
+  // Keep the latest message in view once the keyboard finishes animating in —
+  // the list's own container shrinks (KeyboardAvoidingView), but that resize
+  // doesn't fire onContentSizeChange, so without this the last bubble stays
+  // scrolled behind the input bar.
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const sub = Keyboard.addListener(showEvent, () => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
-  const send = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || loading) return;
+  const buildContext = useCallback(
+    (): ChatV2Context => ({
+      group_id: activeGroup?.id,
+      group_name: activeGroup?.name,
+      user_name: userName,
+      currency: activeGroup?.currency || "INR",
+      groups: groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        currency: g.currency,
+        my_net: g.my_net,
+      })),
+    }),
+    [activeGroup, userName, groups]
+  );
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: trimmed };
-    setMessages(prev => [...prev, userMsg]);
-    setInput("");
-    setLoading(true);
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
 
-    try {
-      const lang    = getCurrentLanguage();
-      const history = messages.filter(m => m.id !== "0").slice(-12).map(m => ({ role: m.role, content: m.content }));
-      const result  = await chatV2(trimmed, history, buildContext(), lang);
+      if (!trimmed || loading) return;
 
-      if (result.action_data?.group_id && !activeGroup) {
-        const gid = result.action_data.group_id;
-        const gname = result.action_data.name || result.action_data.group_name;
-        const gcur  = result.action_data.currency || "INR";
-        if (gid && gname) {
-          setActiveGroup({ id: gid, name: gname, currency: gcur, my_net: 0 });
-          api.get("/trips").then(r => setGroups(r.data || [])).catch(() => {});
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: trimmed,
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setLoading(true);
+
+      try {
+        const lang = getCurrentLanguage();
+
+        const history = messages
+          .filter((m) => m.id !== "0")
+          .slice(-12)
+          .map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
+        const result = await chatV2(
+          trimmed,
+          history,
+          buildContext(),
+          lang
+        );
+
+        if (result.action_data?.group_id && !activeGroup) {
+          const gid = result.action_data.group_id;
+          const gname =
+            result.action_data.name ||
+            result.action_data.group_name;
+          const gcur =
+            result.action_data.currency || "INR";
+
+          if (gid && gname) {
+            setActiveGroup({
+              id: gid,
+              name: gname,
+              currency: gcur,
+              my_net: 0,
+            });
+
+            api
+              .get("/trips")
+              .then((r) => setGroups(r.data || []))
+              .catch(() => {});
+          }
         }
+
+        const lower = result.reply.toLowerCase();
+
+        const suggestsCreate =
+          !result.action_type &&
+          (lower.includes("create a new group") ||
+            lower.includes("would you like to create") ||
+            lower.includes("shall i create") ||
+            lower.includes("want to create a group"));
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: result.reply,
+            action_type: result.action_type,
+            action_data: result.action_data,
+            ...(suggestsCreate
+              ? {
+                  quickReplies: [
+                    {
+                      label: t("chat.createNewGroup"),
+                      value: "__create_group__",
+                    },
+                    {
+                      label: t("chat.noThanks"),
+                      value: "no thanks",
+                    },
+                  ],
+                }
+              : {}),
+          },
+        ]);
+      } catch (e: any) {
+        const msg =
+          e?.response?.status === 401
+            ? t("chat.sessionExpired")
+            : t("chat.connectionError");
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: msg,
+          },
+        ]);
+      } finally {
+        setLoading(false);
       }
+    },
+    [loading, messages, buildContext, activeGroup, t]
+  );
 
-      const lower = result.reply.toLowerCase();
-      const suggestsCreate = !result.action_type && (
-        lower.includes("create a new group") ||
-        lower.includes("would you like to create") ||
-        lower.includes("shall i create") ||
-        lower.includes("want to create a group")
-      );
+  const onVoiceTranscript = useCallback(
+    (text: string) => {
+      if (text) send(text);
+    },
+    [send]
+  );
 
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: result.reply,
-        action_type: result.action_type,
-        action_data: result.action_data,
-        ...(suggestsCreate ? {
-          quickReplies: [
-            { label: t("chat.createNewGroup"), value: "__create_group__" },
-            { label: t("chat.noThanks"),        value: "no thanks" },
-          ],
-        } : {}),
-      }]);
-    } catch (e: any) {
-      const msg = e?.response?.status === 401
-        ? t("chat.sessionExpired")
-        : t("chat.connectionError");
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: msg }]);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading, messages, buildContext, activeGroup, t]);
+  const handleNavigate = useCallback(
+    (groupId: string) => {
+      router.push(`/split/${groupId}` as any);
+    },
+    [router]
+  );
 
-  const onVoiceTranscript = useCallback((text: string) => { if (text) send(text); }, [send]);
-  const handleNavigate    = useCallback((groupId: string) => { router.push(`/split/${groupId}` as any); }, [router]);
-  const handleQuickReply  = useCallback((_label: string, value: string) => {
-    if (value === "__create_group__") {
-      router.push({ pathname: "/create-split", params: { category: "other" } } as any);
-    } else {
-      send(value);
-    }
-  }, [send, router]);
+  const handleQuickReply = useCallback(
+    (_label: string, value: string) => {
+      if (value === "__create_group__") {
+        router.push({
+          pathname: "/create-split",
+          params: { category: "other" },
+        } as any);
+      } else {
+        send(value);
+      }
+    },
+    [send, router]
+  );
 
-  const prompts = activeGroup ? getPromptsWithGroup(activeGroup.name, t) : getPromptsNoGroup(t);
+  const prompts = activeGroup
+    ? getPromptsWithGroup(activeGroup.name, t)
+    : getPromptsNoGroup(t);
+
   const showSuggestions = messages.length <= 1;
   const hasInput = input.trim().length > 0;
 
   const openGroupPicker = () => {
-    if (groups.length === 0) { Alert.alert(t("chat.noGroupsTitle"), t("chat.noGroupsDesc")); return; }
-    Alert.alert(t("chat.setContextTitle"), t("chat.setContextDesc"), [
-      ...groups.slice(0, 5).map(g => ({ text: g.name, onPress: () => setActiveGroup(g) })),
-      { text: t("chat.clearContext"), onPress: () => setActiveGroup(null), style: "destructive" as const },
-      { text: t("common.cancel"), style: "cancel" as const },
-    ]);
+    if (groups.length === 0) {
+      Alert.alert(
+        t("chat.noGroupsTitle"),
+        t("chat.noGroupsDesc")
+      );
+      return;
+    }
+
+    Alert.alert(
+      t("chat.setContextTitle"),
+      t("chat.setContextDesc"),
+      [
+        ...groups.slice(0, 5).map((g) => ({
+          text: g.name,
+          onPress: () => setActiveGroup(g),
+        })),
+        {
+          text: t("chat.clearContext"),
+          onPress: () => setActiveGroup(null),
+          style: "destructive" as const,
+        },
+        {
+          text: t("common.cancel"),
+          style: "cancel" as const,
+        },
+      ]
+    );
   };
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.bg }}
+      style={{
+        flex: 1,
+        backgroundColor: c.bg,
+      }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={90}
+      // Android's "height" behavior shrinks this view by keyboardHeight + offset.
+      // A nonzero offset here (there's nothing above this view to compensate
+      // for — the header is a child of it) over-shrinks the layout and leaves
+      // a blank gap between the input bar and the keyboard. iOS's "padding"
+      // behavior needs an offset to clear the tab bar, which stays on-screen
+      // under the keyboard there but auto-hides on Android.
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       {/* ── Header ── */}
-      <View style={{
-        paddingTop: Platform.OS === "ios" ? 56 : 40,
-        paddingHorizontal: 20,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: `${c.border}30`,
-        backgroundColor: c.bg,
-      }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View
+        style={{
+          paddingTop: Platform.OS === "ios" ? 56 : 40,
+          paddingHorizontal: 20,
+          paddingBottom: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: `${c.border}30`,
+          backgroundColor: c.bg,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
             <SketchAIAvatar size={36} />
+
             <View>
-              <Text style={{ fontFamily: type.family.bold, fontSize: type.size.md, color: c.textPrimary, letterSpacing: -0.3 }}>
+              <Text
+                style={{
+                  fontFamily: type.family.bold,
+                  fontSize: type.size.md,
+                  color: c.textPrimary,
+                  letterSpacing: -0.3,
+                }}
+              >
                 {t("chat.title")}
               </Text>
-              <Text style={{ fontFamily: type.family.regular, fontSize: 10, color: c.textMuted, marginTop: 1, letterSpacing: 1 }}>
+
+              <Text
+                style={{
+                  fontFamily: type.family.regular,
+                  fontSize: 10,
+                  color: c.textMuted,
+                  marginTop: 1,
+                  letterSpacing: 1,
+                }}
+              >
                 {t("chat.financialAssistant")}
               </Text>
             </View>
           </View>
+
           {/* Group context picker */}
           <TouchableOpacity
             onPress={openGroupPicker}
             activeOpacity={0.7}
             style={{
-              borderWidth: 1, borderColor: `${c.border}50`,
-              paddingHorizontal: 10, paddingVertical: 6,
-              flexDirection: "row", alignItems: "center", gap: 6,
+              borderWidth: 1,
+              borderColor: `${c.border}50`,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             <Svg width={12} height={12} viewBox="0 0 12 12">
-              <Rect x={1} y={1} width={4} height={4} stroke={c.textMuted} strokeWidth={1} fill="none" />
-              <Rect x={7} y={1} width={4} height={4} stroke={c.textMuted} strokeWidth={1} fill="none" />
-              <Rect x={1} y={7} width={4} height={4} stroke={c.textMuted} strokeWidth={1} fill="none" />
-              <Rect x={7} y={7} width={4} height={4} stroke={c.textMuted} strokeWidth={1} fill="none" />
+              <Rect
+                x={1}
+                y={1}
+                width={4}
+                height={4}
+                stroke={c.textMuted}
+                strokeWidth={1}
+                fill="none"
+              />
+
+              <Rect
+                x={7}
+                y={1}
+                width={4}
+                height={4}
+                stroke={c.textMuted}
+                strokeWidth={1}
+                fill="none"
+              />
+
+              <Rect
+                x={1}
+                y={7}
+                width={4}
+                height={4}
+                stroke={c.textMuted}
+                strokeWidth={1}
+                fill="none"
+              />
+
+              <Rect
+                x={7}
+                y={7}
+                width={4}
+                height={4}
+                stroke={c.textMuted}
+                strokeWidth={1}
+                fill="none"
+              />
             </Svg>
-            <Text style={{ fontFamily: type.family.regular, fontSize: 11, color: c.textSecondary }} numberOfLines={1}>
-              {activeGroup ? activeGroup.name : t("chat.allGroups")}
+
+            <Text
+              style={{
+                fontFamily: type.family.regular,
+                fontSize: 11,
+                color: c.textSecondary,
+              }}
+              numberOfLines={1}
+            >
+              {activeGroup
+                ? activeGroup.name
+                : t("chat.allGroups")}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Context badge */}
-      {activeGroup && <ContextBadge group={activeGroup} onClear={() => setActiveGroup(null)} />}
+      {activeGroup && (
+        <ContextBadge
+          group={activeGroup}
+          onClear={() => setActiveGroup(null)}
+        />
+      )}
 
       {/* ── Messages ── */}
       <FlatList
         ref={listRef}
         data={messages}
-        keyExtractor={m => m.id}
-        contentContainerStyle={{ padding: 20, paddingBottom: 8, gap: 4 }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => <ChatBubble message={item} onNavigate={handleNavigate} onQuickReply={handleQuickReply} />}
-        ListHeaderComponent={showSuggestions ? (
-          <SuggestionList prompts={prompts} onSelect={send} />
-        ) : null}
-        ListFooterComponent={loading ? <TypingIndicator /> : null}
+        keyExtractor={(m) => m.id}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: 8,
+          gap: 4,
+        }}
+        onContentSizeChange={() =>
+          listRef.current?.scrollToEnd({
+            animated: true,
+          })
+        }
+        renderItem={({ item }) => (
+          <ChatBubble
+            message={item}
+            onNavigate={handleNavigate}
+            onQuickReply={handleQuickReply}
+          />
+        )}
+        ListHeaderComponent={
+          showSuggestions ? (
+            <SuggestionList
+              prompts={prompts}
+              onSelect={send}
+            />
+          ) : null
+        }
+        ListFooterComponent={
+          loading ? <TypingIndicator /> : null
+        }
       />
 
       {/* ── Input bar ── */}
-      <View style={{
-        borderTopWidth: 1,
-        borderTopColor: `${c.border}30`,
-        backgroundColor: c.bg,
-        paddingBottom: Platform.OS === "ios" ? 30 : 12,
-        paddingTop: 12,
-        paddingHorizontal: 16,
-      }}>
-        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10 }}>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: `${c.border}30`,
+          backgroundColor: c.bg,
+
+          // FIX:
+          // Remove the extra Android bottom whitespace.
+          // Keep the original iOS safe-area spacing.
+          paddingBottom: Platform.OS === "ios" ? 30 : 0,
+
+          paddingTop: 12,
+          paddingHorizontal: 16,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-end",
+            gap: 10,
+          }}
+        >
           {/* Scan button */}
           <TouchableOpacity
             onPress={() => router.push("/scan")}
             style={{
-              width: 42, height: 42,
-              borderWidth: 1, borderColor: `${c.border}50`,
-              alignItems: "center", justifyContent: "center",
+              width: 42,
+              height: 42,
+              borderWidth: 1,
+              borderColor: `${c.border}50`,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Svg width={18} height={18} viewBox="0 0 18 18">
-              <Path d="M 2 5 L 2 3 L 5 3" stroke={c.textSecondary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <Path d="M 13 3 L 16 3 L 16 5" stroke={c.textSecondary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <Path d="M 2 13 L 2 15 L 5 15" stroke={c.textSecondary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <Path d="M 13 15 L 16 15 L 16 13" stroke={c.textSecondary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <Line x1={2} y1={9} x2={16} y2={9} stroke={c.textSecondary} strokeWidth={1} strokeLinecap="round" opacity={0.4} />
+              <Path
+                d="M 2 5 L 2 3 L 5 3"
+                stroke={c.textSecondary}
+                strokeWidth={1.3}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              <Path
+                d="M 13 3 L 16 3 L 16 5"
+                stroke={c.textSecondary}
+                strokeWidth={1.3}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              <Path
+                d="M 2 13 L 2 15 L 5 15"
+                stroke={c.textSecondary}
+                strokeWidth={1.3}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              <Path
+                d="M 13 15 L 16 15 L 16 13"
+                stroke={c.textSecondary}
+                strokeWidth={1.3}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              <Line
+                x1={2}
+                y1={9}
+                x2={16}
+                y2={9}
+                stroke={c.textSecondary}
+                strokeWidth={1}
+                strokeLinecap="round"
+                opacity={0.4}
+              />
             </Svg>
           </TouchableOpacity>
 
@@ -326,17 +752,19 @@ export default function AIChatScreen() {
             onChangeText={setInput}
             placeholder={t("chat.inputPlaceholder")}
             placeholderTextColor={c.textMuted}
-            style={{
-              flex: 1,
-              borderWidth: 1,
-              borderColor: `${c.border}50`,
-              paddingHorizontal: 14,
-              paddingVertical: 11,
-              color: c.textPrimary,
-              fontSize: type.size.sm,
-              maxHeight: 100,
-              fontFamily: type.family.regular,
-            } as any}
+            style={
+              {
+                flex: 1,
+                borderWidth: 1,
+                borderColor: `${c.border}50`,
+                paddingHorizontal: 14,
+                paddingVertical: 11,
+                color: c.textPrimary,
+                fontSize: type.size.sm,
+                maxHeight: 100,
+                fontFamily: type.family.regular,
+              } as any
+            }
             onSubmitEditing={() => send(input)}
             returnKeyType="send"
             multiline
@@ -349,17 +777,28 @@ export default function AIChatScreen() {
               onPress={() => send(input)}
               disabled={loading}
               style={{
-                width: 42, height: 42,
+                width: 42,
+                height: 42,
                 backgroundColor: c.textPrimary,
-                alignItems: "center", justifyContent: "center",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               <Svg width={18} height={18} viewBox="0 0 18 18">
-                <Path d="M 3 15 L 9 3 L 15 15 L 9 12 Z" stroke={c.bg} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Path
+                  d="M 3 15 L 9 3 L 15 15 L 9 12 Z"
+                  stroke={c.bg}
+                  strokeWidth={1.4}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </Svg>
             </TouchableOpacity>
           ) : (
-            <VoiceButton onTranscript={onVoiceTranscript} />
+            <VoiceButton
+              onTranscript={onVoiceTranscript}
+            />
           )}
         </View>
       </View>

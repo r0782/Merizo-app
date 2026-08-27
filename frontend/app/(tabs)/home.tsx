@@ -14,6 +14,12 @@ import Animated, {
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import Svg, { Path, Line, Circle } from "react-native-svg";
+import {
+  PlusIcon, ScanIcon, UsersThreeIcon, ChatCircleTextIcon,
+  AirplaneIcon, ForkKnifeIcon, HouseIcon as HouseCategoryIcon,
+  ShoppingBagIcon, FilmSlateIcon, PackageIcon,
+} from "phosphor-react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/lib/theme";
 import { useAuth } from "../../src/lib/auth";
 import { api } from "../../src/lib/api";
@@ -50,7 +56,6 @@ function DottedLine({ c }: { c: any }) {
 
 // ── Page header ───────────────────────────────────────────────────────────────
 function NotebookHeader({ greeting, date, c }: any) {
-  const { toggle, isDark } = useTheme();
   const opacity    = useSharedValue(0);
   const translateY = useSharedValue(-12);
 
@@ -63,46 +68,15 @@ function NotebookHeader({ greeting, date, c }: any) {
 
   return (
     <Animated.View style={[as, { paddingHorizontal: 20, paddingBottom: 16 }]}>
-      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <View>
-          <Text style={{ fontFamily: type.family.light, fontSize: type.size.xs, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 2 }}>
-            {date}
-          </Text>
-          <Text style={{ fontFamily: type.family.bold, fontSize: 32, color: c.textPrimary, letterSpacing: -1.5, lineHeight: 36 }}>
-            MERIZO
-          </Text>
-          <Text style={{ fontFamily: type.family.light, fontSize: type.size.sm, color: c.textSecondary, marginTop: 2, letterSpacing: 0.5 }}>
-            {greeting}
-          </Text>
-        </View>
-        {/* Theme toggle — sun/moon sketch icon */}
-        <TouchableOpacity
-          onPress={toggle}
-          activeOpacity={0.6}
-          style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${c.border}40` }}
-        >
-          {isDark ? (
-            /* Sun icon */
-            <Svg width={20} height={20} viewBox="0 0 20 20">
-              <Circle cx={10} cy={10} r={4} stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
-              <Line x1={10} y1={1} x2={10} y2={3.5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={10} y1={16.5} x2={10} y2={19} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={1} y1={10} x2={3.5} y2={10} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={16.5} y1={10} x2={19} y2={10} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={3.2} y1={3.2} x2={5} y2={5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={15} y1={15} x2={16.8} y2={16.8} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={16.8} y1={3.2} x2={15} y2={5} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-              <Line x1={5} y1={15} x2={3.2} y2={16.8} stroke={c.textPrimary} strokeWidth={1.2} strokeLinecap="round" />
-            </Svg>
-          ) : (
-            /* Moon icon */
-            <Svg width={20} height={20} viewBox="0 0 20 20">
-              <Path d="M 10 2 Q 15 3 16 9 Q 17 16 10 18 Q 4 17 3 11 Q 4 4 10 2 Z" stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
-              <Path d="M 10 2 Q 6 5 6 10 Q 6 14 10 18" stroke={c.textPrimary} strokeWidth={0.8} fill="none" opacity={0.4} />
-            </Svg>
-          )}
-        </TouchableOpacity>
-      </View>
+      <Text style={{ fontFamily: type.family.light, fontSize: type.size.xs, color: c.textMuted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 2 }}>
+        {date}
+      </Text>
+      <Text style={{ fontFamily: type.family.bold, fontSize: 32, color: c.textPrimary, letterSpacing: -1.5, lineHeight: 36 }}>
+        MERIZO
+      </Text>
+      <Text style={{ fontFamily: type.family.light, fontSize: type.size.sm, color: c.textSecondary, marginTop: 2, letterSpacing: 0.5 }}>
+        {greeting}
+      </Text>
     </Animated.View>
   );
 }
@@ -153,7 +127,7 @@ function QuickAction({ label, icon, onPress, c }: any) {
           gap: 8,
         }}
       >
-        <Svg width={22} height={22} viewBox="0 0 24 24">{icon}</Svg>
+        {icon}
         <Text style={{
           fontFamily: type.family.medium,
           fontSize: 9,
@@ -473,43 +447,25 @@ export default function HomeScreen() {
               label={`${t("home.wordAdd")}\n${t("home.wordExpense")}`}
               onPress={() => setShowAddExpense(true)}
               c={c}
-              icon={<>
-                <Path d="M 12 5 L 12 19" stroke={c.textPrimary} strokeWidth={1.6} strokeLinecap="round" />
-                <Path d="M 5 12 L 19 12" stroke={c.textPrimary} strokeWidth={1.6} strokeLinecap="round" />
-              </>}
+              icon={<PlusIcon size={22} color={c.textPrimary} weight="regular" />}
             />
             <QuickAction
               label={`${t("home.wordScan")}\n${t("home.wordBill")}`}
               onPress={() => router.push("/scan")}
               c={c}
-              icon={<>
-                <Path d="M 4 8 L 4 5 L 8 5"  stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M 20 5 L 16 5 L 16 8" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M 4 16 L 4 19 L 8 19" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M 20 19 L 16 19 L 16 16" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <Line x1={4} y1={12} x2={20} y2={12} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.4} />
-              </>}
+              icon={<ScanIcon size={22} color={c.textPrimary} weight="regular" />}
             />
             <QuickAction
               label={`${t("home.wordNew")}\n${t("home.wordGroup")}`}
               onPress={() => setShowNewGroup(true)}
               c={c}
-              icon={<>
-                <Circle cx={10} cy={9} r={3.5} stroke={c.textPrimary} strokeWidth={1.3} fill="none" />
-                <Path d="M 4 20 Q 4 16 10 16 Q 16 16 16 20" stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" />
-                <Path d="M 19 8 L 19 13 M 16.5 10.5 L 21.5 10.5" stroke={c.textPrimary} strokeWidth={1.3} strokeLinecap="round" />
-              </>}
+              icon={<UsersThreeIcon size={22} color={c.textPrimary} weight="regular" />}
             />
             <QuickAction
               label={`${t("home.wordAi")}\n${t("home.wordAdvisor")}`}
               onPress={() => router.push("/(tabs)/chat")}
               c={c}
-              icon={<>
-                <Path d="M 4 6 Q 4 4 6 4 L 18 4 Q 20 4 20 6 L 20 13 Q 20 15 18 15 L 9 15 L 4 19 L 4 6 Z"
-                  stroke={c.textPrimary} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <Line x1={8} y1={9} x2={16} y2={9} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.5} />
-                <Line x1={8} y1={12} x2={13} y2={12} stroke={c.textPrimary} strokeWidth={1} strokeLinecap="round" opacity={0.5} />
-              </>}
+              icon={<ChatCircleTextIcon size={22} color={c.textPrimary} weight="regular" />}
             />
           </View>
         </View>
@@ -537,7 +493,9 @@ export default function HomeScreen() {
                 activeOpacity={0.65}
                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: `${c.border}25` }}
               >
-                <Text style={{ fontSize: 18, marginRight: 10 }}>{bill.emoji}</Text>
+                <View style={{ width: 28, marginRight: 10 }}>
+                  <Ionicons name={bill.icon as any} size={18} color={c.textMuted} />
+                </View>
                 <Text style={{ fontFamily: type.family.regular, fontSize: type.size.sm, color: c.textPrimary, flex: 1 }}>
                   {bill.name}
                 </Text>
@@ -759,13 +717,13 @@ export default function HomeScreen() {
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               {([
-                { label: t("home.catTravel"),        category: "travel",        icon: "✈️" },
-                { label: t("home.catFood"),          category: "food",          icon: "🍽️" },
-                { label: t("home.catHome"),          category: "home",          icon: "🏠" },
-                { label: t("home.catShopping"),      category: "shopping",      icon: "🛍️" },
-                { label: t("home.catEntertainment"), category: "entertainment",  icon: "🎬" },
-                { label: t("home.catOther"),         category: "other",         icon: "📦" },
-              ]).map(({ label, category, icon }) => (
+                { label: t("home.catTravel"),        category: "travel",        Icon: AirplaneIcon },
+                { label: t("home.catFood"),          category: "food",          Icon: ForkKnifeIcon },
+                { label: t("home.catHome"),          category: "home",          Icon: HouseCategoryIcon },
+                { label: t("home.catShopping"),      category: "shopping",      Icon: ShoppingBagIcon },
+                { label: t("home.catEntertainment"), category: "entertainment",  Icon: FilmSlateIcon },
+                { label: t("home.catOther"),         category: "other",         Icon: PackageIcon },
+              ]).map(({ label, category, Icon }) => (
                 <TouchableOpacity
                   key={category}
                   onPress={() => {
@@ -779,7 +737,7 @@ export default function HomeScreen() {
                     width: "30%",
                   }}
                 >
-                  <Text style={{ fontSize: 22 }}>{icon}</Text>
+                  <Icon size={22} color={c.textPrimary} weight="regular" />
                   <Text style={{ fontFamily: type.family.medium, fontSize: 11, color: c.textPrimary, textAlign: "center" }}>{label}</Text>
                 </TouchableOpacity>
               ))}
