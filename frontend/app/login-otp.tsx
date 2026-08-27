@@ -131,9 +131,9 @@ export default function LoginOTPScreen() {
             onPress={onSendOTP}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.bg} />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Send OTP</Text>
+              <Text style={{ color: c.bg, fontSize: 16, fontWeight: "700" }}>Send OTP</Text>
             )}
           </TouchableOpacity>
 

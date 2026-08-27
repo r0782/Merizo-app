@@ -194,7 +194,7 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
                       }}
                     >
                       {selected.has(item.id) && (
-                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Ionicons name="checkmark" size={16} color={c.bg} />
                       )}
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
@@ -244,7 +244,7 @@ export function ContactPickerButton({ onSelectContacts, testID }: Props) {
                   alignItems: "center",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>Add Selected</Text>
+                <Text style={{ color: c.bg, fontWeight: "600" }}>Add Selected</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
   Platform, Linking, Modal, TextInput, Switch, Share, ActivityIndicator,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Path, Circle, Line } from "react-native-svg";
@@ -18,6 +18,8 @@ import { api } from "../../src/lib/api";
 import { currencySymbol, type } from "../../src/lib/tokens";
 import { getLanguageMeta } from "../../src/lib/i18n";
 import { confirmAction } from "../../src/lib/confirm";
+import { QRCodeGenerator } from "../../src/components/QRCodeGenerator";
+import { buildMerizoLink } from "../../src/lib/merizoLinks";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "JPY", "AUD", "CAD"];
 
@@ -61,42 +63,6 @@ function ProfileRow({ icon, label, sub, onPress, right, danger = false, c }: any
   );
 }
 
-// ── Deterministic QR-like SVG from user id ────────────────────────────────────
-function SketchQR({ userId, size = 120, c }: { userId: string; size?: number; c: any }) {
-  const cells = 11;
-  const cell = size / cells;
-  // Deterministic hash from userId string
-  const hash = (s: string) => {
-    let h = 0x9e3779b9;
-    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x9e3779b9);
-    return h >>> 0;
-  };
-  const bits: boolean[][] = Array.from({ length: cells }, (_, r) =>
-    Array.from({ length: cells }, (_, col) => {
-      // Always fill corners (3×3 finder patterns)
-      if ((r < 3 && col < 3) || (r < 3 && col >= cells - 3) || (r >= cells - 3 && col < 3)) return true;
-      // Mirror left half to right for symmetry
-      const c2 = col < Math.ceil(cells / 2) ? col : cells - 1 - col;
-      return !!(hash(userId + r + c2) & 1);
-    })
-  );
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {bits.map((row, r) =>
-        row.map((on, col) =>
-          on ? (
-            <Path
-              key={`${r}-${col}`}
-              d={`M ${col * cell + 1} ${r * cell + 1} h ${cell - 2} v ${cell - 2} h -${cell - 2} Z`}
-              fill={c.textPrimary}
-            />
-          ) : null
-        )
-      )}
-    </Svg>
-  );
-}
-
 // ── SVG profile icon ──────────────────────────────────────────────────────────
 function ProfileSketchIcon({ size = 48, initial, c }: any) {
   return (
@@ -124,6 +90,11 @@ export default function ProfileScreen() {
   const { user, logout, refresh, requestDeleteOtp, confirmDeleteAccount } = useAuth();
   const { t, i18n } = useTranslation();
   const router = useRouter();
+
+  const { width } = useWindowDimensions();
+  // Scanning a QR code isn't a desktop/PC workflow (no consistent camera
+  // access across browsers) — hide the scan action there, keep it on mobile/tablet.
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
 
   const { currency, setCurrency } = useCurrency();
   const [editProfile, setEditProfile] = useState(false);
@@ -226,6 +197,7 @@ export default function ProfileScreen() {
     bell:      (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 5 9 Q 5 4 10 4 Q 15 4 15 9 L 16 14 L 4 14 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /><Path d="M 8 14 Q 8 17 10 17 Q 12 17 12 14" stroke={p.color} strokeWidth={1.2} fill="none" /></Svg>,
     chart:     (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Line x1={2} y1={17} x2={18} y2={17} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={5} y1={17} x2={5} y2={11} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={9} y1={17} x2={9} y2={7} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={13} y1={17} x2={13} y2={12} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /><Line x1={17} y1={17} x2={17} y2={4} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
     repeat:    (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 4 6 Q 4 3 10 3 Q 16 3 16 8" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 13 1 L 16 3 L 13 5" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /><Path d="M 16 14 Q 16 17 10 17 Q 4 17 4 12" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Path d="M 7 19 L 4 17 L 7 15" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /></Svg>,
+    friends:   (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={7} cy={7} r={3} stroke={p.color} strokeWidth={1.3} fill="none" /><Path d="M 1 18 Q 1 12 7 12 Q 13 12 13 18" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" /><Circle cx={15} cy={6} r={2.4} stroke={p.color} strokeWidth={1.1} fill="none" /><Path d="M 12 17 Q 12.5 13 17 13 Q 19.5 13 19.5 17" stroke={p.color} strokeWidth={1.1} fill="none" strokeLinecap="round" /></Svg>,
     question:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Circle cx={10} cy={10} r={7} stroke={p.color} strokeWidth={1.3} fill="none" /><Path d="M 7 8 Q 7 5 10 5 Q 13 5 13 8 Q 13 10 10 11" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinecap="round" /><Circle cx={10} cy={14.5} r={0.8} fill={p.color} /></Svg>,
     mail:      (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 2 5 L 10 11 L 18 5" stroke={p.color} strokeWidth={1.2} fill="none" strokeLinejoin="round" /><Path d="M 2 5 L 2 16 L 18 16 L 18 5 L 2 5 Z" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinejoin="round" /></Svg>,
     download:  (p: any) => <Svg width={p.size} height={p.size} viewBox="0 0 20 20"><Path d="M 10 3 L 10 13 M 6 10 L 10 14 L 14 10" stroke={p.color} strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round" /><Line x1={3} y1={17} x2={17} y2={17} stroke={p.color} strokeWidth={1.3} strokeLinecap="round" /></Svg>,
@@ -317,21 +289,22 @@ export default function ProfileScreen() {
         <ProfileRow icon={icons.chart}  label={t("profile.spendingAnalytics")} sub={t("profile.spendingAnalyticsSub")} onPress={() => router.push("/(tabs)/insights")} c={c} />
         <InkDivider c={c} />
         <ProfileRow icon={icons.repeat} label={t("profile.recurringExpenses")} sub={t("profile.recurringExpensesSub")} onPress={() => router.push("/recurring")} c={c} />
+        <InkDivider c={c} />
+        <ProfileRow icon={icons.friends} label="Friends" sub="Scan or add by email" onPress={() => router.push("/friends" as any)} c={c} />
 
         {/* ── QR & Profile Link ── */}
         <SectionLabel label={t("profile.sectionQrCode")} />
         <View style={{ paddingHorizontal: 20, paddingBottom: 24, alignItems: "center", gap: 16 }}>
-          {/* QR visual */}
-          <View style={{ borderWidth: 1, borderColor: c.border, padding: 12, backgroundColor: c.bg }}>
-            <SketchQR userId={user?.id || user?.email || "merizo"} size={130} c={c} />
-          </View>
+          {/* QR visual — real, scannable Merizo link keyed by the user's email;
+              scanning it (via Scan QR) prompts to add this person as a friend */}
+          <QRCodeGenerator value={user?.email ? buildMerizoLink("user", user.email) : ""} size={130} showLogo={false} />
           {/* Profile link */}
           <View style={{ alignItems: "center", gap: 4 }}>
             <Text style={{ fontFamily: type.family.regular, fontSize: 9, color: c.textMuted, letterSpacing: 2, textTransform: "uppercase" }}>
               {t("profile.profileLink")}
             </Text>
             <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textSecondary, letterSpacing: 0.3 }}>
-              merizo.app/u/{(user?.id || "").slice(0, 8) || "you"}
+              {user?.email || "you"}
             </Text>
           </View>
           {/* Action buttons */}
@@ -348,19 +321,21 @@ export default function ProfileScreen() {
               </Svg>
               <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>{t("profile.shareLink")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push("/scan-qr" as any)}
-              style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Svg width={14} height={14} viewBox="0 0 14 14">
-                <Path d="M 2 4 L 2 2 L 4 2" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
-                <Path d="M 10 2 L 12 2 L 12 4" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
-                <Path d="M 2 10 L 2 12 L 4 12" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
-                <Path d="M 10 12 L 12 12 L 12 10" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
-                <Line x1={2} y1={7} x2={12} y2={7} stroke={c.textPrimary} strokeWidth={0.8} opacity={0.4} />
-              </Svg>
-              <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>{t("profile.scanQr")}</Text>
-            </TouchableOpacity>
+            {!isDesktopWeb && (
+              <TouchableOpacity
+                onPress={() => router.push("/scan-qr" as any)}
+                style={{ borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Svg width={14} height={14} viewBox="0 0 14 14">
+                  <Path d="M 2 4 L 2 2 L 4 2" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                  <Path d="M 10 2 L 12 2 L 12 4" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                  <Path d="M 2 10 L 2 12 L 4 12" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                  <Path d="M 10 12 L 12 12 L 12 10" stroke={c.textPrimary} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                  <Line x1={2} y1={7} x2={12} y2={7} stroke={c.textPrimary} strokeWidth={0.8} opacity={0.4} />
+                </Svg>
+                <Text style={{ fontFamily: type.family.medium, fontSize: 12, color: c.textPrimary }}>{t("profile.scanQr")}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         <View style={{ height: 1, backgroundColor: c.border, opacity: 0.15, marginHorizontal: 20, marginBottom: 8 }} />

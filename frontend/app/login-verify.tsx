@@ -183,9 +183,9 @@ export default function LoginVerifyOTPScreen() {
             onPress={onVerifyOTP}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.bg} />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Verify OTP</Text>
+              <Text style={{ color: c.bg, fontSize: 16, fontWeight: "700" }}>Verify OTP</Text>
             )}
           </TouchableOpacity>
 

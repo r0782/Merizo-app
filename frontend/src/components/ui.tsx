@@ -83,7 +83,7 @@ export function Btn({
     primary:   { bg: c.textPrimary,  text: c.bg },
     secondary: { bg: c.surface,      text: c.textPrimary, border: c.border },
     ghost:     { bg: "transparent",  text: c.textSecondary },
-    danger:    { bg: c.negative,     text: "#fff" },
+    danger:    { bg: c.negative,     text: c.bg },
   };
   const s = styles[variant];
 

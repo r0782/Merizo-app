@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,7 +11,7 @@ import { validateEmail as validateEmailAPI } from "../src/lib/externalApis";
 import { ROUTES } from "../src/lib/routes";
 
 export default function RegisterScreen() {
-  const { c, isDark, toggle } = useTheme();
+  const { c } = useTheme();
   const { register } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
@@ -43,15 +43,6 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      {/* Theme toggle */}
-      <TouchableOpacity
-        testID="theme-toggle-register"
-        onPress={toggle}
-        style={{ position: "absolute", top: Platform.OS === "ios" ? 60 : 40, right: 24, zIndex: 5, width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" }}
-      >
-        <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={18} color={c.textPrimary} />
-      </TouchableOpacity>
-
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 32, paddingTop: 100, paddingBottom: 60 }}
         keyboardShouldPersistTaps="handled"
@@ -59,11 +50,9 @@ export default function RegisterScreen() {
       >
         {/* Wordmark */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 40 }}>
-          <Image
-            source={require("../assets/images/logo-icon.png")}
-            style={{ width: 36, height: 36 }}
-            resizeMode="contain"
-          />
+          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.textPrimary, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: c.bg, fontSize: 18, fontWeight: "800" }}>M</Text>
+          </View>
           <Text style={{ color: c.textPrimary, fontSize: 20, fontWeight: "700", letterSpacing: -0.5 }}>Merizo</Text>
         </View>
 

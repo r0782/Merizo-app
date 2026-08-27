@@ -13,10 +13,12 @@ import {
   Platform,
   Share,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Svg, { Path, Circle as SvgCircle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
+import { UserQrScanner } from "../../src/components/UserQrScanner";
 import { SkeletonGroupDetail } from "../../src/components/Skeleton";
 import { EmptyExpenses } from "../../src/components/EmptyStates";
 import { cache, CK, TTL } from "../../src/lib/cache";
@@ -2198,21 +2200,28 @@ function AddExpenseSheet({ trip, onClose, onAdded, initialSplitMethod = "equal" 
 // --- Add Member sheet ---
 function AddMemberSheet({ trip, onClose, onAdded }: any) {
   const { c } = useTheme();
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [addingContacts, setAddingContacts] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
-  const onSubmit = async () => {
-    if (!name.trim()) return;
+  const addMemberByName = async (value: string) => {
     setSubmitting(true);
     try {
-      await api.post(`/trips/${trip.id}/members`, { name: name.trim() });
+      await api.post(`/trips/${trip.id}/members`, { name: value });
       onAdded();
     } catch {
       Alert.alert("Error", "Could not add member");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = async () => {
+    if (!name.trim()) return;
+    await addMemberByName(name.trim());
   };
 
   const onSelectContacts = async (contacts: string[]) => {
@@ -2275,6 +2284,31 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
             <ContactPickerButton testID="add-member-from-contacts" onSelectContacts={onSelectContacts} />
           )}
 
+          {/* Scan a friend's profile QR straight into this split */}
+          {!isDesktopWeb && (
+            <TouchableOpacity
+              testID="add-member-scan"
+              onPress={() => setScannerOpen(true)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: c.surface,
+                borderColor: c.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                marginTop: 10,
+              }}
+            >
+              <Ionicons name="qr-code-outline" size={16} color={c.textPrimary} />
+              <Text style={{ color: c.textPrimary, fontWeight: "600", fontSize: 14 }}>
+                Scan a profile QR
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <View style={{ marginTop: 22, gap: 8 }}>
             <Text style={{ color: c.textMuted, fontSize: 11, fontFamily: "Manrope_700Bold", letterSpacing: 1 }}>CURRENT MEMBERS</Text>
             {trip.members.map((m: any) => (
@@ -2288,6 +2322,15 @@ function AddMemberSheet({ trip, onClose, onAdded }: any) {
           </View>
         </View>
       </View>
+
+      <UserQrScanner
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanned={(email) => {
+          setScannerOpen(false);
+          addMemberByName(email);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

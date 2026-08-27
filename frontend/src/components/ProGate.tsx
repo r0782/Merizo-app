@@ -67,7 +67,7 @@ export function ProGate({ visible, onClose, feature = "This feature" }: {
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={{ fontSize: 13, fontWeight: "500", color: c.textSecondary }}>Yearly</Text>
                   <View style={{ backgroundColor: c.positive, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                    <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>SAVE 40%</Text>
+                    <Text style={{ fontSize: 9, color: c.bg, fontWeight: "700" }}>SAVE 40%</Text>
                   </View>
                 </View>
                 <Text style={{ fontSize: 18, fontWeight: "700", color: c.textPrimary, letterSpacing: -0.5 }}>₹1,999</Text>

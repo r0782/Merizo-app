@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Image,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -321,11 +321,9 @@ export default function LoginScreen() {
 function Wordmark({ c }: { c: any }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <Image
-        source={require("../assets/images/logo-icon.png")}
-        style={{ width: 36, height: 36 }}
-        resizeMode="contain"
-      />
+      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.textPrimary, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: c.bg, fontSize: 18, fontWeight: "800" }}>M</Text>
+      </View>
       <Text style={{ color: c.textPrimary, fontSize: 20, fontWeight: "700", letterSpacing: -0.5 }}>
         Merizo
       </Text>

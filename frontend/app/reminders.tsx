@@ -165,7 +165,7 @@ export default function RemindersScreen() {
             onPress={() => setShowAdd(true)}
             style={[styles.iconBtn, { backgroundColor: c.indigo, borderColor: "transparent" }]}
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="add" size={20} color={c.bg} />
           </TouchableOpacity>
         </View>
 
@@ -365,7 +365,7 @@ function AddReminderSheet({ onClose, onAdded }: any) {
                     },
                   ]}
                 >
-                  <Text style={{ color: active ? "#fff" : c.textPrimary, fontSize: 12, fontWeight: "700" }}>
+                  <Text style={{ color: active ? c.bg : c.textPrimary, fontSize: 12, fontWeight: "700" }}>
                     {p.label}
                   </Text>
                 </TouchableOpacity>
@@ -380,9 +380,9 @@ function AddReminderSheet({ onClose, onAdded }: any) {
             style={[styles.primaryBtn, { backgroundColor: c.indigo, marginTop: 22 }]}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.bg} />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Add reminder</Text>
+              <Text style={{ color: c.bg, fontSize: 15, fontWeight: "700" }}>Add reminder</Text>
             )}
           </TouchableOpacity>
         </View>

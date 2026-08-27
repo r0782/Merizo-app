@@ -320,7 +320,7 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
                     onPress={listening ? () => { recRef.current?.stop(); setListening(false); } : startListen}
                     style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: listening ? c.negative : isDark ? c.indigo : "#1F1A17", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 }}
                   >
-                    <Ionicons name={listening ? "stop" : "mic"} size={30} color="#fff" />
+                    <Ionicons name={listening ? "stop" : "mic"} size={30} color={isDark ? c.bg : "#fff"} />
                   </TouchableOpacity>
                 </Animated.View>
                 <Text style={{ color: c.textMuted, fontSize: 11 }}>{listening ? "Listening… tap to stop" : "Tap to speak"}</Text>
@@ -342,10 +342,10 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
                     onPress={() => doParse(transcript)}
                     style={{ marginTop: 10, backgroundColor: isDark ? c.indigo : "#1F1A17", borderRadius: 8, paddingVertical: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>
+                    <Text style={{ color: isDark ? c.bg : "#fff", fontSize: 13, fontWeight: "700" }}>
                       {parsing ? "Parsing with AI…" : "Parse with AI"}
                     </Text>
-                    {!parsing && <Ionicons name="sparkles" size={12} color="#fff" />}
+                    {!parsing && <Ionicons name="sparkles" size={12} color={isDark ? c.bg : "#fff"} />}
                   </TouchableOpacity>
                 )}
               </View>
@@ -405,8 +405,8 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
                   style={{ backgroundColor: isDark ? c.indigo : "#1F1A17", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginBottom: 8, opacity: submitting ? 0.7 : 1 }}
                 >
                   {submitting
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Add to Ledger</Text>
+                    ? <ActivityIndicator color={isDark ? c.bg : "#fff"} size="small" />
+                    : <Text style={{ color: isDark ? c.bg : "#fff", fontSize: 15, fontWeight: "800" }}>Add to Ledger</Text>
                   }
                 </TouchableOpacity>
               )}

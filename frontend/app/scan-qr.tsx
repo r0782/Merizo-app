@@ -40,7 +40,7 @@ export default function ScanQrScreen() {
     const link = parseMerizoLink(result.data);
     if (!link) {
       lockedRef.current = true;
-      setScanError("That's not a Merizo invite code.");
+      setScanError("That's not a Merizo QR code.");
       setTimeout(() => { lockedRef.current = false; setScanError(""); }, 1800);
       return;
     }

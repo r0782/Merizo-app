@@ -2,15 +2,17 @@
 // Merizo Links — central builder/parser for shareable + scannable app links
 // (QR codes, deep links, share-sheet URLs).
 //
-// Only "join" (trip invites) is wired up today. Add new entries to
-// MERIZO_LINK_TYPES and a case in resolveMerizoLink() when e.g. /pay/:token
-// or /user/:username ship — everything else (QR generation, the scanner,
+// "join" (trip invites) and "user" (a profile QR, keyed by email — scan to
+// add someone as a friend or straight into a split) are wired up. Add new
+// entries to MERIZO_LINK_TYPES and a case in navigateToMerizoLink() for
+// future link types — everything else (QR generation, the scanner,
 // deep-link handling) is generic over this map already.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { Router } from "expo-router";
 
 export const MERIZO_LINK_TYPES = {
   join: "join",
+  user: "user",
 } as const;
 
 export type MerizoLinkType = keyof typeof MERIZO_LINK_TYPES;
@@ -65,6 +67,11 @@ export function navigateToMerizoLink(router: Router, link: ParsedMerizoLink) {
   switch (link.type) {
     case "join":
       router.push(`/join/${link.token}` as any);
+      return;
+    case "user":
+      // token is the scanned user's email — hand off to the friends screen,
+      // which prompts to add them as a friend.
+      router.push({ pathname: "/friends", params: { addEmail: link.token } } as any);
       return;
     default:
       link.type satisfies never;

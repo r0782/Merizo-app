@@ -45,8 +45,8 @@ function ToastView({ item, onDone }: { item: ToastItem; onDone: () => void }) {
   const opacity    = useRef(new Animated.Value(0)).current;
 
   const KIND_CONFIG = {
-    success: { bg: c.positive,  icon: (p: any) => <CheckCircleIcon {...p} weight="fill" />,  text: "#fff" },
-    error:   { bg: c.negative,  icon: (p: any) => <XCircleIcon     {...p} weight="fill" />,  text: "#fff" },
+    success: { bg: c.positive,  icon: (p: any) => <CheckCircleIcon {...p} weight="fill" />,  text: c.bg },
+    error:   { bg: c.negative,  icon: (p: any) => <XCircleIcon     {...p} weight="fill" />,  text: c.bg },
     info:    { bg: c.textPrimary, icon: (p: any) => <InfoIcon       {...p} weight="fill" />,  text: c.bg  },
   };
   const cfg = KIND_CONFIG[item.kind];

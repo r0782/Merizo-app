@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../src/lib/theme";
 import { ContactPickerButton } from "../src/components/ContactPicker";
+import { UserQrScanner } from "../src/components/UserQrScanner";
 import { api } from "../src/lib/api";
 import {
   categoryMeta,
@@ -35,6 +37,9 @@ export default function CreateSplitScreen() {
   const params = useLocalSearchParams<{ category?: string }>();
   const category = (params.category as string) || "trip";
   const meta = categoryMeta[category] || categoryMeta.other;
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const [step, setStep] = useState(0); // 0,1,2
   const [name, setName] = useState("");
@@ -185,7 +190,7 @@ export default function CreateSplitScreen() {
                   },
                 ]}
               >
-                <Text style={{ color: s <= step ? "#fff" : c.textSecondary, fontSize: 12, fontWeight: "800" }}>{s + 1}</Text>
+                <Text style={{ color: s <= step ? c.bg : c.textSecondary, fontSize: 12, fontWeight: "800" }}>{s + 1}</Text>
               </View>
               {s < 2 && <View style={[styles.stepLine, { backgroundColor: s < step ? c.indigo : c.border }]} />}
             </View>
@@ -270,6 +275,31 @@ export default function CreateSplitScreen() {
               }}
             />
 
+            {/* Scan a friend's profile QR straight into this split */}
+            {!isDesktopWeb && (
+              <TouchableOpacity
+                testID="create-scan-member"
+                onPress={() => setScannerOpen(true)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  backgroundColor: c.surface,
+                  borderColor: c.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <Ionicons name="qr-code-outline" size={16} color={c.textPrimary} />
+                <Text style={{ color: c.textPrimary, fontWeight: "600", fontSize: 14 }}>
+                  Scan a profile QR
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {/* Quick-add from previous groups */}
             {cachedContacts.length > 0 && (
               <View style={{ marginTop: 20 }}>
@@ -341,7 +371,7 @@ export default function CreateSplitScreen() {
                       },
                     ]}
                   >
-                    <Text style={{ color: active ? "#fff" : c.textPrimary, fontWeight: "700", fontSize: 13 }}>{cur.code} {cur.symbol}</Text>
+                    <Text style={{ color: active ? c.bg : c.textPrimary, fontWeight: "700", fontSize: 13 }}>{cur.code} {cur.symbol}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -383,14 +413,23 @@ export default function CreateSplitScreen() {
           style={[styles.primaryBtn, { backgroundColor: c.indigo, marginTop: 28, opacity: submitting ? 0.7 : 1 }]}
         >
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={c.bg} />
           ) : (
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            <Text style={{ color: c.bg, fontSize: 16, fontWeight: "700" }}>
               {step === 2 ? "Create split" : "Next"}
             </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <UserQrScanner
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanned={(email) => {
+          setScannerOpen(false);
+          setMembers((prev) => (prev.includes(email) ? prev : [...prev, email]));
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -630,7 +669,7 @@ function ChipInput({
           onPress={onAdd}
           style={[styles.addBtn, { backgroundColor: c.indigo }]}
         >
-          <Ionicons name="add" size={20} color="#fff" />
+          <Ionicons name="add" size={20} color={c.bg} />
         </TouchableOpacity>
       </View>
       {chips.length > 0 && (

@@ -14,9 +14,12 @@ const MAILBOXLAYER_KEY = process.env.EXPO_PUBLIC_MAILBOXLAYER_KEY || "";
 const LANGUAGELAYER_KEY = process.env.EXPO_PUBLIC_LANGUAGELAYER_KEY || "";
 
 // ── 1. Frankfurter — Real-time currency exchange ───────────────────────────
+// api.frankfurter.app permanently redirects to api.frankfurter.dev/v1 now —
+// calling the new host directly avoids relying on that cross-origin redirect
+// resolving correctly in every environment.
 export async function getExchangeRates(base: string = "INR"): Promise<Record<string, number>> {
   try {
-    const r = await fetch(`https://api.frankfurter.app/latest?from=${base}`);
+    const r = await fetch(`https://api.frankfurter.dev/v1/latest?from=${base}`);
     const data = await r.json();
     return data.rates || {};
   } catch { return {}; }
@@ -25,7 +28,7 @@ export async function getExchangeRates(base: string = "INR"): Promise<Record<str
 export async function convertCurrency(amount: number, from: string, to: string): Promise<number> {
   try {
     if (from === to) return amount;
-    const r = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}&amount=${amount}`);
+    const r = await fetch(`https://api.frankfurter.dev/v1/latest?from=${from}&to=${to}&amount=${amount}`);
     const data = await r.json();
     return data.rates?.[to] || amount;
   } catch { return amount; }
@@ -33,7 +36,7 @@ export async function convertCurrency(amount: number, from: string, to: string):
 
 export async function getSupportedCurrencies(): Promise<Record<string, string>> {
   try {
-    const r = await fetch("https://api.frankfurter.app/currencies");
+    const r = await fetch("https://api.frankfurter.dev/v1/currencies");
     return await r.json();
   } catch { return {}; }
 }
@@ -91,7 +94,7 @@ export async function getHistoricalRate(date: string, base: string = "USD"): Pro
   try {
     if (!OER_KEY) {
       // Fallback to Frankfurter for historical
-      const r = await fetch(`https://api.frankfurter.app/${date}?from=${base}`);
+      const r = await fetch(`https://api.frankfurter.dev/v1/${date}?from=${base}`);
       const data = await r.json();
       return data.rates || {};
     }

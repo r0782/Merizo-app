@@ -199,6 +199,13 @@ async def _issue_email_otp(email: str, purpose: str):
     }
     sent = await send_email(email, EMAIL_OTP_SUBJECTS[purpose], EMAIL_OTP_BODIES[purpose].format(code=code))
     if not sent:
+        if SMTP_HOST and SMTP_USER and SMTP_PASSWORD:
+            # SMTP is configured but delivery actually failed (commonly: the
+            # host blocks outbound SMTP ports). Don't silently pretend this
+            # succeeded — the frontend needs to know no email is coming, and
+            # the caller has already spent one of their 5 sends/hour on this.
+            logger.error(f"Email OTP ({purpose}) send FAILED for ***{email[-12:]} despite SMTP being configured")
+            raise HTTPException(502, "Could not send the verification email right now. Please try again shortly.")
         # Dev / SMTP-not-configured fallback — never log raw codes in production without masking
         logger.info(f"Email OTP ({purpose}) for ***{email[-12:]}: {code}")
 
@@ -316,6 +323,8 @@ class Trip(BaseModel):
 class ReminderCreate(BaseModel):
     trip_id: Optional[str] = None; title: str
     message: Optional[str] = None; due_date: Optional[str] = None
+class FriendCreate(BaseModel):
+    email: str; name: Optional[str] = None
 
 # ── Member resolution ─────────────────────────────────────────────────────────
 async def _resolve_member(name_or_id: str) -> str:
@@ -1242,6 +1251,40 @@ async def delete_reminder(rid: str, current_user: dict = Depends(get_current_use
     return {"message": "Deleted"}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# FRIENDS — added by scanning a profile QR (see /user/{email} links) or by
+# email, then reusable as quick-add members when creating/editing a split.
+# ══════════════════════════════════════════════════════════════════════════════
+@api.get("/friends")
+async def get_friends(current_user: dict = Depends(get_current_user)):
+    return await sb_get("friends", owner_id=current_user["id"])
+
+@api.post("/friends")
+async def add_friend(friend: FriendCreate, current_user: dict = Depends(get_current_user)):
+    email = friend.email.strip().lower()
+    if not email:
+        raise HTTPException(400, "Email required")
+    if email == (current_user.get("email") or "").strip().lower():
+        raise HTTPException(400, "Can't add yourself as a friend")
+    existing = await sb_one("friends", owner_id=current_user["id"], friend_email=email)
+    if existing:
+        return existing
+    matched_user = await sb_one("users", email=email)
+    fid = str(uuid.uuid4())
+    doc = {
+        "id": fid, "owner_id": current_user["id"], "friend_email": email,
+        "friend_name": friend.name or (matched_user.get("name") if matched_user else email.split("@")[0]),
+        "friend_user_id": matched_user.get("id") if matched_user else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await sb_insert("friends", doc)
+    return doc
+
+@api.delete("/friends/{friend_id}")
+async def delete_friend(friend_id: str, current_user: dict = Depends(get_current_user)):
+    await sb_delete("friends", id=friend_id, owner_id=current_user["id"])
+    return {"message": "Deleted"}
+
+# ══════════════════════════════════════════════════════════════════════════════
 # AI REPORT
 # ══════════════════════════════════════════════════════════════════════════════
 @api.get("/trips/{trip_id}/ai-report")
@@ -1412,9 +1455,15 @@ async def forgot_password(body: dict, request: Request):
     user = await sb_one("users", email=email)
     if user:
         token = create_reset_token(email)
-        # TODO: send email via SMTP
-        # For now: return token in dev (remove in production)
-        logger.info(f"Password reset token for {email}: {token}")
+        reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
+        sent = await send_email(
+            email, "Reset your Merizo password",
+            f"Tap the link below to set a new password. It expires in 30 minutes.\n\n{reset_link}\n\n"
+            "If you didn't request this, ignore this email and your password will stay the same.",
+        )
+        if not sent:
+            # Dev / SMTP-not-configured fallback — never log raw tokens in production without masking
+            logger.info(f"Password reset link for {email}: {reset_link}")
     # Always return same response — don't reveal if email exists
     return {"message": "If this email is registered, you will receive a reset link shortly."}
 
