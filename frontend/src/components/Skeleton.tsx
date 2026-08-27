@@ -9,10 +9,8 @@
  * - Never show ActivityIndicator or "Loading..."
  */
 import React, { useEffect, useRef } from "react";
-import { View, Animated, Easing, StyleSheet, Dimensions } from "react-native";
+import { View, Animated, Easing, StyleSheet } from "react-native";
 import { useTheme } from "../lib/theme";
-
-const { width: SW } = Dimensions.get("window");
 
 // ─── Base shimmer atom ────────────────────────────────────────────────────────
 export function SkeletonBox({
@@ -40,7 +38,7 @@ export function SkeletonBox({
       ])
     ).start();
     return () => anim.stopAnimation();
-  }, []);
+  }, [anim]);
 
   const opacity = anim.interpolate({
     inputRange: [0, 1],
@@ -67,7 +65,7 @@ export function FadeIn({ children, delay = 0 }: { children: React.ReactNode; del
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [anim, delay]);
   return <Animated.View style={{ opacity: anim }}>{children}</Animated.View>;
 }
 

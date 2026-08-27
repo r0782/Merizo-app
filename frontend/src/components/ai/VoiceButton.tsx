@@ -121,7 +121,7 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
       recordingRef.current = recording;
       setIsRecording(true);
       startPulse();
-    } catch (e) {
+    } catch {
       setIsRecording(false);
       recordingRef.current = null;
       stopPulse();

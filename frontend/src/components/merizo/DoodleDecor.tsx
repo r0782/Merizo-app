@@ -3,7 +3,7 @@
  * Used as contextual doodles on group cards, section headers, empty states.
  * All monochrome / ink-style.
  */
-import Svg, { Path, Circle, Line, Rect, Ellipse } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../../lib/theme";
 
 interface DoodleProps {

@@ -198,7 +198,7 @@ export function VoiceExpenseSheet({ trip, onClose, onAdded }: Props) {
     pulse.value = listening
       ? withRepeat(withTiming(1.28, { duration: 700, easing: Easing.inOut(Easing.ease) }), -1, true)
       : withTiming(1, { duration: 200 });
-  }, [listening]);
+  }, [listening, pulse]);
 
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 

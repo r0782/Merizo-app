@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue, withSpring, withTiming,
   useAnimatedStyle, interpolate, Extrapolation,
 } from "react-native-reanimated";
-import Svg, { Path, Line } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../lib/theme";
 
 type Option = { label: string; sublabel: string; icon: "write" | "mic" | "camera" | "branch" | "download"; onPress: () => void };
@@ -49,7 +49,7 @@ function FABOption({ option, index, open, onPress }: { option: Option; index: nu
   const anim = useSharedValue(0);
   React.useEffect(() => {
     anim.value = withSpring(open ? 1 : 0, { damping: 20, stiffness: 200 } as any);
-  }, [open]);
+  }, [open, anim]);
   const style = useAnimatedStyle(() => ({
     opacity: anim.value,
     transform: [{ translateY: interpolate(anim.value, [0, 1], [12, 0], Extrapolation.CLAMP) }],

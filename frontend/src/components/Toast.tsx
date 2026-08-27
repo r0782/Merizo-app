@@ -65,7 +65,7 @@ function ToastView({ item, onDone }: { item: ToastItem; onDone: () => void }) {
     }, 2800);
 
     return () => clearTimeout(t);
-  }, []);
+  }, [onDone, opacity, translateY]);
 
   return (
     <Animated.View style={{
