@@ -119,32 +119,23 @@ async def voice_transcribe(
 ):
     """
     Transcribe audio and parse it as an expense.
-    Tries Gemini first, then falls back to OpenAI Whisper.
+
+    Only reached when on-device STT fails or isn't available (Android uses
+    the native speech recognizer as the primary path — see
+    frontend/src/lib/androidSpeech.ts). Gemini is the sole backend fallback.
     """
-    import os
+    from .gemini_voice import transcribe_audio_gemini
+    from .parser import parse_expense_from_text
     audio_bytes = await audio.read()
     member_list = [m.strip() for m in members.split(",") if m.strip()]
-
-    # Try Gemini first
-    if os.environ.get("GEMINI_API_KEY"):
-        try:
-            from .gemini_voice import transcribe_audio_gemini
-            from .parser import parse_expense_from_text
-            transcript = await transcribe_audio_gemini(
-                audio_bytes, language, audio.filename or "audio.m4a"
-            )
-            parsed = await parse_expense_from_text(transcript, member_list, currency)
-            return {"transcript": transcript, "parsed": parsed}
-        except Exception as e:
-            import logging
-            logging.getLogger("merizo.router").warning(f"Gemini STT failed, falling back: {e}")
-
-    # Fallback to OpenAI Whisper
     try:
-        from .voice import transcribe_and_parse
-        return await transcribe_and_parse(audio_bytes, member_list, currency, language)
+        transcript = await transcribe_audio_gemini(
+            audio_bytes, language, audio.filename or "audio.m4a"
+        )
+        parsed = await parse_expense_from_text(transcript, member_list, currency)
+        return {"transcript": transcript, "parsed": parsed}
     except RuntimeError:
-        raise HTTPException(503, "Voice transcription requires GEMINI_API_KEY or OPENAI_API_KEY.")
+        raise HTTPException(503, "Voice transcription requires GEMINI_API_KEY to be configured.")
     except Exception as e:
         raise HTTPException(500, str(e))
 

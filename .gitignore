@@ -19,6 +19,9 @@ node_modules/
 dist/
 web-build/
 
+# husky-generated runtime shim, recreated by `npm install` (prepare script)
+.husky/_/
+
 # OS
 .DS_Store
 Thumbs.db

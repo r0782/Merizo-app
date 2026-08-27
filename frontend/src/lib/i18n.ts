@@ -100,6 +100,7 @@ export async function initI18n(): Promise<void> {
     savedLang = getDeviceLanguage();
   }
 
+  // eslint-disable-next-line import/no-named-as-default-member -- i18next singleton instance method, not the named export
   await i18n
     .use(initReactI18next)
     .init({
@@ -113,6 +114,7 @@ export async function initI18n(): Promise<void> {
 
 // ── Runtime language change (persists to AsyncStorage) ───────────────────────
 export async function changeLanguage(code: string): Promise<void> {
+  // eslint-disable-next-line import/no-named-as-default-member -- i18next singleton instance method, not the named export
   await i18n.changeLanguage(code);
   try {
     await AsyncStorage.setItem(LANG_STORAGE_KEY, code);

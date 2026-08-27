@@ -7,7 +7,7 @@
  * Never animate: top, left, width, height, padding, margin
  */
 import { useRef, useCallback, useEffect } from "react";
-import { Animated, Easing, Platform } from "react-native";
+import { Animated, Easing } from "react-native";
 
 // ─── Animation presets ────────────────────────────────────────────────────────
 export const SPRING = {
@@ -32,7 +32,7 @@ export function useFadeIn(delay = 0, duration = 250) {
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [delay, duration, opacity]);
   return { opacity };
 }
 
@@ -53,7 +53,7 @@ export function useSlideIn(from: "bottom" | "right" = "bottom", delay = 0) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [delay, from, opacity, translateX, translateY]);
 
   return from === "bottom"
     ? { opacity, transform: [{ translateY }] }
@@ -66,10 +66,10 @@ export function usePressScale(to = 0.96) {
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn  = useCallback(() => {
     Animated.spring(scale, { toValue: to, ...SPRING.snappy }).start();
-  }, []);
+  }, [scale, to]);
   const onPressOut = useCallback(() => {
     Animated.spring(scale, { toValue: 1,  ...SPRING.gentle }).start();
-  }, []);
+  }, [scale]);
   return { scale, onPressIn, onPressOut, style: { transform: [{ scale }] } };
 }
 
@@ -86,7 +86,7 @@ export function useShimmer() {
       ])
     ).start();
     return () => anim.stopAnimation();
-  }, []);
+  }, [anim]);
   const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
   return { opacity };
 }
@@ -104,7 +104,7 @@ export function useGlowPulse() {
       ])
     ).start();
     return () => anim.stopAnimation();
-  }, []);
+  }, [anim]);
   const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
   return { opacity };
 }

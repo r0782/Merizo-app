@@ -5,9 +5,11 @@
 import { useRef, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, TextInput, ActivityIndicator,
-  Animated, StyleSheet, ViewStyle, TextStyle,
+  Animated, ViewStyle, TextStyle,
 } from "react-native";
 import { getDeviceLocale } from "../lib/currency";
+import { useTheme } from "../lib/theme";
+import { spacing, radius, type, shadow } from "../lib/tokens";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PressScale — spring micro-interaction wrapper for any touchable
@@ -46,8 +48,6 @@ export function PressScale({
     </Animated.View>
   );
 }
-import { useTheme } from "../lib/theme";
-import { spacing, radius, type, shadow } from "../lib/tokens";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Button
@@ -467,7 +467,7 @@ export function Skeleton({ width, height, radius: r = 12, style }: {
         Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [anim]);
 
   const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.8] });
 
